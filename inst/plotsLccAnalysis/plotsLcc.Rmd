@@ -1,0 +1,250 @@
+---
+title: "`r params$docTitle`"
+date: "`r format(Sys.Date())`"
+output:
+  pdf_document:
+    toc: true
+    toc_depth: 3
+    fig_caption: false
+params:
+    docTitle: "BRICK Analysis report"
+    cal: "BRICK_analysis_report.csv"
+    path: "C:\\Users\\ricardar\\Documents\\Results\\BRICK\\tests\\noShellDEU_2024-06-28_14.54.54"
+    name: ""
+---
+
+```{r setup, include=FALSE}
+library(dplyr) #nolint: undesirable_function_linter.
+library(ggplot2)
+
+knitr::opts_chunk$set(
+  echo = FALSE,
+  error = TRUE,
+  message = FALSE,
+  warning = FALSE
+)
+```
+
+
+```{r set variables and functions, check existence of first file}
+
+# Assemble all file paths
+filePath <- file.path(params$path, params$cal)
+
+# Check if at least one file in the given paths exists
+if (!any(file.exists(filePath))) {
+  message("No BRICK_analysis_report.csv file found",
+          "BRICK_calibration_calibration.csv is normally produced during calibration runs.")
+  knitr::knit_exit()
+}
+
+outName <- params$name
+outPath <- dirname(filePath[1])
+
+# Standard procedure to write a calibration plot
+.createLtPlot <- function(data, varName, yname, color, rprt = NULL) {
+  
+  colorMap <- unlist(readBrickSets(NULL)[[color]][["elements"]])
+  
+  plData <- data %>%
+    filter(.data[["variable"]] == varName) %>%
+    mutate(across(any_of(color), ~ factor(colorMap[.x], levels = colorMap)))
+  
+  heading <- paste(varName, "by", color)
+  
+  if (length(rprt) == 1) {
+    filterVals <- unique(plData[[rprt]])
+    heading <- paste(heading, "|", rprt, "=", filterVals)
+  } else {
+    filterVals <- "None"
+  }
+  
+  for (i in seq_along(filterVals)) {
+    
+    plDataFiltered <- plData
+    
+    if (length(rprt) == 1) plDataFiltered <- filter(plDataFiltered, .data[[rprt]] == filterVals[i])
+    
+    pl <- ggplot(plDataFiltered, mapping = aes(x = ttot2, y = !!sym(yname), fill = !!sym(color))) +
+      geom_col() +
+      ggplot2::scale_fill_manual(values = mip::plotstyle(colorMap)) +
+      ggtitle(heading[i]) +
+      facet_grid(rows = vars(loc), cols = vars(typ))
+    print(pl)
+  }
+}
+
+.createLtTwoBar <- function(data, varName, yname, color, remCols, rprt = NULL) {
+  
+  colorMap <- unlist(readBrickSets(NULL)[[color]][["elements"]])
+  
+  plData <- data %>%
+    filter(.data[["variable"]] %in% varName) %>%
+    mutate(across(any_of(color), ~ factor(colorMap[.x], levels = colorMap)))
+  browser()
+  plDataNew <- plData %>%
+    select(-any_of(remCols)) %>%
+    pivot_wider(names_from = "variable", values_from = yname) %>%
+    mutate(ttot2_1 = .data[["ttot2"]] - 5, ttot2_2 = .data[["ttot2"]] + 5)
+  
+  heading <- paste(varName[1], "and", varName[2], "by", color)
+  
+  if (length(rprt) == 1) {
+    filterVals <- unique(plData[[rprt]])
+    heading <- paste(heading, "|", rprt, "=", filterVals)
+  } else {
+    filterVals <- "None"
+  }
+  
+  for (i in seq_along(filterVals)) {
+    
+    plDataFiltered <- plData
+    
+    if (length(rprt) == 1) plDataFiltered <- filter(plDataFiltered, .data[[rprt]] == filterVals[i])
+    browser()
+    
+    pl <- ggplot(plDataFiltered) +
+      geom_col(mapping = aes(x = ttot2_1, y = !!sym(varName[1]), fill = !!sym(color))) +
+      geom_col(mapping = aes(x = ttot2_2, y = !!sym(varName[2]), fill = !!sym(color))) +
+      ggplot2::scale_fill_manual(values = mip::plotstyle(colorMap)) +
+      ggtitle(heading[i]) +
+      facet_grid(rows = vars(loc), cols = vars(typ))
+    print(pl)
+  }
+  
+}
+
+```
+
+
+```{r load data}
+
+data <- utils::read.csv(filePath)
+
+```
+
+## Plot ex-post outflow of standing stock
+
+```{r Plot ex-post outflow of standing stock}
+
+.createLtPlot(data, "stockInitLtPost", yname = "absVal", color = "hs", rprt = "vin")
+
+```
+
+## Plot ex-ante outflow of standing stock
+
+```{r Plot ex-ante outflow of standing stock}
+
+.createLtPlot(data, "stockInitLtAnte", yname = "absVal", color = "hs", rprt = "vin")
+
+```
+
+## Plot mixture outflow of standing stock
+
+```{r Plot mixture outflow of standing stock}
+
+.createLtPlot(data, "stockInitLtMixed", yname = "absVal", color = "hs", rprt = "vin")
+
+```
+
+## Plot ex-post outflow of standing stock, relative values
+
+```{r Plot ex-post outflow of standing stock, relative values}
+
+.createLtPlot(data, "stockInitLtPost", yname = "relVal", color = "hs", rprt = "vin")
+
+```
+
+## Plot ex-ante outflow of standing stock, relative values
+
+```{r Plot ex-ante outflow of standing stock, relative values}
+
+.createLtPlot(data, "stockInitLtAnte", yname = "relVal", color = "hs", rprt = "vin")
+
+```
+
+## Plot ex-post leave time of constructions
+
+```{r Plot ex-post leave time of constructions}
+
+.createLtPlot(data, "conLtPost", yname = "absVal", color = "hs", rprt = "ttot")
+
+```
+
+## Plot ex-ante leave time of constructions
+
+```{r Plot ex-ante leave time of constructions}
+
+.createLtPlot(data, "conLtAnte", yname = "absVal", color = "hs", rprt = "ttot")
+
+```
+
+## Plot mixture leave time of constructions
+
+```{r Plot mixture leave time of constructions}
+
+.createLtPlot(data, "conLtMixed", yname = "absVal", color = "hs", rprt = "ttot")
+
+```
+
+## Plot ex-post leave time of constructions, relative values
+
+```{r Plot ex-post leave time of constructions, relative values}
+
+.createLtPlot(data, "conLtPost", yname = "relVal", color = "hs", rprt = "ttot")
+
+```
+
+## Plot ex-ante leave time of constructions, relative values
+
+```{r Plot ex-ante leave time of constructions, relative values}
+
+.createLtPlot(data, "conLtAnte", yname = "relVal", color = "hs", rprt = "ttot")
+
+```
+
+## Plot ex-post leave time of renovations
+
+```{r Plot ex-post leave time of renovations}
+
+.createLtPlot(data, "renLtPost", yname = "absVal", color = "hs", rprt = "ttot")
+
+```
+
+## Plot ex-ante leave time of renovations
+
+```{r Plot ex-ante leave time of renovations}
+
+.createLtPlot(data, "renLtAnte", yname = "absVal", color = "hs", rprt = "ttot")
+
+```
+
+## Plot mixture leave time of renovations
+
+```{r Plot mixture leave time of renovations}
+
+.createLtPlot(data, "renLtMixed", yname = "absVal", color = "hs", rprt = "ttot")
+
+```
+
+## Plot ex-post leave time of renovations, relative values
+
+```{r Plot ex-post leave time of renovations, relative values}
+
+.createLtPlot(data, "renLtPost", yname = "relVal", color = "hs", rprt = "ttot")
+
+```
+
+## Plot ex-ante leave time of renovations, relative values
+
+```{r Plot ex-ante leave time of renovations, relative values}
+
+.createLtPlot(data, "renLtAnte", yname = "relVal", color = "hs", rprt = "ttot")
+
+```
+
+## Plot ex-post leave time constructions and total outflow
+
+```{r Plot ex-post construction leave time and total outflow}
+.createLtTwoBar(data, c("conLtPost", "outflow"), yname = "absVal", color = "hs", remCols = c("value", "relVal"), rprt = "ttot")
+```
