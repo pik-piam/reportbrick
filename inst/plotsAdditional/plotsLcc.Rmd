@@ -1,0 +1,547 @@
+---
+title: "`r params$docTitle`"
+date: "`r format(Sys.Date())`"
+output:
+  pdf_document:
+    toc: true
+    toc_depth: 3
+    fig_caption: false
+params:
+    docTitle: "BRICK Analysis report"
+    file: "BRICK_analysis_report.csv"
+    path: "C:/Users/ricardar/Documents/PIAM/brick/output/noShellEUR_2024-11-03_11.33.26"
+    scenNames: NULL
+    savePlots: TRUE
+    name: ""
+---
+
+```{r setup, include=FALSE}
+library(dplyr) #nolint: undesirable_function_linter.
+library(ggplot2) #nolint: undesirable_function_linter.
+
+knitr::opts_chunk$set(
+  echo = FALSE,
+  error = TRUE,
+  message = FALSE,
+  warning = FALSE
+)
+```
+
+
+```{r set variables and functions, check existence of first file}
+
+# Assemble the file path
+filePath <- file.path(params$path, params$file)
+
+if (length(filePath) > 1) {
+  stop("plotsLcc.Rmd only runs on a single file.")
+}
+
+# Check if the file exists
+if (!file.exists(filePath)) {
+  message("No BRICK_analysis_report.csv file found. ",
+          "BRICK_calibration_calibration.csv is normally produced during calibration runs.")
+  knitr::knit_exit()
+}
+
+outName <- params$name
+outPath <- dirname(filePath[1])
+
+# Standard procedure to write a calibration plot
+.createLtPlot <- function(data, varName, yname, color,
+                          rprt = NULL, avg = NULL, xname = "ttot2", suppressLateTtot = TRUE,
+                          noFacets = FALSE, xlabName = NULL, ylabName = NULL) {
+  
+  colorMap <- unlist(readBrickSets(NULL)[[color]][["elements"]])
+  
+  plData <- filter(data, .data[["variable"]] == varName)
+  if (!is.null(colorMap)) {
+    plData <- mutate(plData, across(any_of(color), ~ factor(colorMap[.x], levels = colorMap)))
+  }
+  if (isTRUE(suppressLateTtot) && "ttot" %in% colnames(plData) && length(unique(plData[["ttot"]])) > 4) {
+    plData <- filter(plData, .data[["ttot"]] < sort(unique(.data[["ttot"]]), decreasing = TRUE)[[3]])
+  }
+  
+  heading <- paste(varName, "by", color)
+  
+  if (length(rprt) == 1) {
+    filterVals <- unique(plData[[rprt]])
+    heading <- paste(heading, "|", rprt, "=", filterVals)
+  } else {
+    filterVals <- "None"
+  }
+
+  if (!is.null(avg)) {
+    plData <- plData %>%
+      group_by(across(-any_of(c(avg, yname, "absVal", "relVal")))) %>%
+      summarise(value = mean(.data[[yname]], na.rm = TRUE), .groups = "drop")
+    yname <- "value"
+  }
+  
+  for (i in seq_along(filterVals)) {
+    
+    plDataFiltered <- plData
+    
+    if (length(rprt) == 1) plDataFiltered <- filter(plDataFiltered, .data[[rprt]] == filterVals[i])
+    
+    pl <- ggplot(plDataFiltered, mapping = aes(x = !!sym(xname), y = !!sym(yname), fill = !!sym(color))) +
+      geom_col() +
+      ggtitle(heading[i])
+    if (isFALSE(noFacets)) pl <- pl + facet_grid(rows = vars(loc), cols = vars(typ))
+    if (!is.null(colorMap)) pl <- pl + ggplot2::scale_fill_manual(values = mip::plotstyle(colorMap))
+    if (!is.null(xlabName)) pl <- pl + xlab(xlabName)
+    if (!is.null(ylabName)) pl <- pl + ylab(ylabName)
+    print(pl)
+  }
+}
+
+.createLtTwoBar <- function(data, varName, yname, color,
+                            xname = "ttot2", suppressLateTtot = TRUE,
+                            remCols = NULL, rprt = NULL, xlabName = NULL, ylabName = NULL) {
+  
+  colorMap <- unlist(readBrickSets(NULL)[[color]][["elements"]])
+  
+  alphaMap <- c(1, 0.5)
+  names(alphaMap) <- varName
+  
+  plData <- data %>%
+    filter(.data[["variable"]] %in% varName) %>%
+    mutate(across(any_of(color), ~ factor(colorMap[.x], levels = colorMap)))
+  if (isTRUE(suppressLateTtot) && "ttot" %in% colnames(plData) && length(unique(plData[["ttot"]])) > 4) {
+    plData <- filter(plData, .data[["ttot"]] < sort(unique(.data[["ttot"]]), decreasing = TRUE)[[3]])
+  }
+  plData <- plData %>%
+    select(-any_of(remCols)) %>%
+    group_by(across(-all_of(c(xname, yname)))) %>%
+    mutate(width = .computeResolution(.data[[xname]])) %>%
+    ungroup() %>%
+    mutate(t = ifelse(.data[["variable"]] == varName[1],
+                         .data[[xname]] - 0.225 * .data[["width"]],
+                         .data[[xname]] + 0.225 * .data[["width"]]),
+           width = 0.4 * .data[["width"]],
+           alpha = factor(ifelse(.data[["variable"]] == varName[1],
+                          1,
+                          0.5)))
+  
+  heading <- paste(varName[1], "and", varName[2], "by", color)
+  
+  if (length(rprt) == 1) {
+    filterVals <- unique(plData[[rprt]])
+    heading <- paste(heading, "|", rprt, "=", filterVals)
+  } else {
+    filterVals <- "None"
+  }
+  
+  for (i in seq_along(filterVals)) {
+    
+    plDataFiltered <- plData
+    
+    if (length(rprt) == 1) plDataFiltered <- filter(plDataFiltered, .data[[rprt]] == filterVals[i])
+    
+    pl <- ggplot(plDataFiltered) +
+      geom_col(mapping = aes(x = t, y = !!sym(yname), fill = !!sym(color),
+                             width = width, alpha = variable)) +
+      ggplot2::scale_fill_manual(values = mip::plotstyle(colorMap)) +
+      ggplot2::scale_alpha_manual(values = alphaMap)
+    if (!is.null(xlabName)) pl <- pl + xlab(xlabName)
+    if (!is.null(ylabName)) pl <- pl + ylab(ylabName)
+    pl <- pl +
+      ggtitle(heading[i]) +
+      facet_grid(rows = vars(loc), cols = vars(typ), scales = "free")
+    print(pl)
+  }
+  
+}
+
+.computeResolution <- function(v, default = 10) {
+  if (length(v) == 1) {
+    return(default)
+  } else {
+    vDiff <- diff(v)
+    return(pmin(c(vDiff[1], vDiff), c(vDiff, vDiff[length(vDiff)])))
+  }
+}
+
+```
+
+```{r some other text}
+data <- utils::read.csv(filePath)
+
+```
+
+# Lifetime distribution estimates
+
+## Lifetime distributions of standing stock
+
+### Ex-post estimate
+
+```{r Plot ex-post outflow of standing stock}
+
+.createLtPlot(data, "stockInitLtPost", yname = "absVal", color = "hs", rprt = "vin",
+              xlabName = "Time of removal", ylabName = "Quantity in million m2")
+
+```
+
+### Ex-ante estimate
+
+```{r Plot ex-ante outflow of standing stock}
+
+.createLtPlot(data, "stockInitLtAnte", yname = "absVal", color = "hs", rprt = "vin",
+              xlabName = "Time of removal", ylabName = "Quantity in million m2")
+
+```
+
+### Simple ex-ante estimate
+
+```{r Plot ex-ante outflow of standing stock (simple)}
+
+.createLtPlot(data, "stockInitLtAnteS", yname = "absVal", color = "hs", rprt = "vin",
+              xlabName = "Time of removal", ylabName = "Quantity in million m2")
+
+```
+
+### Mixed estimate
+
+```{r Plot mixture outflow of standing stock}
+
+.createLtPlot(data, "stockInitLtMixed", yname = "absVal", color = "hs", rprt = "vin",
+              xlabName = "Time of removal", ylabName = "Quantity in million m2")
+
+```
+
+### Mixed estimate compared to ex-ante estimate
+
+```{r Plot mixed initial stock leave time and ex-ante estimate}
+.createLtTwoBar(data, c("stockInitLtMixed", "stockInitLtAnte"), yname = "absVal", color = "hs", remCols = c("value", "relVal"), rprt = "ttot", xlabName = "Time of removal", ylabName = "Quantity in million m2")
+```
+
+### Ex-post estimate, relative values
+
+```{r Plot ex-post outflow of standing stock, relative values}
+
+.createLtPlot(data, "stockInitLtPost", yname = "relVal", color = "hs",
+              rprt = "vin", avg = "ttot",
+              xlabName = "Time of removal", ylabName = "Share of installations")
+
+```
+
+### Ex-ante estimate, relative values
+
+```{r Plot ex-ante outflow of standing stock, relative values}
+
+.createLtPlot(data, "stockInitLtAnte", yname = "relVal", color = "hs",
+              rprt = "vin", avg = "ttot",
+              xlabName = "Time of removal", ylabName = "Share of installations")
+
+```
+
+## Lifetime estimates of new constructions
+
+### Ex-post estimate
+
+```{r Plot ex-post leave time of constructions}
+
+.createLtPlot(data, "conLtPost", yname = "absVal", color = "hs", rprt = "ttot",
+              xlabName = "Time of removal", ylabName = "Quantity in million m2")
+
+```
+
+### Ex-ante estimate
+
+```{r Plot ex-ante leave time of constructions}
+
+.createLtPlot(data, "conLtAnte", yname = "absVal", color = "hs", rprt = "ttot",
+              xlabName = "Time of removal", ylabName = "Quantity in million m2")
+
+```
+
+### Simple ex-ante estimate
+
+```{r Plot ex-ante leave time of constructions (simple)}
+
+.createLtPlot(data, "conLtAnteS", yname = "absVal", color = "hs", rprt = "ttot",
+              xlabName = "Time of removal", ylabName = "Quantity in million m2")
+
+```
+
+### Mixed estimate
+
+```{r Plot mixture leave time of constructions}
+
+.createLtPlot(data, "conLtMixed", yname = "absVal", color = "hs", rprt = "ttot",
+              xlabName = "Time of removal", ylabName = "Quantity in million m2")
+
+```
+
+### Mixed estimate compared to ex-ante estimate
+
+```{r Plot mixed construction leave time and ex-ante estimate}
+.createLtTwoBar(data, c("conLtMixed", "conLtAnte"), yname = "absVal", color = "hs",
+                remCols = c("value", "relVal"), rprt = "ttot",
+                xlabName = "Time of removal", ylabName = "Quantity in million m2")
+```
+
+### Ex-post estimate, relative values
+
+```{r Plot ex-post leave time of constructions, relative values}
+
+.createLtPlot(data, "conLtPost", yname = "relVal", color = "hs", rprt = "ttot",
+              xlabName = "Time of removal", ylabName = "Share of installations")
+
+```
+
+### Ex-ante estimate, relative values
+
+```{r Plot ex-ante leave time of constructions, relative values}
+
+.createLtPlot(data, "conLtAnte", yname = "relVal", color = "hs", rprt = "ttot",
+              xlabName = "Time of removal", ylabName = "Share of installations")
+
+```
+
+## Lifetime distribution of renovations
+
+### Ex-post estimate
+
+```{r Plot ex-post leave time of renovations}
+
+.createLtPlot(data, "renLtPost", yname = "absVal", color = "hs", rprt = "ttot",
+              xlabName = "Time of removal", ylabName = "Quantity in million m2")
+
+```
+
+### Ex-ante estimate
+
+```{r Plot ex-ante leave time of renovations}
+
+.createLtPlot(data, "renLtAnte", yname = "absVal", color = "hs", rprt = "ttot",
+              xlabName = "Time of removal", ylabName = "Quantity in million m2")
+
+```
+
+### Simple ex-ante estimate
+
+```{r Plot ex-ante leave time of renovations (simple)}
+
+.createLtPlot(data, "renLtAnteS", yname = "absVal", color = "hs", rprt = "ttot",
+              xlabName = "Time of removal", ylabName = "Quantity in million m2")
+
+```
+
+### Mixed estimate
+
+```{r Plot mixture leave time of renovations}
+
+.createLtPlot(data, "renLtMixed", yname = "absVal", color = "hs", rprt = "ttot",
+              xlabName = "Time of removal", ylabName = "Quantity in million m2")
+
+```
+
+### Mixed estimate compared to ex-ante estimate
+
+```{r Plot mixed renovation leave time and ex-ante estimate}
+
+.createLtTwoBar(data, c("renLtMixed", "renLtAnte"), yname = "absVal", color = "hs",
+                remCols = c("value", "relVal"), rprt = "ttot",
+                xlabName = "Time of removal", ylabName = "Quantity in million m2")
+```
+
+### Ex-post esimate, relative values
+
+```{r Plot ex-post leave time of renovations, relative values}
+
+.createLtPlot(data, "renLtPost", yname = "relVal", color = "hs",
+              rprt = "ttot", avg = "vin",
+              xlabName = "Time of removal", ylabName = "Share of installations")
+
+```
+
+### Ex-ante estimate, relative values
+
+```{r Plot ex-ante leave time of renovations, relative values}
+
+.createLtPlot(data, "renLtAnte", yname = "relVal", color = "hs",
+              rprt = "ttot", avg = "vin",
+              xlabName = "Time of removal", ylabName = "Share of installations")
+
+```
+
+### Mixed estimate, relative values
+
+```{r Plot mixed leave time of renovations, relative values}
+
+.createLtPlot(data, "renLtMixed", yname = "relVal", color = "hs",
+              rprt = "ttot", avg = "vin",
+              xlabName = "Time of removal", ylabName = "Share of installations")
+
+```
+
+
+## Total outflow
+
+```{r Plot total outflow}
+
+.createLtPlot(data, "outflow", yname = "value", color = "hs", rprt = "vin",
+              xlabName = "Time of removal", ylabName = "Quantity in million m2")
+
+```
+
+### Verification of lifetime inequality
+
+```{r Plot left-hand side and right-hand side of lifetime inequality}
+
+.createLtTwoBar(data, c("lhsLtIneq", "rhsLtIneq"), yname = "value", color = "hs",
+                rprt = "vin",
+                xlabName = "Time of removal", ylabName = "Quantity in million m2")
+```
+
+
+# Lifecycle costs (LCC)
+
+## LCC of construction with ex-ante lifetimes
+
+```{r Plot ex-ante LCC of construction}
+.createLtPlot(data %>% filter(loc == "rural", typ == "MFH"), "conLccAnte",
+              xname = "hs", yname = "value", color = "costType", rprt = "vin",
+              noFacets = TRUE, xlabName = "Heating System", ylabName = "Costs in USD/m2")
+```
+
+## LCC of construction with mixed lifetimes
+
+```{r Plot LCC of construction with mixed lifetimes}
+.createLtPlot(data %>% filter(loc == "rural", typ == "MFH"), "conLccMixed",
+              xname = "hs", yname = "value", color = "costType", rprt = "vin",
+              noFacets = TRUE, xlabName = "Heating System", ylabName = "Costs in USD/m2")
+```
+
+## LCC of renovation with ex-ante lifetimes
+
+```{r Plot ex-ante LCC of renovation}
+.createLtPlot(data %>% filter(loc == "rural", typ == "MFH"), "renLccAnte",
+              xname = "hs", yname = "value", color = "costType", rprt = "ttot",
+              noFacets = TRUE, xlabName = "Heating System", ylabName = "Costs in USD/m2")
+```
+
+## LCC of renovation with mixed lifetimes
+
+```{r Plot LCC of renovation with mixed lifetimes}
+.createLtPlot(data %>% filter(loc == "rural", typ == "MFH"), "renLccMixed",
+              xname = "hs", yname = "value", color = "costType", rprt = "ttot",
+              noFacets = TRUE, xlabName = "Heating System", ylabName = "Costs in USD/m2")
+```
+
+# Levelized costs of heat (LCOH)
+
+## LCOH of construction with ex-ante lifetimes
+
+```{r Plot LCOH of construction with ex-ante lifetimes}
+.createLtPlot(data %>% filter(loc == "rural", typ == "MFH"), "conLcohAnte",
+              xname = "hs", yname = "value", color = "costType", rprt = "vin",
+              noFacets = TRUE, xlabName = "Heating System", ylabName = "Costs in USD/kWh")
+```
+
+## LCOH of construction with mixed lifetimes
+
+```{r Plot LCOH of construction with mixed lifetimes}
+.createLtPlot(data %>% filter(loc == "rural", typ == "MFH"), "conLcohMixed",
+              xname = "hs", yname = "value", color = "costType", rprt = "ttot",
+              noFacets = TRUE, xlabName = "Heating System", ylabName = "Costs in USD/kWh")
+```
+
+## LCOH of renovation with ex-ante lifetimes
+
+```{r Plot LCOH of renovation with ex-ante lifetimes}
+.createLtPlot(data %>% filter(loc == "rural", typ == "MFH"), "renLcohAnte",
+              xname = "hs", yname = "value", color = "costType", rprt = "ttot",
+              noFacets = TRUE, xlabName = "Heating System", ylabName = "Costs in USD/kWh")
+```
+
+## LCOH of renovation with mixed lifetimes
+
+```{r Plot LCOH of renovation with mixed lifetimes}
+.createLtPlot(data %>% filter(loc == "rural", typ == "MFH"), "renLcohMixed",
+              xname = "hs", yname = "value", color = "costType", rprt = "ttot", avg = "vin",
+              noFacets = TRUE, xlabName = "Heating System", ylabName = "Costs in USD/kWh")
+```
+
+# Logit Shares
+
+## Logit shares of renovation with ex-ante lifetimes
+
+### Energy ladder position 1
+
+```{r Plot logit shares of renovation with ex-ante lifetimes, energy ladder 1}
+.createLtPlot(data %>% filter(loc == "rural", typ == "MFH"), "renLogitEl1Ante",
+              xname = "ttot", yname = "value", color = "hs", rprt = "vin", noFacets = TRUE,
+              xlabName = "Time of installation", ylabName = "Shares")
+```
+
+### Energy ladder position 2
+
+```{r Plot logit shares of renovation with ex-ante lifetimes, energy ladder 2}
+.createLtPlot(data %>% filter(loc == "rural", typ == "MFH"), "renLogitEl2Ante",
+              xname = "ttot", yname = "value", color = "hs", rprt = "vin", noFacets = TRUE,
+              xlabName = "Time of installation", ylabName = "Shares")
+```
+
+### Energy ladder position 3
+
+```{r Plot logit shares of renovation with ex-ante lifetimes, energy ladder 3}
+.createLtPlot(data %>% filter(loc == "rural", typ == "MFH"), "renLogitEl3Ante",
+              xname = "ttot", yname = "value", color = "hs", rprt = "vin", noFacets = TRUE,
+              xlabName = "Time of installation", ylabName = "Shares")
+```
+
+## Logit shares of renovation with mixed lifetimes
+
+### Energy ladder position 1
+
+```{r Plot logit shares of renovation with mixed lifetimes, energy ladder 1}
+.createLtPlot(data %>% filter(loc == "rural", typ == "MFH"), "renLogitEl1Mixed",
+              xname = "ttot", yname = "value", color = "hs", rprt = "vin", noFacets = TRUE,
+              xlabName = "Time of installation", ylabName = "Shares")
+```
+
+### Energy ladder position 2
+
+```{r Plot logit shares of renovation with mixed lifetimes, energy ladder 2}
+.createLtPlot(data %>% filter(loc == "rural", typ == "MFH"), "renLogitEl2Mixed",
+              xname = "ttot", yname = "value", color = "hs", rprt = "vin", noFacets = TRUE,
+              xlabName = "Time of installation", ylabName = "Shares")
+```
+
+### Energy ladder position 3
+
+```{r Plot logit shares of renovation with mixed lifetimes, energy ladder 3}
+.createLtPlot(data %>% filter(loc == "rural", typ == "MFH"), "renLogitEl3Mixed",
+              xname = "ttot", yname = "value", color = "hs", rprt = "vin", noFacets = TRUE,
+              xlabName = "Time of installation", ylabName = "Shares")
+```
+
+# Logit shares compared to Brick shares
+
+## Shares of renovation with mixed lifetimes
+
+### Energy ladder 1
+
+```{r Plot Logit and brick Share with mixed lifetimes, energy ladder 1}
+.createLtTwoBar(data, c("renLogitEl1Mixed", "renBrickEl1"),
+                yname = "value", xname = "ttot", color = "hs", rprt = "vin",
+                xlabName = "Time of installation", ylabName = "Shares")
+```
+
+### Energy ladder 2
+
+```{r Plot Logit and brick Share with mixed lifetimes, energy ladder 2}
+.createLtTwoBar(data, c("renLogitEl2Mixed", "renBrickEl2"),
+                yname = "value", xname = "ttot", color = "hs", rprt = "vin",
+                xlabName = "Time of installation", ylabName = "Shares")
+```
+
+### Energy ladder 3
+
+```{r Plot Logit and brick Share with mixed lifetimes, energy ladder 3}
+.createLtTwoBar(data, c("renLogitEl3Mixed", "renBrickEl3"),
+                yname = "value", xname = "ttot", color = "hs", rprt = "vin",
+                xlabName = "Time of installation", ylabName = "Shares")
+```

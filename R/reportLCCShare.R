@@ -1,18 +1,20 @@
 #' Compute life cycle costs and logit share
 #'
 #' @author Ricarda Rosemann
-#' @importFrom dplyr %>% filter full_join group_by last left_join mutate right_join select summarise
+#' @importFrom dplyr %>% .data filter full_join group_by inner_join last left_join mutate rename right_join select summarise
+#' @importFrom piamutils getSystemFile
 #' @importFrom stats pweibull
-#' @importFrom tidyr crossing replace_na
-
-library(dplyr)
-library(tidyr)
+#' @importFrom tidyr crossing pivot_wider replace_na
+#' @importFrom utils read.csv write.csv
 
 #TODO: Proper handling of hs vs hsr
 #TODO: Proper handling of building shell!!! (Ignored for the time being)
+
 reportLCCShare <- function(gdx, pathLt = NULL) {
 
   if (is.null(pathLt)) pathLt <- "C:/Users/ricardar/Documents/PIAM/brick/inst/input/f_lifetimeHeatingSystem.cs4r"
+  pathHs <- getSystemFile("extdata", "sectoral", "heatingSystem.csv",
+                          package = "brick", mustWork = TRUE)
   path <- dirname(gdx)
 
   # READ IN DATA ---------------------------------------------------------------
@@ -26,13 +28,15 @@ reportLCCShare <- function(gdx, pathLt = NULL) {
 
   # Load info on time period and vintage
   p_dtVin <- readGdxSymbol(gdx, "p_dtVin", asMagpie = FALSE)
+  p_dt <- readGdxSymbol(gdx, "p_dt", asMagpie = FALSE) %>%
+    rename(dt = "value") %>%
+    mutate(ttot = as.numeric(levels(.data[["ttot"]]))[.data[["ttot"]]])
 
   p_dtVin <- p_dtVin %>%
     group_by(ttot) %>%
-    summarise(vin = dplyr::last(.data[["vin"]]), dt = dplyr::last(.data[["value"]]),
+    summarise(vin = dplyr::last(.data[["vin"]]), dt = sum(.data[["value"]]),
               .groups = "drop") %>%
     mutate(ttot = as.numeric(levels(.data[["ttot"]]))[.data[["ttot"]]])
-  p_dt <- select(p_dtVin, -"vin")
   p_ttotVin <- select(p_dtVin, -"dt")
   vinExists <- readGdxSymbol(gdx, "vinExists", asMagpie = FALSE)
   renAllowed <- readGdxSymbol(gdx, "renAllowed", asMagpie = FALSE)
@@ -46,18 +50,28 @@ reportLCCShare <- function(gdx, pathLt = NULL) {
   dims <- setdiff(colnames(v_stock), c("ttot", "value"))
 
   # Load cost components
-  p_specCostOpe <- readGdxSymbol(gdx, "p_specCostOpe", asMagpie = FALSE)
-  p_specCostCon <- readGdxSymbol(gdx, "p_specCostCon", asMagpie = FALSE)
-  p_specCostRen <- readGdxSymbol(gdx, "p_specCostRen", asMagpie = FALSE)
+  p_specCostOpe <- readGdxSymbol(gdx, "p_specCostOpe", asMagpie = FALSE) %>%
+    mutate(ttot = as.numeric(levels(.data[["ttot"]]))[.data[["ttot"]]])
+  p_specCostCon <- readGdxSymbol(gdx, "p_specCostCon", asMagpie = FALSE) %>%
+    mutate(ttot = as.numeric(levels(.data[["ttot"]]))[.data[["ttot"]]])
+  p_specCostRen <- readGdxSymbol(gdx, "p_specCostRen", asMagpie = FALSE) %>%
+    mutate(ttot = as.numeric(levels(.data[["ttot"]]))[.data[["ttot"]]])
   p_specCostDem <- readGdxSymbol(gdx, "p_specCostDem", asMagpie = FALSE)
 
-  # Load parameters (Discount rate, price sensitivity, Weibull parameters)
-  p_discountFac <- readGdxSymbol(gdx, "p_discountFac", asMagpie = FALSE)
+  # Load parameters (Discount rate, price sensitivity, UE demand, Weibull parameters)
+  p_discountFac <- readGdxSymbol(gdx, "p_discountFac", asMagpie = FALSE) %>%
+    mutate(ttot = as.numeric(levels(.data[["ttot"]]))[.data[["ttot"]]])
   priceSensBs <- readGdxSymbol(gdx, "priceSensBs", asMagpie = FALSE)
-  priceSensHs <- readGdxSymbol(gdx, "priceSensHs", asMagpie = FALSE)
+  priceSensHs <- readGdxSymbol(gdx, "priceSensHs", asMagpie = FALSE) %>%
+    pivot_wider(names_from = "var", values_from = "value") %>%
+    unlist()
+  p_ueDemand <- readGdxSymbol(gdx, "p_ueDemand", asMagpie = FALSE)
   # Weibull parameters have to be read from cs4r!
   lifeTimeHs <- read.csv(pathLt, header = FALSE, comment.char = "*")
   colnames(lifeTimeHs) <- c("reg", "typ", "hs", "variable", "value")
+  # Energy ladder specifications have to be read from csv
+  energyLadder <- read.csv(pathHs) %>%
+    select("hs", "energyLadder")
 
   # TODO: Write the filtering properly
   lifeTimeHs <- pivot_wider(lifeTimeHs, names_from = "variable", values_from = "value") %>%
@@ -70,10 +84,13 @@ reportLCCShare <- function(gdx, pathLt = NULL) {
 
   # IN- AND OUTFLOW COMPUTATION ------------------------------------------------
 
-  # Attribute construction to vintages
+  # Compute total construction by time period and attribute construction to vintages
   conVin <- v_construction %>%
     left_join(p_dtVin,
-              by = intersect(colnames(v_construction), colnames(p_dtVin)))
+              by = intersect(colnames(v_construction), colnames(p_dtVin))) %>%
+    mutate(value = .data[["value"]] * .data[["dt"]])
+
+  v_constructionIn <- select(conVin, -"vin", -"dt")
 
 
   #TODO: Temporary, should handle bsr properly eventually
@@ -82,16 +99,20 @@ reportLCCShare <- function(gdx, pathLt = NULL) {
     filter(hsr != "0") %>%
     group_by(across(-all_of(c("hsr", "bsr", "value")))) %>%
     summarise(value = sum(value), .groups = "drop") %>%
-    left_join(p_dt, by = "ttot")
+    left_join(p_dt, by = "ttot") %>%
+    mutate(value = .data[["value"]] * .data[["dt"]])
 
   v_renovationIn <- v_renovation %>%
     filter(hsr != "0") %>%
     group_by(across(-all_of(c("hs", "bs", "value")))) %>%
     summarise(value = sum(value), .groups = "drop") %>%
     rename(hs = "hsr", bs = "bsr") %>%
-    left_join(p_dt, by = "ttot")
+    left_join(p_dt, by = "ttot") %>%
+    mutate(value = .data[["value"]] * .data[["dt"]])
 
-  v_demolitionOut <- left_join(v_demolition, p_dt, by = "ttot")
+  v_demolitionOut <- v_demolition %>%
+    left_join(p_dt, by = "ttot") %>%
+    mutate(value = .data[["value"]] * .data[["dt"]])
 
   # Compute total in- and outflow
   outflow <- v_renovationOut %>%
@@ -123,252 +144,178 @@ reportLCCShare <- function(gdx, pathLt = NULL) {
 
   # COMPUTE EX-ANTE LIFETIME PROBABILITIES -------------------------------------
 
-  # Assemble in and out time periods and compute starting and end point
-  times <- expand.grid(ttot = ttot, ttot2 = ttot) %>%
-    filter(.data[["ttot2"]] >= .data[["ttot"]]) %>%
-    group_by(ttot2) %>%
-    mutate(tIn0 = .extractInitTime(.data[["ttot"]]),
-           tIn1 = .data[["ttot"]]) %>%
-    ungroup() %>%
-    group_by(ttot) %>%
-    mutate(tOut0 = .extractInitTime(.data[["ttot2"]], ttotNum = ttotNum),
-           tOut1 = .data[["ttot2"]])
-
   # Compute life time probabilities of initial stock
-  stockInitLtAnte <- v_stockInit %>%
-    select(-"value") %>%
-    crossing(ttot2 = ttotNum[-1]) %>%
-    left_join(times, by = c("ttot", "ttot2")) %>%
-    select(-"tIn0", -"tIn1") %>%
-    left_join(lifeTimeHs, by = c("reg", "typ", "hs"))
-
-  stockInitLtAnte <- .computeLtStock(stockInitLtAnte) %>%
-    rename(relVal = "value") %>%
-    left_join(v_stock, by = c(dims, "ttot")) %>%
-    mutate(absVal = .data[["value"]] * .data[["relVal"]]) %>%
-    select(-"value")
+  stockInitLtAnte <- computeLtAnte("stock", v_stockInit, ttotNum, lifeTimeHs, dims, p_dt = p_dt)
+  conLtAnte <- computeLtAnte("construction", conVin, ttotNum, lifeTimeHs, dims)
+  renLtAnte <- computeLtAnte("renovation", v_renovation, ttotNum, lifeTimeHs, dims,
+                                      dataValue = v_renovationIn)
 
   out[["stockInitLtAnte"]] <- stockInitLtAnte
-
-  # Compute lifetime probabilities in newly constructed buildings
-  conLtAnte <- v_construction %>%
-    select(-"value") %>%
-    filter(.data[["ttot"]] != ttotNum[1]) %>%
-    left_join(times, by = "ttot") %>%
-    left_join(lifeTimeHs, by = c("reg", "typ", "hs"))
-
-  conLtAnte <- .computeLtAnte(conLtAnte, .weibullIntegrand, 4) %>%
-    left_join(p_ttotVin, by = "ttot") %>%
-    relocate("vin", .before = "reg") %>%
-    rename(relVal = "value") %>%
-    left_join(v_construction, by = c(setdiff(dims, "vin"), "ttot")) %>%
-    mutate(absVal = .data[["value"]] * .data[["relVal"]]) %>%
-    select(-"value")
-
   out[["conLtAnte"]] <- conLtAnte
-
-  # Compute lifetime probabilities of renovations
-  renLtAnte <- v_renovation %>%
-    select(-"value") %>%
-    filter(.data[["hsr"]] != "0", .data[["ttot"]] != ttotNum[1]) %>%
-    left_join(times, by = "ttot") %>%
-    left_join(lifeTimeHs %>% rename(hsr = "hs"), by = c("reg", "typ", "hsr"))
-
-  renLtAnte <- .computeLtAnte(renLtAnte, .weibullIntegrand, 4) %>%
-    group_by(across(-all_of(c("hs", "value")))) %>%
-    summarise(value = sum(.data[["value"]]), .groups = "drop") %>%
-    select(-"bs") %>%
-    rename(bs = "bsr", hs = "hsr", relVal = "value") %>%
-    left_join(v_renovationIn %>%
-                select(-"dt"),
-              by = c(dims, "ttot")) %>%
-    mutate(absVal = .data[["value"]] * .data[["relVal"]]) %>%
-    select(-"value")
-
   out[["renLtAnte"]] <- renLtAnte
+
+  checkLtAnte <- .checkLifetimeResults(renLtAnte, dims)
+  checkLtAnteInitStock <- .checkLifetimeResults(stockInitLtAnte, dims)
+
+
+  # COMPUTE EX-ANTE LIFETIME PROBABILITIES  (SIMPLE METHOD) --------------------
+
+  # Compute life time probabilities of initial stock
+  stockInitLtAnteS <- computeLtAnte("stock", v_stockInit, ttotNum, lifeTimeHs, dims,
+                                   runSimple = TRUE, p_dt = p_dt)
+  conLtAnteS <- computeLtAnte("construction", conVin, ttotNum, lifeTimeHs, dims,
+                             runSimple = TRUE, p_dt = p_dt)
+  renLtAnteS <- computeLtAnte("renovation", v_renovation, ttotNum, lifeTimeHs, dims,
+                             runSimple = TRUE, p_dt = p_dt, dataValue = v_renovationIn)
+
+  out[["stockInitLtAnteS"]] <- stockInitLtAnteS
+  out[["conLtAnteS"]] <- conLtAnteS
+  out[["renLtAnteS"]] <- renLtAnteS
+
+  checkLtAnteS <- .checkLifetimeResults(renLtAnteS, dims)
+  checkLtAnteS <- .checkLifetimeResults(stockInitLtAnteS, dims)
 
 
   # COMPUTE EX-POST LIFETIME PROBABILITIES -------------------------------------
 
-  # Initialize data frames to collect leave times of initial stock and inflows
-  inAll <- inflow %>%
-    crossing(ttot2 = ttotNum[-1]) %>%
-    filter(.data[["ttot2"]] >= .data[["ttot"]], .data[["ttot"]] != t0) %>%
-    mutate(value = 0)
+  ltPost <- computeLtPost(
+    inflow,
+    outflow,
+    list(stock = v_stockInit, construction = v_construction, renovation = v_renovationIn),
+    conShare,
+    p_ttotVin,
+    ttotNum,
+    dims
+  )
 
-  stockAll <- v_stockInit %>%
-    select(-"value") %>%
-    crossing(ttot2 = ttotNum) %>%
-    mutate(value = 0)
+  checkLtPost <- .checkLifetimeResults(ltPost[["stockInitLtPost"]], dims)
 
-  # Compute leave times of initial stock and inflows
-  for (t2 in tRun) {
-    stockThis <- .computeLeaveInitStock(t2, v_stockInit, stockAll, outflow, rprt = dims)
-    stockAll <- stockAll %>%
-      left_join(stockThis, by = c(dims, "ttot", "ttot2")) %>%
-      mutate(value = ifelse(.data[["ttot2"]] == t2, .data[["value.y"]], .data[["value.x"]])) %>%
-      select(-"value.x", -"value.y")
-
-    for (t1 in tRun[tRun <= t2]) {
-      inThis <- .computeLeaveInFlow(t1, t2, inAll, stockAll, inflow, outflow, rprt = dims)
-      inAll <- inAll %>%
-        left_join(inThis, by = c(dims, "ttot", "ttot2", "dt")) %>%
-        mutate(value = ifelse(.data[["ttot"]] == t1 & .data[["ttot2"]] == t2,
-                              .data[["value.y"]], .data[["value.x"]])) %>%
-        select(-"value.x", -"value.y")
-    }
-  }
-
-  # Process leave time results and separate construction and renovation
-  stockAll <- stockAll %>%
-    filter(.data[["ttot2"]] != t0) %>%
-    mutate(ttot = t0, .before = "ttot2")
-
-  conAll <- inAll %>%
-    select(-"dt") %>%
-    left_join(conShare, by = c(dims, "ttot")) %>%
-    mutate(value = .data[["value"]] * .data[["share"]])
-
-  renAll <- inAll %>%
-    select(-"dt") %>%
-    left_join(conShare, by = c(dims, "ttot")) %>%
-    mutate(value = .data[["value"]] * (1 - .data[["share"]]))
-
-  # Ex-post life time of initial stock
-  out[["stockInitLtPost"]] <- stockAll %>%
-    rename(absVal = "value") %>%
-    left_join(v_stock, by = c(dims, "ttot")) %>%
-    mutate(relVal = .data[["absVal"]] / .data[["value"]]) %>%
-    select(-"value")
-
-  # Ex-post lifetime in newly constructed buildings
-  out[["conLtPost"]] <- conAll %>%
-    dplyr::right_join(p_ttotVin %>%
-                        filter(.data[["ttot"]] != t0),
-                      by = c("ttot", "vin")) %>%
-    select(-"share") %>%
-    rename(absVal = "value") %>%
-    left_join(v_construction, by = c(setdiff(dims, "vin"), "ttot")) %>%
-    mutate(relVal = .data[["absVal"]] / .data[["value"]]) %>%
-    select(-"value")
-
-  # Test that for construction all entries with non-matching vintage are zero
-  conTest <- conAll %>%
-    dplyr::anti_join(p_dtVin, by = c("ttot", "vin"))
-  if (any(conTest[["value"]] > 0)) {
-    message("Ex-post lifetime probabilites of construction are implausible: ",
-            "Non-zero entries for vintages that do not match the given time period.")
-  }
-
-  # Ex-post lifetime in renovations
-  out[["renLtPost"]] <- renAll %>%
-    select(-"share") %>%
-    rename(absVal = "value") %>%
-    left_join(v_renovationIn %>%
-                select(-"dt"),
-              by = c(dims, "ttot")) %>%
-    mutate(relVal = .data[["absVal"]] / .data[["value"]]) %>%
-    select(-"value")
+  out <- c(out, ltPost)
 
   # COMPUTE LIFETIMES MATCHING EX-ANTE TO BRICK OUTFLOW ------------------------
 
-  outAnte <- .prepareLtAnte(stockInitLtAnte, c(stock = "absVal")) %>%
-    full_join(.prepareLtAnte(conLtAnte, c(con = "absVal"), sumTtot = TRUE), by = c(dims, "ttot2")) %>%
-    full_join(.prepareLtAnte(renLtAnte, c(ren = "absVal"), sumTtot = TRUE), by = c(dims, "ttot2")) %>%
-    replace_na(list(stock = 0, con = 0)) %>%
-    mutate(value = .data[["stock"]] + .data[["con"]] + .data[["ren"]]) %>%
-    select(-"stock", -"con", -"ren")
+  ltMixed <- computeLtMixed(
+    list(stock = stockInitLtAnte, construction = conLtAnte, renovation = renLtAnte),
+    outflow,
+    list(stock = v_stockInit, construction = v_constructionIn, renovation = v_renovationIn),
+    conShare,
+    ttotNum,
+    dims
+  )
 
-  stockInitLtDirect <- .computeLtDirect(stockInitLtAnte, outAnte, outflow, dims)
-  conLtDirect <- .computeLtDirect(conLtAnte, outAnte, outflow, dims)
-  renLtDirect <- .computeLtDirect(renLtAnte, outAnte, outflow, dims)
+  checkRenLtMixed <- .checkLifetimeResults(ltMixed[["renLtMixed"]], dims)
+  checkStockLtMixed <- .checkLifetimeResults(ltMixed[["stockInitLtMixed"]], dims)
+  checkConLtMixed <- .checkLifetimeResults(ltMixed[["conLtMixed"]], dims)
 
-  # Compute leave times of initial stock and inflows
-  # add results column to all DFs and fill with zero
-  stockInitLtMixed <- .prepareLtMixed(stockInitLtDirect)
-  conLtMixed <- .prepareLtMixed(conLtDirect)
-  renLtMixed <- .prepareLtMixed(renLtDirect)
-
-  for (t2 in tRun) {
-    # Compute unattributed outflow
-    stockInitLtMixed <- .computeUnattrOut(stockInitLtMixed, v_stockInit, t2, dims)
-    conLtMixed <- .computeUnattrOut(conLtMixed, v_construction, t2, setdiff(dims, "vin"))
-    renLtMixed <- .computeUnattrOut(renLtMixed, select(v_renovationIn, -"dt"), t2, dims)
-
-    unattrTot <- rbind(
-      stockInitLtMixed %>%
-        mutate(variable = "stock"),
-      conLtMixed %>%
-        mutate(variable = "con"),
-      renLtMixed %>%
-        mutate(variable = "ren")
-    ) %>%
-      select("variable", dims, "ttot", "ttot2", "remInflow", "unattr") %>%
-      filter(.data[["ttot2"]] == t2)
-    unattrTot <- unattrTot %>%
-      group_by(across(any_of(c(dims, "ttot2")))) %>%
-      summarise(sumUnattr = sum(.data[["unattr"]]))
-
-    # compute initial stock lt and save to new column
-    stockThis <- .computeLtMixed(stockInitLtMixed, unattrTot, t0, t2, dims)
-    stockInitLtMixed <- .addResults(stockInitLtMixed, stockThis, t0, t2, dims, addDims = c("directVal", "remInflow", "unattr"))
-
-    #TODO: Do all this properly! -> how to disentangle con and ren?
-    for (t1 in tRun[tRun <= t2]) {
-      # Compute lifetimes for construction and renovation flow
-      conThis <- .computeLtMixed(conLtMixed, unattrTot, t1, t2, dims, dfStock = stockThis, dfShare = conShare)
-      renThis <- .computeLtMixed(renLtMixed, unattrTot, t1, t2, dims, dfStock = stockThis, dfShare = renShare)
-
-      conLtMixed <- .addResults(conLtMixed, .combineAddAttr(conThis, renThis, dims), t1, t2, dims,
-                                addDims = c("directVal", "remInflow", "unattr"))
-      renLtMixed <- .addResults(renLtMixed, .combineAddAttr(renThis, conThis, dims), t1, t2, dims,
-                                addDims = c("directVal", "remInflow", "unattr"))
-    }
-  }
-
-  out[["stockInitLtMixed"]] <- .processLtMixed(stockInitLtMixed, v_stockInit, dims)
-  out[["conLtMixed"]] <- .processLtMixed(conLtMixed, v_construction, dims, removeVin = TRUE)
-  out[["renLtMixed"]] <- .processLtMixed(renLtMixed, v_renovationIn, dims)
-
+  out <- c(out, ltMixed)
 
   # SAVE OUTFLOWS --------------------------------------------------------------
 
   out[["outflow"]] <- outflow %>%
     select(-"dt") %>%
-    rename(ttot2 = "ttot") %>%
-    mutate(ttot = "None", relVal = .data[["value"]], absVal = .data[["value"]]) %>%
-    select(-"value")
+    rename(ttot2 = "ttot")
+
+  # VERIFY THE LIFETIME INEQUALITY ---------------------------------------------
+
+  ltIneq <- verifyLtHs(gdx, inflow, v_stockInit, outflow, lifeTimeHs, dims)
+
+  out <- c(out, ltIneq)
+
+  # COMPUTE LCC AND LCOH -------------------------------------------------------
+
+  costCon <- p_specCostCon %>%
+    pivot_wider(names_from = "cost", values_from = "value") %>%
+    left_join(p_ttotVin, by = "ttot") %>%
+    replace_na(list(intangible = 0))
+  #TODO: Add proper handling to restore zeros from gdx
+
+  costRen <- p_specCostRen %>%
+    inner_join(renAllowed, by = c("bs", "hs", "bsr", "hsr")) %>%
+    filter(.data[["bsr"]] == 0) %>%
+    # group_by(across(-all_of(c("bs", "hs", "value")))) %>%
+    # summarise(value = mean(.data[["value"]]), .groups = "drop") %>%
+    # rename(bs = "bsr", hs = "hsr") %>%
+    pivot_wider(names_from = cost, values_from = value) %>% replace_na(list(intangible = 0))
 
   # Compute ex-ante LCC and LCOH
+  out[["conLccAnte"]] <- computeLCC(out[["conLtAnte"]], p_specCostOpe, costCon, p_dt, p_discountFac)
+  out[["conLcohAnte"]] <- computeLCOH(out[["conLccAnte"]], out[["conLtAnte"]], p_ueDemand, p_dt, p_discountFac, dims)
+
+  renLccAnteFull <- computeLCC(out[["renLtAnte"]], p_specCostOpe, costRen, p_dt, p_discountFac)
+  out[["renLccAnte"]] <- .avgAlongDim(renLccAnteFull, c("bs", "hs"), hs = "hsr", bs = "bsr")
+  out[["renLcohAnte"]] <- computeLCOH(out[["renLccAnte"]], out[["renLtAnte"]], p_ueDemand, p_dt, p_discountFac, dims)
 
   # Compute ex-post LCC and LCOH
 
-  # Compute logit share
+  # Compute mixed LCC and LCOH
+  out[["conLccMixed"]] <- computeLCC(out[["conLtMixed"]], p_specCostOpe, costCon, p_dt, p_discountFac)
+  out[["conLcohMixed"]] <- computeLCOH(out[["conLccMixed"]], out[["conLtMixed"]], p_ueDemand, p_dt, p_discountFac, dims)
 
-  # Compute model share
+  renLccMixedFull <- computeLCC(out[["renLtMixed"]], p_specCostOpe, costRen, p_dt, p_discountFac)
+  out[["renLccMixed"]] <- .avgAlongDim(renLccMixedFull, c("bs", "hs"), hs = "hsr", bs = "bsr")
+  out[["renLcohMixed"]] <- computeLCOH(out[["renLccMixed"]], out[["renLtMixed"]], p_ueDemand, p_dt, p_discountFac, dims)
+
+
+  # COMPUTE LOGIT HEATING SYSTEM SHARES ----------------------------------------
+
+  renLogitEl1AnteFull <- computeLogitShare("renovation", renLccAnteFull, c(dims, "bsr", "hsr"), priceSensHs[["renovation"]],
+                                                energyLadder = energyLadder, energyLadderNo = 1)
+  out[["renLogitEl1Ante"]] <- aggregateLogitShare(renLogitEl1AnteFull, select(v_renovationIn, -"dt"))
+
+  renLogitEl1MixedFull <- computeLogitShare("renovation", renLccMixedFull, c(dims, "bsr", "hsr"), priceSensHs[["renovation"]],
+                                           energyLadder = energyLadder, energyLadderNo = 1)
+  out[["renLogitEl1Mixed"]] <- aggregateLogitShare(renLogitEl1MixedFull, select(v_renovationIn, -"dt"))
+
+  renLogitEl2AnteFull <- computeLogitShare("renovation", renLccAnteFull, c(dims, "bsr", "hsr"), priceSensHs[["renovation"]],
+                                           energyLadder = energyLadder, energyLadderNo = 2)
+  out[["renLogitEl2Ante"]] <- .avgAlongDim(renLogitEl2AnteFull, c("hs", "bs"), hs = "hsr", bs = "bsr")
+
+  renLogitEl2MixedFull <- computeLogitShare("renovation", renLccMixedFull, c(dims, "bsr", "hsr"), priceSensHs[["renovation"]],
+                                            energyLadder = energyLadder, energyLadderNo = 2)
+
+  out[["renLogitEl2Mixed"]] <- aggregateLogitShare(renLogitEl2MixedFull, select(v_renovationIn, -"dt"))
+
+  renLogitEl3AnteFull <- computeLogitShare("renovation", renLccAnteFull, c(dims, "bsr", "hsr"), priceSensHs[["renovation"]],
+                                           energyLadder = energyLadder, energyLadderNo = 3)
+  out[["renLogitEl3Ante"]] <- .avgAlongDim(renLogitEl3AnteFull, c("hs", "bs"), hs = "hsr", bs = "bsr")
+
+  renLogitEl3MixedFull <- computeLogitShare("renovation", renLccMixedFull, c(dims, "bsr", "hsr"), priceSensHs[["renovation"]],
+                                            energyLadder = energyLadder, energyLadderNo = 3)
+  out[["renLogitEl3Mixed"]] <- aggregateLogitShare(renLogitEl3MixedFull, select(v_renovationIn, -"dt"))
+
+
+  # COMPUTE BRICK HEATING SYSTEM SHARES ----------------------------------------
+
+  out[["renBrickEl1"]] <- computeBrickShare("renovation", v_renovation, energyLadder, 1)
+  out[["renBrickEl2"]] <- computeBrickShare("renovation", v_renovation, energyLadder, 2)
+  out[["renBrickEl3"]] <- computeBrickShare("renovation", v_renovation, energyLadder, 3)
+
+  # NORMALIZE PRICE SENSITIVITY ------------------------------------------------
+
+  normLambdaCon <- normalizePriceSensitivity(out[["conLccMixed"]], conVin, priceSensHs[["construction"]], dims)
+  normLambdaRen <- normalizePriceSensitivity(out[["renLccMixed"]], v_renovationIn, priceSensHs[["renovation"]], dims)
+
+  normLambdaConSubs <- normalizePriceSensitivity(out[["conLccMixed"]], conVin, priceSensHs[["construction"]], dims, groupCols = c("reg", "loc", "typ", "inc"))
+  normLambdaRenSubs <- normalizePriceSensitivity(out[["renLccMixed"]], v_renovationIn, priceSensHs[["renovation"]], dims, groupCols = c("reg", "loc", "typ", "inc"))
 
   # WRITE ----------------------------------------------------------------------
 
+  # Determine all dimensions present in output data
+  allSets <- unique(unlist(lapply(out, colnames)))
+
   #(Partial) code duplicate of reportCalibration
-  browser()
-  # namesAll <- c("stockInitLtAnte", "stockInitLtPost", "stockInitLtMixed", "conLtAnte", "conLtPost", "conLtMixed", "renLtAnte", "renLtPost", "renLtMixed")
-  # namesIndex <- expand.grid(sa = c(TRUE,FALSE), sp = c(TRUE,FALSE), sm = c(TRUE,FALSE), ca = c(TRUE,FALSE), cp = c(TRUE,FALSE), cm = c(TRUE,FALSE), ra = c(TRUE,FALSE), rp = c(TRUE,FALSE), rm = c(TRUE,FALSE))
-  # for (i in seq_len(nrow(namesIndex))) {
-  #   print(namesAll[as.vector(t(namesIndex[i, ]))])
-  #   if (length(namesAll[as.vector(t(namesIndex[i, ]))]) > 1) {
-  #     out <- do.call(rbind, lapply(namesAll[as.vector(t(namesIndex[i, ]))], function(varName) {
-  #       mutate(out[[varName]], variable = varName, .before = 1)
-  #     }))
-  #   }
-  # }
   out <- do.call(rbind, lapply(names(out), function(varName) {
-    mutate(out[[varName]], variable = varName, .before = 1)
+    .expandDims(out[[varName]], varName, allSets)
   }))
 
   write.csv(out, file.path(path, "BRICK_analysis_report.csv"), row.names = FALSE)
 
 }
 
+#' Read in Gdx and slightly modify
+#'
+#' @importFrom dplyr %>% across any_of .data filter mutate right_join
+#'
 .cleanReadGdx <- function(df, vinExists, renAllowed = NULL, bsToZero = TRUE) {
 
   if ("qty" %in% colnames(df)) {
@@ -391,244 +338,54 @@ reportLCCShare <- function(gdx, pathLt = NULL) {
       dplyr::right_join(renAllowed, by = c("hs", "hsr", "bs", "bsr"))
   }
 
+  #TODO: Temporary fix - need to do this properly!
   df %>%
-    mutate(across(any_of(c("bs", "bsr")), ~ "0"))
+    mutate(across(any_of(c("bs", "bsr")), ~ "low"))
 }
 
-#' Determine leave time of initial stock
+#' Check plausibility of lifetime results
 #'
-.computeLeaveInitStock <- function(tOut, dfStockInit, dfStock, dfOut, rprt) {
-
-  dfStock <- dfStock %>%
-    filter(.data[["ttot2"]] < tOut) %>%
-    group_by(across(any_of(rprt))) %>%
-    summarise(valueCumSum = sum(value), .groups = "drop") %>%
-    left_join(dfOut %>%
-                rename(valueOut = "value", dtOut = "dt", ttot2 = "ttot") %>%
-                filter(.data[["ttot2"]] == tOut),
-              by = rprt) %>%
-    left_join(dfStockInit %>%
-                rename(valueTot = "value"),
-              by = rprt) %>%
-    mutate(value = pmin(.data[["dtOut"]] * .data[["valueOut"]], .data[["valueTot"]] - .data[["valueCumSum"]]))
-  dfStock <- dfStock %>%
-    select(-"valueOut", -"valueTot", -"valueCumSum", -"dtOut")
-}
-
-#' Determine leave time of inflows
+#' @importFrom dplyr %>% .data across all_of group_by mutate summarise
 #'
-.computeLeaveInFlow <- function(tIn, tOut, dfInAll, dfStock, dfIn, dfOut, rprt) {
-
-  dfInPrev <- dfInAll %>%
-    filter(.data[["ttot"]] == tIn, .data[["ttot2"]] >= tIn, .data[["ttot2"]] <= tOut) %>%
-    group_by(across(any_of(rprt))) %>%
-    summarise(prevCumSum = sum(.data[["dt"]] * .data[["value"]]), .groups = "drop")
-
-  dfInAll <- dfInAll %>%
-    filter(.data[["ttot"]] <= tIn, .data[["ttot2"]] == tOut)
-  dfInAll <- dfInAll %>%
-    group_by(across(any_of(rprt))) %>%
-    summarise(valueCumSum = sum(.data[["dt"]] * .data[["value"]]), .groups = "drop")
-  dfInAll <- dfInAll %>%
-    left_join(dfInPrev, by = rprt)
-  dfInAll <- dfInAll %>%
-    left_join(dfOut %>%
-                rename(valueOut = "value", ttot2 = "ttot", dtOut = "dt") %>%
-                filter(.data[["ttot2"]] == tOut),
-              by = rprt)
-  dfInAll <- dfInAll %>%
-    dplyr::right_join(dfIn %>%
-                rename(valueIn = "value") %>%
-                filter(.data[["ttot"]] == tIn),
-              by = rprt)
-  dfInAll <- dfInAll %>%
-    left_join(dfStock %>%
-                rename(valueStock = "value") %>%
-                filter(.data[["ttot2"]] == tOut),
-              by = c(rprt, "ttot", "ttot2")) %>%
-    replace_na(list(valueStock = 0))
-  dfInAll <- dfInAll %>%
-    mutate(value = pmin(.data[["dtOut"]] * .data[["valueOut"]] - .data[["valueStock"]] - .data[["valueCumSum"]],
-                        .data[["dt"]] * .data[["valueIn"]] - .data[["prevCumSum"]]) / .data[["dt"]])
-  dfInAll <- dfInAll %>%
-    select(-"valueOut", -"valueIn", -"valueStock", -"valueCumSum", -"prevCumSum", -"dtOut")
-}
-
-.extractInitTime <- function(ttot, ttotNum = NULL) {
-  if (!is.null(ttotNum) && ttot[1] != ttotNum[1]) {
-    firstVal <- ttotNum[which(ttotNum == ttot[1]) - 1]
-  } else {
-    firstVal <- ttot[1]
-  }
-  t <- c(firstVal, ttot[1:length(ttot)-1])
-  return(t)
-}
-
-.computeLtStock <- function(dfLt, standingLifetime = 12) {
-  dfLt %>%
-    mutate(value = (pweibull(.data[["tOut1"]] - .data[["ttot"]] + standingLifetime, .data[["shape"]], .data[["scale"]])
-                    - pweibull(.data[["tOut0"]] - .data[["ttot"]] + standingLifetime, .data[["shape"]], .data[["scale"]]))) %>%
-    select(-"tOut0", -"tOut1", -"shape", -"scale")
-}
-
-# TODO: Flexible integration limits not needed right now, as the function arguments aren't flexible.
-# TODO: Arguments to function look really messy, maybe this can be cleared up
-.computeLtAnte <- function(dfLt, func, n, a = "tIn0", b = "tIn1") {
-
-  dfLtK <- dfLt %>%
-    mutate(step = (.data[[b]] - .data[[a]]) / n) %>%
-    crossing(k = seq(1, n-1)) %>%
-    group_by(across(-all_of("k"))) %>%
-    summarise(sumFunc = sum(func(.data[[a]] + .data[["k"]] * .data[["step"]],
-                                 .data[["shape"]], .data[["scale"]], .data[["tOut0"]], .data[["tOut1"]])),
-              .groups = "drop")
+.checkLifetimeResults <- function(dfLt, dims) {
 
   dfLt %>%
-    left_join(dfLtK, by = intersect(colnames(dfLt), colnames(dfLtK))) %>%
-    mutate(value = (1 / (.data[["tIn1"]] - .data[["tIn0"]]) * .data[["step"]]
-                    * (func(.data[[a]], .data[["shape"]], .data[["scale"]], .data[["tOut0"]], .data[["tOut1"]]) / 2
-                       + .data[["sumFunc"]]
-                       + func(.data[[b]], .data[["shape"]], .data[["scale"]], .data[["tOut0"]], .data[["tOut1"]]) / 2))) %>%
-    select(-"tIn0", -"tIn1", -"tOut0", -"tOut1", -"step", -"shape", -"scale", -"sumFunc")
+    group_by(across(all_of(c(dims, "ttot")))) %>%
+    summarise(value = sum(.data[["relVal"]]), .groups = "drop") %>%
+    mutate(error = .data[["value"]] <= 0.95)
+
 }
 
-.weibullIntegrand <- function(x, shape, scale, tOut0, tOut1) {
-  pweibull(tOut1 - x, shape, scale) - pweibull(tOut0 - x, shape, scale)
-}
-
-.prepareLtAnte <- function(df, toRename, sumTtot = FALSE) {
+#' Compute data average along given dimensions
+#'
+#' @importFrom dplyr
+#'
+.avgAlongDim <- function(df, dimToAvg, ...) {
 
   df <- df %>%
-    select(-"relVal")
+    group_by(across(-any_of(c(dimToAvg, "value")))) %>%
+    summarise(value = mean(.data[["value"]]), .groups = "drop") %>%
+    rename(...)
 
-  if (isTRUE(sumTtot)) {
-    df <- df %>%
-      group_by(across(-all_of(c("ttot", "absVal")))) %>%
-      summarise(absVal = sum(.data[["absVal"]]), .groups = "drop")
-  }
+  return(df)
+}
 
+#' Extend dimensions of a data frame by adding NA entries, add variable name
+#' Code duplicate from reportCalibration.R
+#'
+#' @param df data frame to be extended
+#' @param varName character, variable name to be added
+#' @param allSets character, sets that need to be included as column names
+#' @returns data frame
+#'
+#' @importFrom dplyr %>% mutate last_col relocate
+
+.expandDims <- function(df, varName, allSets) {
+
+  # Add missing columns with NA entries
+  df[setdiff(allSets, colnames(df))] <- NA
+
+  # Add variable name as first column
   df <- df %>%
-    select(-any_of("ttot")) %>%
-    rename(toRename)
-}
-
-.computeLtDirect <- function(dfLtAnte, outAnte, outflow, dims) {
-
-  dfLtAnte %>%
-    select(-"relVal") %>%
-    left_join(outAnte %>%
-                rename(outAnte = "value"),
-              by = c(dims, "ttot2")) %>%
-    left_join(outflow %>%
-                select(-"dt") %>%
-                rename(outflow = "value", ttot2 = "ttot"),
-              by = c(dims, "ttot2")) %>%
-    mutate(value = .data[["absVal"]] * .data[["outflow"]] / .data[["outAnte"]]) %>%
-    select(-"absVal", -"outflow", -"outAnte")
-
-
-}
-
-.prepareLtMixed <- function(dfLtDirect) {
-
-  dfLtDirect %>%
-    rename(directVal = "value") %>%
-    mutate(addAttr = 0, value = 0)
-}
-
-.computeUnattrOut <- function(dfLtMixed, dfTotVal, tOut, dims) {
-
-  dfLtMixed %>%
-    filter(.data[["ttot2"]] <= tOut) %>%
-    group_by(across(any_of(c(dims, "ttot")))) %>%
-    summarise(sumVal = sum(.data[["value"]]), .groups = "drop") %>%
-    right_join(dfLtMixed, by = c(dims, "ttot")) %>%
-    left_join(dfTotVal %>%
-                rename(totVal = "value"),
-              by = c(dims, "ttot")) %>%
-    mutate(remInflow =  .data[["totVal"]] - .data[["sumVal"]],
-           unattr = pmax(.data[["directVal"]] - .data[["remInflow"]], 0)) %>%
-    select(-"totVal", -"sumVal")
-
-}
-
-.computeLtMixed <- function(dfLtMixed, unattrTot, tIn, tOut, dims, dfStock = NULL, dfShare = NULL) {
-
-  dfLtMixed <- filter(dfLtMixed, .data[["ttot2"]] == tOut)
-
-  if (!is.null(dfStock)) {
-
-    # Isolate additional attribution in stock data frame and filter for current tOut
-    dfStock <- dfStock %>%
-      rename(stockAttr = "addAttr") %>%
-      select(all_of(c(dims, "ttot2", "stockAttr")))
-
-    dfLtMixed <- dfLtMixed %>%
-      filter(.data[["ttot"]] <= tIn) %>%
-      group_by(across(any_of(c(dims, "ttot2")))) %>%
-      summarise(addAttrSum = sum(.data[["addAttr"]]), .groups = "drop") %>%
-      mutate(ttot = tIn) %>%
-      left_join(dfLtMixed, by = c(dims, "ttot", "ttot2")) %>%
-      left_join(dfStock, by = c(dims, "ttot2")) %>%
-      replace_na(list(stockAttr = 0)) %>%
-      left_join(dfShare, by = c(dims, "ttot"))
-  }
-
-  dfLtMixed <- dfLtMixed %>%
-    left_join(unattrTot, by = c(dims, "ttot2")) %>%
-    mutate(maxOutflow = if (is.null(dfStock)) .data[["directVal"]] + .data[["sumUnattr"]]
-                        else .data[["directVal"]] + .data[["share"]] * (.data[["sumUnattr"]] - .data[["stockAttr"]] - .data[["addAttrSum"]]),
-           value = pmin(.data[["maxOutflow"]], .data[["remInflow"]]),
-           addAttr = pmax(.data[["value"]] - .data[["directVal"]], 0)) %>%
-    select(-any_of(c("maxOutflow", "sumUnattr", "addAttrSum", "stockAttr", "share")))
-
-  return(dfLtMixed)
-
-}
-
-.addResults <- function(dfOrig, dfNew, tIn, tOut, dims, addDims = NULL) {
-
-  dfOrig %>%
-    left_join(dfNew, by = c(dims, "ttot", "ttot2", addDims)) %>%
-    mutate(value = ifelse(
-      .data[["ttot"]] == tIn & .data[["ttot2"]] == tOut,
-      .data[["value.y"]],
-      .data[["value.x"]]
-      ),
-      addAttr = ifelse(
-        .data[["ttot"]] == tIn & .data[["ttot2"]] == tOut,
-        .data[["addAttr.y"]],
-        .data[["addAttr.x"]]
-      )) %>%
-    select(-"value.x", -"value.y", -"addAttr.x", -"addAttr.y")
-
-}
-
-.combineAddAttr <- function(dfThis, dfOther, dims) {
-
-  #TODO: I get NAs if adding con values to ren, and I omit other vintages if adding ren values to con -> but this is not a problem as I don't compute these vintages
-  # Rename addAttr column
-  dfOther <- dfOther %>%
-    rename(addAttrOther = "addAttr") %>%
-    select(any_of(c(dims, "ttot", "ttot2", "addAttrOther")))
-
-  dfThis %>%
-    left_join(dfOther, by = c(dims, "ttot", "ttot2")) %>%
-    replace_na(list(addAttrOther = 0)) %>%
-    mutate(addAttr = .data[["addAttr"]] + .data[["addAttrOther"]]) %>%
-    select(-"addAttrOther")
-
-}
-
-.processLtMixed <- function(dfLt, dfVal, dims, removeVin = FALSE) {
-
-  if (isTRUE(removeVin)) dims <- setdiff(dims, "vin")
-
-  dfLt %>%
-    select(-any_of(c("directVal", "remInflow", "unattr", "addAttr"))) %>%
-    rename(absVal = "value") %>%
-    left_join(dfVal, by = c(dims, "ttot")) %>%
-    mutate(relVal = .data[["absVal"]] / .data[["value"]]) %>%
-    select(-any_of(c("dt", "value")))
-
+    mutate(variable = varName, .before = 1)
 }
