@@ -39,7 +39,7 @@ knitr::opts_chunk$set(
 ```{r set variables and check existence of first file}
 
 # Assemble all file paths
-filePath <- file.path(params$path, params$cal)
+filePath <- file.path(params$path, params$file)
 
 # Check if at least one file in the given paths exists
 if (!any(file.exists(filePath))) {
