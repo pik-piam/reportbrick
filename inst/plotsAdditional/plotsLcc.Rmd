@@ -402,7 +402,7 @@ data <- utils::read.csv(filePath)
 
 ```{r Plot ex-ante LCC of construction}
 .createLtPlot(data %>% filter(loc == "rural", typ == "MFH"), "conLccAnte",
-              xname = "hs", yname = "value", color = "costType", rprt = "vin",
+              xname = "hs", yname = "value", color = "costType", rprt = "ttot",
               noFacets = TRUE, xlabName = "Heating System", ylabName = "Costs in USD/m2")
 ```
 
@@ -410,7 +410,7 @@ data <- utils::read.csv(filePath)
 
 ```{r Plot LCC of construction with mixed lifetimes}
 .createLtPlot(data %>% filter(loc == "rural", typ == "MFH"), "conLccMixed",
-              xname = "hs", yname = "value", color = "costType", rprt = "vin",
+              xname = "hs", yname = "value", color = "costType", rprt = "ttot",
               noFacets = TRUE, xlabName = "Heating System", ylabName = "Costs in USD/m2")
 ```
 
@@ -418,7 +418,7 @@ data <- utils::read.csv(filePath)
 
 ```{r Plot ex-ante LCC of renovation}
 .createLtPlot(data %>% filter(loc == "rural", typ == "MFH"), "renLccAnte",
-              xname = "hs", yname = "value", color = "costType", rprt = "ttot",
+              xname = "hs", yname = "value", color = "costType", rprt = "ttot", avg = "vin",
               noFacets = TRUE, xlabName = "Heating System", ylabName = "Costs in USD/m2")
 ```
 
@@ -426,7 +426,7 @@ data <- utils::read.csv(filePath)
 
 ```{r Plot LCC of renovation with mixed lifetimes}
 .createLtPlot(data %>% filter(loc == "rural", typ == "MFH"), "renLccMixed",
-              xname = "hs", yname = "value", color = "costType", rprt = "ttot",
+              xname = "hs", yname = "value", color = "costType", rprt = "ttot", avg = "vin",
               noFacets = TRUE, xlabName = "Heating System", ylabName = "Costs in USD/m2")
 ```
 
@@ -436,7 +436,7 @@ data <- utils::read.csv(filePath)
 
 ```{r Plot LCOH of construction with ex-ante lifetimes}
 .createLtPlot(data %>% filter(loc == "rural", typ == "MFH"), "conLcohAnte",
-              xname = "hs", yname = "value", color = "costType", rprt = "vin",
+              xname = "hs", yname = "value", color = "costType", rprt = "ttot",
               noFacets = TRUE, xlabName = "Heating System", ylabName = "Costs in USD/kWh")
 ```
 
@@ -452,7 +452,7 @@ data <- utils::read.csv(filePath)
 
 ```{r Plot LCOH of renovation with ex-ante lifetimes}
 .createLtPlot(data %>% filter(loc == "rural", typ == "MFH"), "renLcohAnte",
-              xname = "hs", yname = "value", color = "costType", rprt = "ttot",
+              xname = "hs", yname = "value", color = "costType", rprt = "ttot",avg = "vin",
               noFacets = TRUE, xlabName = "Heating System", ylabName = "Costs in USD/kWh")
 ```
 
@@ -468,59 +468,66 @@ data <- utils::read.csv(filePath)
 
 ## Logit shares of renovation with ex-ante lifetimes
 
-### Energy ladder position 1
-
-```{r Plot logit shares of renovation with ex-ante lifetimes, energy ladder 1}
-.createLtPlot(data %>% filter(loc == "rural", typ == "MFH"), "renLogitEl1Ante",
-              xname = "ttot", yname = "value", color = "hs", rprt = "vin", noFacets = TRUE,
-              xlabName = "Time of installation", ylabName = "Shares")
-```
-
-### Energy ladder position 2
-
-```{r Plot logit shares of renovation with ex-ante lifetimes, energy ladder 2}
-.createLtPlot(data %>% filter(loc == "rural", typ == "MFH"), "renLogitEl2Ante",
-              xname = "ttot", yname = "value", color = "hs", rprt = "vin", noFacets = TRUE,
-              xlabName = "Time of installation", ylabName = "Shares")
-```
-
-### Energy ladder position 3
-
-```{r Plot logit shares of renovation with ex-ante lifetimes, energy ladder 3}
-.createLtPlot(data %>% filter(loc == "rural", typ == "MFH"), "renLogitEl3Ante",
-              xname = "ttot", yname = "value", color = "hs", rprt = "vin", noFacets = TRUE,
+```{r Plot logit shares of renovation with ex-ante lifetimes, all}
+.createLtPlot(data, "renLogitAllAnte",
+              xname = "ttot", yname = "value", color = "hs", rprt = "vin",
               xlabName = "Time of installation", ylabName = "Shares")
 ```
 
 ## Logit shares of renovation with mixed lifetimes
 
-### Energy ladder position 1
-
 ```{r Plot logit shares of renovation with mixed lifetimes, energy ladder 1}
-.createLtPlot(data %>% filter(loc == "rural", typ == "MFH"), "renLogitEl1Mixed",
-              xname = "ttot", yname = "value", color = "hs", rprt = "vin", noFacets = TRUE,
-              xlabName = "Time of installation", ylabName = "Shares")
-```
-
-### Energy ladder position 2
-
-```{r Plot logit shares of renovation with mixed lifetimes, energy ladder 2}
-.createLtPlot(data %>% filter(loc == "rural", typ == "MFH"), "renLogitEl2Mixed",
-              xname = "ttot", yname = "value", color = "hs", rprt = "vin", noFacets = TRUE,
-              xlabName = "Time of installation", ylabName = "Shares")
-```
-
-### Energy ladder position 3
-
-```{r Plot logit shares of renovation with mixed lifetimes, energy ladder 3}
-.createLtPlot(data %>% filter(loc == "rural", typ == "MFH"), "renLogitEl3Mixed",
-              xname = "ttot", yname = "value", color = "hs", rprt = "vin", noFacets = TRUE,
+.createLtPlot(data, "renLogitAllMixed",
+              xname = "ttot", yname = "value", color = "hs", rprt = "vin",
               xlabName = "Time of installation", ylabName = "Shares")
 ```
 
 # Logit shares compared to Brick shares
 
+```{r Plot renovation-in shares}
+.createLtPlot(data, "renBrickIn",
+              xname = "ttot", yname = "value", color = "hs", rprt = "vin",
+              xlabName = "Time of installation", ylabName = "Shares")
+```
+
+## Shares of renovation with ex-ante lifetimes
+
+### Aggregated across all hs
+
+```{r Plot Logit and brick Share with ex-ante lifetimes, all}
+.createLtTwoBar(data, c("renLogitAllAnte", "renBrickAll"),
+                yname = "value", xname = "ttot", color = "hs", rprt = "vin",
+                xlabName = "Time of installation", ylabName = "Shares")
+```
+
+### Energy ladder 1
+
+```{r Plot Logit and brick Share with ex-ante lifetimes, energy ladder 1}
+.createLtTwoBar(data, c("renLogitEl1Ante", "renBrickEl1"),
+                yname = "value", xname = "ttot", color = "hs", rprt = "vin",
+                xlabName = "Time of installation", ylabName = "Shares")
+```
+
+### By initial heating system
+
+```{r Plot Logit and brick Share with ex-ante lifetimes, by hs}
+hsNames <- unique(data[["hs"]])
+for (h in hsNames) {
+  .createLtTwoBar(data, paste0(c("renLogitAnte", "renBrick"), h),
+                  yname = "value", xname = "ttot", color = "hs", rprt = "vin",
+                  xlabName = "Time of installation", ylabName = "Shares")
+}
+```
+
 ## Shares of renovation with mixed lifetimes
+
+### Aggregated across all hs
+
+```{r Plot Logit and brick Share with mixed lifetimes, all}
+.createLtTwoBar(data, c("renLogitAllMixed", "renBrickAll"),
+                yname = "value", xname = "ttot", color = "hs", rprt = "vin",
+                xlabName = "Time of installation", ylabName = "Shares")
+```
 
 ### Energy ladder 1
 
@@ -530,18 +537,13 @@ data <- utils::read.csv(filePath)
                 xlabName = "Time of installation", ylabName = "Shares")
 ```
 
-### Energy ladder 2
+### By initial heating system
 
-```{r Plot Logit and brick Share with mixed lifetimes, energy ladder 2}
-.createLtTwoBar(data, c("renLogitEl2Mixed", "renBrickEl2"),
-                yname = "value", xname = "ttot", color = "hs", rprt = "vin",
-                xlabName = "Time of installation", ylabName = "Shares")
-```
-
-### Energy ladder 3
-
-```{r Plot Logit and brick Share with mixed lifetimes, energy ladder 3}
-.createLtTwoBar(data, c("renLogitEl3Mixed", "renBrickEl3"),
-                yname = "value", xname = "ttot", color = "hs", rprt = "vin",
-                xlabName = "Time of installation", ylabName = "Shares")
+```{r Plot Logit and brick Share with mixed lifetimes, by hs}
+hsNames <- unique(data[["hs"]])
+for (h in hsNames) {
+  .createLtTwoBar(data, paste0(c("renLogitMixed", "renBrick"), h),
+                  yname = "value", xname = "ttot", color = "hs", rprt = "vin",
+                  xlabName = "Time of installation", ylabName = "Shares")
+}
 ```

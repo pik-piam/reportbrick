@@ -23,13 +23,9 @@ computeLCOH <- function(dfLcc, dfLt, dfUe, dfDt, dfDiscount, dims) {
     group_by(across(all_of(c(dims, "ttot")))) %>%
     summarise(ue = sum(.data[["ltProb"]] * .data[["cumVal"]]), .groups = "drop")
 
-  dfLcc <- dfLcc %>%
+  dfLcc %>%
     rename(lcc = "value") %>%
-    left_join(expUe, by = c(dims, "ttot"))
-  dfLcc <- dfLcc %>%
+    left_join(expUe, by = c(dims, "ttot")) %>%
     mutate(value = .data[["lcc"]] / .data[["ue"]]) %>%
     select(-"ue", -"lcc")
-
-  return(dfLcc)
-
 }

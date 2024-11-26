@@ -242,7 +242,10 @@ reportLCCShare <- function(gdx, pathLt = NULL) {
   out[["conLcohAnte"]] <- computeLCOH(out[["conLccAnte"]], out[["conLtAnte"]], p_ueDemand, p_dt, p_discountFac, dims)
 
   renLccAnteFull <- computeLCC(out[["renLtAnte"]], p_specCostOpe, costRen, p_dt, p_discountFac)
-  out[["renLccAnte"]] <- .avgAlongDim(renLccAnteFull, c("bs", "hs"), hs = "hsr", bs = "bsr")
+  out[["renLccAnte"]] <- mutate(
+    .avgAlongDim(renLccAnteFull, c("bs", "hs"), hs = "hsr", bs = "bsr"),
+    bs = "low"
+  )
   out[["renLcohAnte"]] <- computeLCOH(out[["renLccAnte"]], out[["renLtAnte"]], p_ueDemand, p_dt, p_discountFac, dims)
 
   # Compute ex-post LCC and LCOH
@@ -252,43 +255,44 @@ reportLCCShare <- function(gdx, pathLt = NULL) {
   out[["conLcohMixed"]] <- computeLCOH(out[["conLccMixed"]], out[["conLtMixed"]], p_ueDemand, p_dt, p_discountFac, dims)
 
   renLccMixedFull <- computeLCC(out[["renLtMixed"]], p_specCostOpe, costRen, p_dt, p_discountFac)
-  out[["renLccMixed"]] <- .avgAlongDim(renLccMixedFull, c("bs", "hs"), hs = "hsr", bs = "bsr")
+  out[["renLccMixed"]] <- mutate(
+    .avgAlongDim(renLccMixedFull, c("bs", "hs"), hs = "hsr", bs = "bsr"),
+    bs = "low"
+  )
   out[["renLcohMixed"]] <- computeLCOH(out[["renLccMixed"]], out[["renLtMixed"]], p_ueDemand, p_dt, p_discountFac, dims)
 
 
   # COMPUTE LOGIT HEATING SYSTEM SHARES ----------------------------------------
 
-  renLogitEl1AnteFull <- computeLogitShare("renovation", renLccAnteFull, c(dims, "bsr", "hsr"), priceSensHs[["renovation"]],
-                                                energyLadder = energyLadder, energyLadderNo = 1)
-  out[["renLogitEl1Ante"]] <- aggregateLogitShare(renLogitEl1AnteFull, select(v_renovationIn, -"dt"))
+  renLogitAnteFull <- computeLogitShare("renovation", renLccAnteFull, c(dims, "bsr", "hsr"), priceSensHs[["renovation"]])
+  out[["renLogitEl1Ante"]] <- aggregateShare(renLogitAnteFull, select(v_renovationIn, -"dt"),
+                                                  energyLadder = energyLadder, energyLadderNo = 1)
+  out[["renLogitAllAnte"]] <- aggregateShare(renLogitAnteFull, select(v_renovationIn, -"dt"))
 
-  renLogitEl1MixedFull <- computeLogitShare("renovation", renLccMixedFull, c(dims, "bsr", "hsr"), priceSensHs[["renovation"]],
-                                           energyLadder = energyLadder, energyLadderNo = 1)
-  out[["renLogitEl1Mixed"]] <- aggregateLogitShare(renLogitEl1MixedFull, select(v_renovationIn, -"dt"))
+  renLogitMixedFull <- computeLogitShare("renovation", renLccMixedFull, c(dims, "bsr", "hsr"), priceSensHs[["renovation"]])
+  out[["renLogitEl1Mixed"]] <- aggregateShare(renLogitMixedFull, select(v_renovationIn, -"dt"),
+                                                   energyLadder = energyLadder, energyLadderNo = 1)
+  out[["renLogitAllMixed"]] <- aggregateShare(renLogitMixedFull, select(v_renovationIn, -"dt"))
 
-  renLogitEl2AnteFull <- computeLogitShare("renovation", renLccAnteFull, c(dims, "bsr", "hsr"), priceSensHs[["renovation"]],
-                                           energyLadder = energyLadder, energyLadderNo = 2)
-  out[["renLogitEl2Ante"]] <- .avgAlongDim(renLogitEl2AnteFull, c("hs", "bs"), hs = "hsr", bs = "bsr")
+  outRenLogitAnte <- .splitDataByHs(renLogitAnteFull, unique(renLogitAnteFull[["hs"]]), "renLogitAnte")
+  outRenLogitMixed <- .splitDataByHs(renLogitMixedFull, unique(renLogitMixedFull[["hs"]]), "renLogitMixed")
 
-  renLogitEl2MixedFull <- computeLogitShare("renovation", renLccMixedFull, c(dims, "bsr", "hsr"), priceSensHs[["renovation"]],
-                                            energyLadder = energyLadder, energyLadderNo = 2)
-
-  out[["renLogitEl2Mixed"]] <- aggregateLogitShare(renLogitEl2MixedFull, select(v_renovationIn, -"dt"))
-
-  renLogitEl3AnteFull <- computeLogitShare("renovation", renLccAnteFull, c(dims, "bsr", "hsr"), priceSensHs[["renovation"]],
-                                           energyLadder = energyLadder, energyLadderNo = 3)
-  out[["renLogitEl3Ante"]] <- .avgAlongDim(renLogitEl3AnteFull, c("hs", "bs"), hs = "hsr", bs = "bsr")
-
-  renLogitEl3MixedFull <- computeLogitShare("renovation", renLccMixedFull, c(dims, "bsr", "hsr"), priceSensHs[["renovation"]],
-                                            energyLadder = energyLadder, energyLadderNo = 3)
-  out[["renLogitEl3Mixed"]] <- aggregateLogitShare(renLogitEl3MixedFull, select(v_renovationIn, -"dt"))
+  out <- c(out, outRenLogitAnte, outRenLogitMixed)
 
 
   # COMPUTE BRICK HEATING SYSTEM SHARES ----------------------------------------
 
-  out[["renBrickEl1"]] <- computeBrickShare("renovation", v_renovation, energyLadder, 1)
-  out[["renBrickEl2"]] <- computeBrickShare("renovation", v_renovation, energyLadder, 2)
-  out[["renBrickEl3"]] <- computeBrickShare("renovation", v_renovation, energyLadder, 3)
+  # Shares of initial systems when renovating
+  out[["renBrickIn"]] <- computeBrickShare("renovationIn", select(v_renovationIn, -"dt"))
+
+  renBrickFull <- computeBrickShare("renovation", v_renovation)
+  out[["renBrickEl1"]] <- aggregateShare(renBrickFull, weight = select(v_renovationIn, -"dt"),
+                                         energyLadder = energyLadder, energyLadderNo = 1)
+  out[["renBrickAll"]] <- aggregateShare(renBrickFull, weight = select(v_renovationIn, -"dt"))
+
+  outBrick <- .splitDataByHs(renBrickFull, unique(renBrickFull[["hs"]]), "renBrick")
+
+  out <- c(out, outBrick)
 
   # NORMALIZE PRICE SENSITIVITY ------------------------------------------------
 
@@ -368,6 +372,26 @@ reportLCCShare <- function(gdx, pathLt = NULL) {
     rename(...)
 
   return(df)
+}
+
+#' Separate a large data set into several variables by hs
+#'
+#' @param data data frame to be split
+#' @param hsrNames character, hsr values to filter for
+#' @param varName character, name stem of resulting variable names
+#'
+#' @importFrom dplyr %>% .data filter rename select
+#'
+.splitDataByHs <- function(data, hsNames, varName) {
+  stats::setNames(
+    lapply(hsNames, function(h) {
+      data %>%
+        filter(.data[["hs"]] == h) %>%
+        select(-"bs", -"hs") %>%
+        rename(bs = "bsr", hs = "hsr")
+    }),
+    paste0(varName, hsNames)
+  )
 }
 
 #' Extend dimensions of a data frame by adding NA entries, add variable name
