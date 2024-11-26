@@ -10,33 +10,21 @@
 #' @importFrom dplyr %>% across all_of .data filter group_by left_join mutate
 #'   rename select summarise ungroup
 #'
-computeBrickShare <- function(variable, data, energyLadder = NULL, energyLadderNo = NULL) {
+computeBrickShare <- function(variable, data) {
 
-  # If this is renovation data: Filter for previous heating systems that match the energy ladder
-  # and summarise across the previous heating system dimension
+  # If this is renovation data: Need to sum over hsr and remove zero renovation
   if (variable == "renovation") {
-    if (is.null(energyLadder) || is.null(energyLadderNo)) {
-      warning("Energy ladder needs to be provided to compute renovation brick share.",
-              "The corresponding variable is skipped")
-      return(mutate(data, value = NA))
-    }
-    data <- data %>%
-      left_join(energyLadder, by = "hs") %>%
-      filter(.data[["energyLadder"]] == energyLadderNo, .data[["hsr"]] != "0") %>%
-      group_by(across(-all_of(c("hs", "value")))) %>%
-      summarise(value = sum(.data[["value"]]), .groups = "drop") %>%
-      select(-"bs") %>%
-      rename(bs = "bsr", hs = "hsr")
+    hsName <- "hsr"
+    data <- filter(data, .data[["hsr"]] != "0")
+  } else {
+    hsName <- "hs"
   }
 
-  brickShare <- data %>%
-    group_by(across(-all_of(c("hs", "value")))) %>%
+  data %>%
+    group_by(across(-all_of(c(hsName, "value")))) %>%
     mutate(totVal = sum(.data[["value"]]),
            shareVal = .data[["value"]] / .data[["totVal"]]) %>%
-    ungroup()
-
-  brickShare <- brickShare %>%
+    ungroup() %>%
     select(-"totVal", -"value") %>%
     rename(value = "shareVal")
-
 }
