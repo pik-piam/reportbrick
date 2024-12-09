@@ -16,12 +16,11 @@ reportRates <- function(gdx, brickSets = NULL, silent = TRUE) {
 
   ## variables ====
 
-  v_renovation <- readGdxSymbol(gdx, "v_renovation")
-  v_stock <- readGdxSymbol(gdx, "v_stock")
-
-  # unit conversion: million m2 / yr -> billion m2 / yr
-  v_renovation <- .prepVar(v_renovation)
-  v_stock      <- .prepVar(v_stock)
+  v_renovation <- readGdxSymbol(gdx, "v_renovation") %>%
+    .prepVar()
+  v_stock <- readGdxSymbol(gdx, "v_stock") %>%
+    .prepVar() %>%
+    .shiftTime(-0.5, "na")
 
 
   ## parameters ====
@@ -33,7 +32,7 @@ reportRates <- function(gdx, brickSets = NULL, silent = TRUE) {
 
   # REPORT ---------------------------------------------------------------------
 
-  out <- mbind(
+  out3 <- mbind(
 
 
     ## Renovation rate ====
