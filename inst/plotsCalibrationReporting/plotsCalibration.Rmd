@@ -107,14 +107,6 @@ if (length(filePath) == 1) {
 
 ```
 
-## Target function
-
-```{r target function}
-
-.createCalibrationPlot(data, "targetFunction", outPath, outName = outName,
-                       color = color, savePlots = savePlots)
-
-```
 
 ## Absolute stock and flow deviations
 
@@ -189,6 +181,7 @@ if (length(filePath) == 1) {
 
 ```
 
+
 ## Step size
 
 ```{r step size}
@@ -197,3 +190,14 @@ if (length(filePath) == 1) {
                        color = color, savePlots = savePlots)
 ```
 
+
+## Descent direction by heating system
+
+```{r descent direction}
+
+.createCalibrationPlot(data, "descDirCon", outPath, outName = outName,
+                       color = "hsr", savePlots = savePlots)
+
+.createCalibrationPlot(data, "descDirRen", outPath, outName = outName,
+                       color = "hsr", savePlots = savePlots)
+```
