@@ -1,4 +1,4 @@
-ValidationKey: '1420426'
+ValidationKey: '1450368'
 AutocreateReadme: yes
 AcceptedWarnings:
 - 'Warning: package ''.*'' was built under R version'
@@ -7,3 +7,5 @@ AcceptedNotes: Namespaces in Imports field not imported from\:\n *.ggplot2. .kni
   .mip. .piamPlotComparison. .purrr.
 allowLinterWarnings: no
 enforceVersionUpdate: no
+AutocreateCITATION: yes
+skipCoverage: no

@@ -2,18 +2,18 @@
 % Please edit documentation in R/reportCalibration.R
 \name{.computeDeviation}
 \alias{.computeDeviation}
-\title{Compute the deviation to historical data}
+\title{Compute the deviation to target data}
 \usage{
-.computeDeviation(df, dfHist)
+.computeDeviation(df, dfTarget)
 }
 \arguments{
 \item{df}{data frame, containing data from calibration run}
 
-\item{dfHist}{data frame, containing historical data}
+\item{dfTarget}{data frame, containing historical data as calibration target}
 }
 \value{
-data frame where the value column contains the deviation from historical data
+data frame where the value column contains the deviation from target data
 }
 \description{
-Compute the deviation to historical data
+Compute the deviation to target data
 }
