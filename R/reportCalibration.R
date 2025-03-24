@@ -34,14 +34,20 @@ reportCalibration <- function(gdx) {
   calibOptim <- cfg[["switches"]][["RUNTYPE"]] == "calibrationOptimization"
 
   # Read diagnostic parameters from csv
-  stepSize <- read.csv(file.path(path, "stepSizeParamsIter.csv")) %>%
-    select(-"delta", -"phiDeriv") %>%
-    rename(value = "stepSize")
-  descDirCon <- read.csv(file.path(path, "deviationConIter.csv")) %>%
-    rename(value = "d") %>%
-    .replaceVarName()
-  descDirRen <- read.csv(file.path(path, "deviationRenIter.csv")) %>%
-    rename(value = "d")
+  diagnostics <- FALSE
+  if (all(file.exists(file.path(path, "stepSizeParamsIter.csv"),
+                      file.path(path, "deviationConIter.csv"),
+                      file.path(path, "deviationRenIter.csv")))) {
+    stepSize <- read.csv(file.path(path, "stepSizeParamsIter.csv")) %>%
+      select(-"delta", -"phiDeriv") %>%
+      rename(value = "stepSize")
+    descDirCon <- read.csv(file.path(path, "deviationConIter.csv")) %>%
+      rename(value = "d") %>%
+      .replaceVarName()
+    descDirRen <- read.csv(file.path(path, "deviationRenIter.csv")) %>%
+      rename(value = "d")
+    diagnostics <- TRUE
+  }
 
   # Potentially shift the time filter to a later stage if I want to save and plot pure stock/flow data
   v_stock <- .readGdxIter(gdx,
@@ -79,11 +85,13 @@ reportCalibration <- function(gdx) {
 
   out <- list()
 
-  out[["stepSize"]] <- stepSize
+  if (isTRUE(diagnostics)) {
+    out[["stepSize"]] <- stepSize
 
-  out[["descDirCon"]] <- .computeAvg(descDirCon, rprt = c("iteration", "region", "typ", "loc", "inc", "hsr", "ttot"))
+    out[["descDirCon"]] <- .computeAvg(descDirCon, rprt = c("iteration", "reg", "typ", "loc", "inc", "hsr", "ttot"))
 
-  out[["descDirRen"]] <- .computeAvg(descDirRen, rprt = c("iteration", "region", "typ", "loc", "inc", "hsr", "ttot"))
+    out[["descDirRen"]] <- .computeAvg(descDirRen, rprt = c("iteration", "reg", "typ", "loc", "inc", "hsr", "ttot"))
+  }
 
   # AGGREGATE QUANTITIES -------------------------------------------------------
 
