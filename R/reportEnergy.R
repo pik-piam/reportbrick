@@ -30,6 +30,11 @@ reportEnergy <- function(gdx, brickSets = NULL, silent = TRUE) {
   specDemand <- list(UE = readGdxSymbol(gdx, "p_ueDemand"),
                      FE = readGdxSymbol(gdx, "p_feDemand"))
 
+  # filter for vintages present in the Brick output
+  specDemand <- lapply(specDemand, function(x) {
+    mselect(x, vin = names(brickSets$vin$elements))
+  })
+
   out <- NULL
 
 

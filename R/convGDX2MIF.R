@@ -41,6 +41,13 @@ convGDX2MIF <- function(gdx,
          paste(capture.output(inconsistencies), collapse = "\n  "))
   }
 
+  # Filter Brick sets for vintages existing in any time period
+  vintages <- unique(readGdxSymbol(gdx, "vinExists", asMagpie = FALSE)$vin)
+  brickSets$vin$elements <- brickSets$vin$elements[vintages]
+  brickSets$vin$subsets <- lapply(brickSets$vin$subsets, function(subset) {
+    subset[subset %in% vintages]
+  })
+
   # central object containing all output data
   output <- NULL
 
