@@ -2,5 +2,6 @@
 .Rhistory
 .RData
 .Ruserdata
+reportbrick.Rproj
 *.pdf
 *_Rmd/*
