@@ -64,7 +64,7 @@ readGdxSymbol <- function(gdx, symbol, field = "level", asMagpie = TRUE,
   # convert to MagPIE object
   if (isTRUE(asMagpie)) {
     out <- data %>%
-      as.magpie(spatial = "reg", temporal = "ttot", datacol = "value")
+      as.magpie(spatial = "region", temporal = "ttot", datacol = "value")
   } else {
     out <- data
   }

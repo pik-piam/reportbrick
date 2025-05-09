@@ -81,27 +81,27 @@ reportCalibration <- function(gdx) {
 
   out[["stepSize"]] <- stepSize
 
-  out[["descDirCon"]] <- .computeAvg(descDirCon, rprt = c("iteration", "reg", "typ", "loc", "inc", "hsr", "ttot"))
+  out[["descDirCon"]] <- .computeAvg(descDirCon, rprt = c("iteration", "region", "typ", "loc", "inc", "hsr", "ttot"))
 
-  out[["descDirRen"]] <- .computeAvg(descDirRen, rprt = c("iteration", "reg", "typ", "loc", "inc", "hsr", "ttot"))
+  out[["descDirRen"]] <- .computeAvg(descDirRen, rprt = c("iteration", "region", "typ", "loc", "inc", "hsr", "ttot"))
 
   # AGGREGATE QUANTITIES -------------------------------------------------------
 
   # Aggregate across all dimensions
-  out[["stockDevAgg"]] <- .computeSumSq(v_stockDev, rprt = c("iteration", "reg", "typ", "loc", "inc"))
+  out[["stockDevAgg"]] <- .computeSumSq(v_stockDev, rprt = c("iteration", "region", "typ", "loc", "inc"))
 
-  out[["conDevAgg"]] <- .computeSumSq(v_constructionDev, rprt = c("iteration", "reg", "typ", "loc", "inc"))
+  out[["conDevAgg"]] <- .computeSumSq(v_constructionDev, rprt = c("iteration", "region", "typ", "loc", "inc"))
 
-  out[["renDevAgg"]] <- .computeSumSq(v_renovationDev, rprt = c("iteration", "reg", "typ", "loc", "inc"))
+  out[["renDevAgg"]] <- .computeSumSq(v_renovationDev, rprt = c("iteration", "region", "typ", "loc", "inc"))
 
   out[["flowDevAgg"]] <- .computeFlowSum(out[["conDevAgg"]], out[["renDevAgg"]])
 
   # Aggregate by heating system (hs)
-  out[["stockDevHs"]] <- .computeSumSq(v_stockDev, rprt = c("iteration", "reg", "typ", "loc", "inc", "hsr"))
+  out[["stockDevHs"]] <- .computeSumSq(v_stockDev, rprt = c("iteration", "region", "typ", "loc", "inc", "hsr"))
 
-  out[["conDevHs"]] <- .computeSumSq(v_constructionDev, rprt = c("iteration", "reg", "typ", "loc", "inc", "hsr"))
+  out[["conDevHs"]] <- .computeSumSq(v_constructionDev, rprt = c("iteration", "region", "typ", "loc", "inc", "hsr"))
 
-  out[["renDevHs"]] <- .computeSumSq(v_renovationDev, rprt = c("iteration", "reg", "typ", "loc", "inc", "hsr"))
+  out[["renDevHs"]] <- .computeSumSq(v_renovationDev, rprt = c("iteration", "region", "typ", "loc", "inc", "hsr"))
 
   out[["flowDevHs"]] <- .computeFlowSum(out[["conDevHs"]], out[["renDevHs"]])
 
@@ -192,16 +192,10 @@ reportCalibration <- function(gdx) {
 #'
 #' @param df data frame
 #' @returns data frame where column names have been replaced
-#'
-#'@importFrom dplyr %>% all_of rename_with
 
 .replaceVarName <- function(df) {
-  for (var in c("hs", "bs")) {
-    if (var %in% colnames(df)) {
-      df <- df %>%
-        rename_with(~ paste0(.x, "r"), all_of(var))
-    }
-  }
+  var <- names(df) %in% c("hs", "bs")
+  names(df)[var] <- paste0(names(df)[var], "r")
   return(df)
 }
 
