@@ -42,7 +42,7 @@ hsr:
 ## Renovation ====
 bs.bsr:
   subsets:
-    all: [low.low, med.med, high.high]
+    identRepl: [low.low, med.med, high.high]
 
 bsr.hsr:
   subsets:
