@@ -9,7 +9,7 @@ checkMatching(path, tol = 0.01)
 \arguments{
 \item{path}{character, path to the matching result files}
 
-\item{tol}{numeric, tolerance against which to check the stock balance equations}
+\item{tol}{numeric, absolute tolerance in million m2 against which to check the stock balance equations}
 }
 \description{
 Check the matching results for inconsistencies

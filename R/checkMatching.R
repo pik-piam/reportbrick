@@ -1,7 +1,7 @@
 #' Check the matching results for inconsistencies
 #'
 #' @param path character, path to the matching result files
-#' @param tol numeric, tolerance against which to check the stock balance equations
+#' @param tol numeric, absolute tolerance in million m2 against which to check the stock balance equations
 #'
 #' @author Ricarda Rosemann
 #'
@@ -85,8 +85,8 @@ checkMatching <- function(path, tol = 1E-2) {
     left_join(renPrev, by = c("qty", "bs", "hs", "vin", "reg", "loc", "typ", "inc", "ttot")) %>%
     left_join(dt, by = "ttot") %>%
     left_join(p_dtVin, by = c("vin", "ttot")) %>%
-    mutate(lhs = round(.data$stock + .data$con * .data$dtCon, 3),
-           rhs = round(.data$renSum * .data$dt, 3),
+    mutate(lhs = .data$stock + .data$con * .data$dtCon,
+           rhs = .data$renSum * .data$dt,
            eqn = .data$lhs - .data$rhs)
 
 
@@ -102,8 +102,8 @@ checkMatching <- function(path, tol = 1E-2) {
     left_join(demCalibTarget, by = c("qty", "bs", "hs", "vin", "reg", "loc", "typ", "inc", "ttot")) %>%
     left_join(renNext, by = c("qty", bs = "bsr", hs = "hsr", "vin", "reg", "loc", "typ", "inc", "ttot")) %>%
     inner_join(dt, by = "ttot") %>%
-    mutate(lhs = round(.data$stock + .data$dem * .data$dt, 3),
-           rhs = round(.data$renSum * .data$dt, 3),
+    mutate(lhs = .data$stock + .data$dem * .data$dt,
+           rhs = .data$renSum * .data$dt,
            eqn = .data$lhs - .data$rhs)
 
 
@@ -127,7 +127,7 @@ checkMatching <- function(path, tol = 1E-2) {
 .checkForDeviation <- function(stockBal, name, tol = 1E-2) {
   if (any(abs(stockBal$eqn[!is.na(stockBal$eqn)]) > tol)) {
     message("The stock balance equation ", name, " deviates by more than ", tol, ".\n",
-            "For details please check the file 'stockBal", name, ".csv'.")
+            "For details, please check the file 'stockBal", name, ".csv'.")
   } else {
     message("The stock balance equation ", name, " is satisfied with a tolerance of ", tol, ".")
   }
