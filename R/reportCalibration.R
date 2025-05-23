@@ -4,7 +4,7 @@
 #' @param gdx path to a gdx; it is assumed that for each iteration a gdx is present
 #'  with this path and the iteration number inserted at the end.
 #' @param flowTargets logical, if set to FALSE, the function does not expect the presence of targets
-#'   for the flows
+#'  for the flows
 #'
 #' @author Ricarda Rosemann
 #'
@@ -107,10 +107,10 @@ reportCalibration <- function(gdx, flowTargets = TRUE) {
     .replaceVarName() %>%
     .computeSum(rprt = dims$stock)
 
-  p_stockCalibTargetTot <- .computeSum(p_stockCalibTarget, rprt = c("iteration", "reg", "typ", "loc", "inc", "ttot"))
+  p_stockCalibTargetTot <- .computeSum(p_stockCalibTarget, rprt = c("iteration", "region", "typ", "loc", "inc", "ttot"))
   p_stockCalibTargetTotHs <- .computeSum(
     p_stockCalibTarget,
-    rprt = c("iteration", "reg", "typ", "loc", "inc", "hsr", "ttot")
+    rprt = c("iteration", "region", "typ", "loc", "inc", "hsr", "ttot")
   )
 
   if (isTRUE(flowTargets)) {
@@ -120,11 +120,11 @@ reportCalibration <- function(gdx, flowTargets = TRUE) {
 
     p_constructionCalibTargetTot <- .computeSum(
       p_constructionCalibTarget,
-      rprt = c("iteration", "reg", "typ", "loc", "inc", "ttot")
+      rprt = c("iteration", "region", "typ", "loc", "inc", "ttot")
     )
     p_constructionCalibTargetTotHs <- .computeSum(
       p_constructionCalibTarget,
-      rprt = c("iteration", "reg", "typ", "loc", "inc", "hsr", "ttot")
+      rprt = c("iteration", "region", "typ", "loc", "inc", "hsr", "ttot")
     )
 
     p_renovationCalibTarget <- readGdxSymbol(gdxInp, "p_renovationCalibTarget", asMagpie = FALSE) %>%
@@ -133,11 +133,11 @@ reportCalibration <- function(gdx, flowTargets = TRUE) {
     p_renovationCalibTargetTot <- .computeSum(
       p_renovationCalibTarget %>%
         filter(.data$hsr != "0"),
-      rprt = c("iteration", "reg", "typ", "loc", "inc", "ttot")
+      rprt = c("iteration", "region", "typ", "loc", "inc", "ttot")
     )
     p_renovationCalibTargetTotHs <- .computeSum(
       p_renovationCalibTarget,
-      rprt = c("iteration", "reg", "typ", "loc", "inc", "hsr", "ttot")
+      rprt = c("iteration", "region", "typ", "loc", "inc", "hsr", "ttot")
     )
   }
 
@@ -145,19 +145,22 @@ reportCalibration <- function(gdx, flowTargets = TRUE) {
 
   # Aggregate quantities -------------------------------------------------------
 
-  v_stockTot <- .computeSum(v_stock, rprt = c("iteration", "reg", "typ", "loc", "inc", "ttot"))
-  v_stockTotHs <- .computeSum(v_stock, rprt = c("iteration", "reg", "typ", "loc", "inc", "hsr", "ttot"))
+  v_stockTot <- .computeSum(v_stock, rprt = c("iteration", "region", "typ", "loc", "inc", "ttot"))
+  v_stockTotHs <- .computeSum(v_stock, rprt = c("iteration", "region", "typ", "loc", "inc", "hsr", "ttot"))
 
   if (isTRUE(flowTargets)) {
-    v_constructionTot <- .computeSum(v_construction, rprt = c("iteration", "reg", "typ", "loc", "inc", "ttot"))
-    v_constructionTotHs <- .computeSum(v_construction, rprt = c("iteration", "reg", "typ", "loc", "inc", "hsr", "ttot"))
+    v_constructionTot <- .computeSum(v_construction, rprt = c("iteration", "region", "typ", "loc", "inc", "ttot"))
+    v_constructionTotHs <- .computeSum(
+      v_construction,
+      rprt = c("iteration", "region", "typ", "loc", "inc", "hsr", "ttot")
+    )
 
     v_renovationTot <- .computeSum(
       v_renovation %>%
         filter(.data$hsr != 0),
-      rprt = c("iteration", "reg", "typ", "loc", "inc", "ttot")
+      rprt = c("iteration", "region", "typ", "loc", "inc", "ttot")
     )
-    v_renovationTotHs <- .computeSum(v_renovation, rprt = c("iteration", "reg", "typ", "loc", "inc", "hsr", "ttot"))
+    v_renovationTotHs <- .computeSum(v_renovation, rprt = c("iteration", "region", "typ", "loc", "inc", "hsr", "ttot"))
   }
 
 
@@ -198,9 +201,9 @@ reportCalibration <- function(gdx, flowTargets = TRUE) {
   if (isTRUE(diagnostics)) {
     out[["stepSize"]] <- stepSize
 
-    out[["descDirCon"]] <- .computeAvg(descDirCon, rprt = c("iteration", "reg", "typ", "loc", "inc", "hsr", "ttot"))
+    out[["descDirCon"]] <- .computeAvg(descDirCon, rprt = c("iteration", "region", "typ", "loc", "inc", "hsr", "ttot"))
 
-    out[["descDirRen"]] <- .computeAvg(descDirRen, rprt = c("iteration", "reg", "typ", "loc", "inc", "hsr", "ttot"))
+    out[["descDirRen"]] <- .computeAvg(descDirRen, rprt = c("iteration", "region", "typ", "loc", "inc", "hsr", "ttot"))
 
     # Aggregate d, i.e. the direction of steepest descent by heating system for late iterations
     out[["descDirConLate"]] <- out[["descDirCon"]] %>%
@@ -213,9 +216,15 @@ reportCalibration <- function(gdx, flowTargets = TRUE) {
   }
 
   # Aggregate specific costs
-  out[["specCostCon"]] <- .computeAvg(p_specCostCon, rprt = c("iteration", "reg", "typ", "loc", "inc", "hsr", "ttot"))
+  out[["specCostCon"]] <- .computeAvg(
+    p_specCostCon,
+    rprt = c("iteration", "region", "typ", "loc", "inc", "hsr", "ttot")
+  )
 
-  out[["specCostRen"]] <- .computeAvg(p_specCostRen, rprt = c("iteration", "reg", "typ", "loc", "inc", "hsr", "ttot"))
+  out[["specCostRen"]] <- .computeAvg(
+    p_specCostRen,
+    rprt = c("iteration", "region", "typ", "loc", "inc", "hsr", "ttot")
+  )
 
   # Aggregate by heating system (hs)
   out[["stockHs"]] <- v_stockTotHs
@@ -228,58 +237,61 @@ reportCalibration <- function(gdx, flowTargets = TRUE) {
 
   # Aggregate by vintage (vin)
   if (isFALSE(aggVin)) {
-    out[["stockVin"]] <- .computeSum(v_stock, rprt = c("iteration", "reg", "typ", "loc", "inc", "vin", "ttot"))
+    out[["stockVin"]] <- .computeSum(v_stock, rprt = c("iteration", "region", "typ", "loc", "inc", "vin", "ttot"))
 
-    out[["renVin"]] <- .computeSum(v_renovation, rprt = c("iteration", "reg", "typ", "loc", "inc", "vin", "ttot"))
+    out[["renVin"]] <- .computeSum(v_renovation, rprt = c("iteration", "region", "typ", "loc", "inc", "vin", "ttot"))
   }
 
 
   ## Aggregate deviations ====
 
   # Aggregate across all dimensions
-  out[["stockDevAgg"]] <- .computeSumSq(v_stockDev, rprt = c("iteration", "reg", "typ", "loc", "inc", "ttot"),
+  out[["stockDevAgg"]] <- .computeSumSq(v_stockDev, rprt = c("iteration", "region", "typ", "loc", "inc", "ttot"),
                                         addSign = FALSE)
 
   if (isTRUE(flowTargets)) {
-    out[["conDevAgg"]] <- .computeSumSq(v_constructionDev, rprt = c("iteration", "reg", "typ", "loc", "inc", "ttot"),
+    out[["conDevAgg"]] <- .computeSumSq(v_constructionDev, rprt = c("iteration", "region", "typ", "loc", "inc", "ttot"),
                                         addSign = FALSE)
 
-    out[["renDevAgg"]] <- .computeSumSq(v_renovationDev, rprt = c("iteration", "reg", "typ", "loc", "inc", "ttot"),
+    out[["renDevAgg"]] <- .computeSumSq(v_renovationDev, rprt = c("iteration", "region", "typ", "loc", "inc", "ttot"),
                                         addSign = FALSE)
 
     out[["flowDevAgg"]] <- .computeFlowSum(out[["conDevAgg"]], out[["renDevAgg"]])
   }
 
   # Aggregate by heating system (hs)
-  out[["stockDevHs"]] <- .computeSumSq(v_stockDev, rprt = c("iteration", "reg", "typ", "loc", "inc", "hsr", "ttot"))
+  out[["stockDevHs"]] <- .computeSumSq(v_stockDev, rprt = c("iteration", "region", "typ", "loc", "inc", "hsr", "ttot"))
 
   if (isTRUE(flowTargets)) {
     out[["conDevHs"]] <- .computeSumSq(
       v_constructionDev,
-      rprt = c("iteration", "reg", "typ", "loc", "inc", "hsr", "ttot")
+      rprt = c("iteration", "region", "typ", "loc", "inc", "hsr", "ttot")
     )
 
     out[["renDevHs"]] <- .computeSumSq(
       v_renovationDev,
-      rprt = c("iteration", "reg", "typ", "loc", "inc", "hsr", "ttot")
+      rprt = c("iteration", "region", "typ", "loc", "inc", "hsr", "ttot")
     )
 
     out[["flowDevHs"]] <- .computeFlowSum(out[["conDevHs"]], out[["renDevHs"]])
 
     out[["renDevSepGabo"]] <- .computeSumSq(
       p_renovationDevSepGabo,
-      rprt = c("iteration", "reg", "typ", "loc", "inc", "hsr", "ttot")
+      rprt = c("iteration", "region", "typ", "loc", "inc", "hsr", "ttot")
     )
   }
 
   # Aggregate by vintage (vin)
   if (isFALSE(aggVin)) {
-    out[["stockDevVin"]] <- .computeSumSq(v_stockDev, rprt = c("iteration", "reg", "typ", "loc", "inc", "vin", "ttot"))
+    out[["stockDevVin"]] <- .computeSumSq(
+      v_stockDev,
+      rprt = c("iteration", "region", "typ", "loc", "inc", "vin", "ttot")
+    )
 
     if (isTRUE(flowTargets)) {
       out[["renDevVin"]] <- .computeSumSq(
         v_renovationDev,
-        rprt = c("iteration", "reg", "typ", "loc", "inc", "vin", "ttot")
+        rprt = c("iteration", "region", "typ", "loc", "inc", "vin", "ttot")
       )
     }
   }
