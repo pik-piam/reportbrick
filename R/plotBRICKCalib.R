@@ -57,7 +57,6 @@ plotBRICKCalib <- function(path = ".", cal = "BRICK_calibration_report.csv",
                           package = "reportbrick"),
             finalOutputDir, overwrite = TRUE)
 
-
   # Call the Rmd file
   render(
     file.path(finalOutputDir, "plotsCalibration.Rmd"),

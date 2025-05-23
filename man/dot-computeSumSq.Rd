@@ -4,12 +4,14 @@
 \alias{.computeSumSq}
 \title{Compute the sum of the squares in a data frame}
 \usage{
-.computeSumSq(df, rprt = "")
+.computeSumSq(df, rprt = "", addSign = TRUE)
 }
 \arguments{
 \item{df}{data frame, containing the data to be evaluated}
 
 \item{rprt}{character, column names for which the sum of the squares should be reported separately}
+
+\item{addSign}{logical indicating whether the heuristic sign of the square should be computed}
 }
 \value{
 data frame sum of squares as value column

@@ -6,6 +6,7 @@ output:
     toc: true
     toc_depth: 3
     fig_caption: false
+geometry: "a4paper,left=1cm,right=1cm,top=1cm,bottom=1cm,footnotesep=0.0cm,footskip=0.1cm"
 params:
     docTitle: "BRICK calibration report"
     cal: "BRICK_calibration_report.csv"
@@ -13,6 +14,8 @@ params:
     scenNames: NULL
     savePlots: false
     name: ""
+    figWidth: 15 
+    figHeight: 10
 ---
 
 ```{r setup, include=FALSE}
@@ -26,7 +29,10 @@ knitr::opts_chunk$set(
   echo = FALSE,
   error = TRUE,
   message = FALSE,
-  warning = FALSE
+  warning = FALSE,
+  fig.width = params$figWidth,
+  fig.height = params$figHeight,
+  fig.pos = "H"
 )
 ```
 
@@ -52,19 +58,44 @@ savePlots <- params$savePlots
 outName <- params$name
 outPath <- dirname(filePath[1])
 
+customPlots <- params$customPlots
+extendedPlots <- params$extendedPlots
+
 # Standard procedure to write a calibration plot
 .createCalibrationPlot <- function(data, varName, outPath, outName = "",
                                    color = NULL, facets = c("loc", "typ"),
-                                   yToZero = TRUE, savePlots = FALSE) {
+                                   yToZero = TRUE, savePlots = FALSE,
+                                   keepCol = NULL, addColor = NULL, newColors = NULL,
+                                   textSize = 20) {
   # Extract the data
   plData <- data %>%
     filter(.data[["variable"]] %in% varName) %>%
-    select(where(~ any(!is.na(.x))))
+    select(any_of(keepCol),
+           # where(~ any(!is.na(.x)) && (length(unique(.x)) > 1) || unique(.x) %in% varName))
+           where(~ any(!is.na(.x)) || unique(.x) %in% varName))
+
   # Read color map if available and rename corresponding entries
   if (!is.null(color)) {
-    colorMap <- unlist(readBrickSets(NULL)[[color]][["elements"]])
-    plData <- plData %>%
-      mutate(across(any_of(color), ~ factor(colorMap[.x], levels = colorMap)))
+    if (any(is.na(plData[[color]]))) {
+      plData <- replace_na(plData, stats::setNames(list("none"), color))
+      addColor <- stats::setNames(c(addColor, "None"), c(names(addColor), "none"))
+      newColors <- rbind(newColors, data.frame(row.names = "None", color = "black"))
+    }
+    colorMap <- c(unlist(readBrickSets(NULL)[[color]][["elements"]]), addColor)
+    if (!is.null(colorMap)) {
+      plData <- plData %>%
+        mutate(across(any_of(color), ~ factor(colorMap[.x], levels = colorMap)))
+    } else {
+      plData <- plData %>%
+        mutate(across(any_of(color), ~ factor(.x, levels = unique(.x))))
+    }
+    if (!color %in% colnames(plData)) color <- NULL
+  }
+  # Remove inexisting facets
+  if (all(facets %in% colnames(plData))) {
+    plData <- mutate(plData, across(any_of(facets), ~ factor(.x)))
+  } else {
+    facets <- NULL
   }
   # Create the plots
   plList <- mip::mipIterations(plData, returnGgplots = TRUE, xAxis = "iteration",
@@ -73,7 +104,10 @@ outPath <- dirname(filePath[1])
   # Modify, save and show the plots
   purrr::walk(plList, function(pl) {
     if (isTRUE(yToZero)) pl <- pl + ggplot2::expand_limits(y = 0)
-    if (!is.null(color)) pl <- pl + ggplot2::scale_colour_manual(values = mip::plotstyle(colorMap))
+    if (!is.null(color) && !is.null(colorMap)) {
+      pl <- pl + ggplot2::scale_colour_manual(values = c(mip::plotstyle(colorMap, unknown = newColors)))
+    }
+    pl <- pl + ggplot2::theme(text = ggplot2::element_text(size = textSize))
     # Currently, this overwrites previous plots so that only the last one remains
     if (isTRUE(savePlots)) {
       ggplot2::ggsave(file.path(outPath, paste0(paste(varName, outName, sep = "_"), ".png")), pl)
@@ -82,6 +116,7 @@ outPath <- dirname(filePath[1])
   })
 }
 
+
 ```
 
 
@@ -89,28 +124,126 @@ outPath <- dirname(filePath[1])
 
 if (length(filePath) == 1) {
   data <- utils::read.csv(filePath)
-  color <- NULL
+  color <- "ttot"
+  facets <- c("loc", "typ")
 } else if (length(filePath) > 1) {
   # If more than one file path is given: Assemble all data in one data frame
   data <- data.frame()
+  maxIter <- Inf
   for (scen in names(filePath)) {
     if (file.exists(filePath[[scen]])) {
       tmp <- utils::read.csv(filePath[[scen]]) %>%
         mutate(scenario = scen, .before = 1)
+      maxIter <- min(max(tmp[["iteration"]]), maxIter) # Find maximum common iteration
       data <- rbind(data, tmp)
     } else {
       warning("The file", filePath[[scen]], "does not exist and was skipped.")
     }
   }
+  # Filter for common iterations (TODO: maybe add a switch to suppress this)
+  data <- filter(data, .data[["iteration"]] <= maxIter)
   color <- "scenario"
+  facets <- "scenario"
 }
 
 ```
 
 
-## Absolute stock and flow deviations
+## Variable Reference Table
 
-```{r absolute stock and flow deviations}
+```{r}
+varReference <- read.csv(getSystemFile(file.path("plotsCalibrationReporting", "variableNames.csv"),
+                                       package = "reportbrick"))
+
+varReference %>%
+  kableExtra::kbl(
+    booktabs = TRUE,
+    col.names = c("Variable name", "Description")
+  ) %>%
+  kableExtra::kable_styling(
+    bootstrap_options = c("striped", "condensed"),
+    latex_options = c("HOLD_position")
+  ) %>%
+  # kableExtra::column_spec(1:2, background = bkgndColors) %>%
+  kableExtra::column_spec(1, width = "3.5cm") %>%
+  kableExtra::column_spec(2, width = "15cm")
+```
+
+# Overview
+
+## Relevant quantities plotted as facets
+
+```{r relevant quantities as facets}
+ttotFirst <- unique(data$ttot[!is.na(data$ttot)])[1]
+dataRelQuant <- data %>%
+  filter(is.na(.data$ttot) | .data$ttot == ttotFirst) %>%
+  mutate(ttot = NA)
+
+.createCalibrationPlot(
+  dataRelQuant,
+  c("descDirRen", "flowDevAgg", "flowDevHs", "conDevHs", "specCostRen", "outerObjective",
+    "renDevHs", "stepSize", "stockDevHs"),
+  outPath,
+  outName = outName,
+  color = "hsr",
+  facets = "variable",
+  addColor = c(gabo_id = "Gas identical replacement"),
+  newColor = data.frame(row.names = "Gas identical replacement", color = "#8B8378")
+)
+.createCalibrationPlot(
+  dataRelQuant,
+  c("descDirRen", "flowDevRel", "flowDevHsRel", "conDevHsRel", "specCostRen", "renDevHsRel",
+    "renDevDiffGasRel", "stepSize", "stockDevAgg", "stockDevHsRel"),
+  outPath,
+  outName = outName,
+  color = "hsr",
+  facets = "variable",
+  addColor = c(gabo_id = "Gas identical replacement"),
+  newColor = data.frame(row.names = "Gas identical replacement", color = "#8B8378")
+)
+
+```
+
+
+# Stock and flow quantities
+
+## Stock and flows by heating system
+
+```{r stock and flows by hs}
+
+.createCalibrationPlot(data, "stockHs", outPath, outName = outName,
+                       color = "hsr", facets = facets, savePlots = savePlots)
+
+.createCalibrationPlot(data, "conHs", outPath, outName = outName,
+                       color = "hsr", facets = facets, savePlots = savePlots)
+
+.createCalibrationPlot(data, "renHs", outPath, outName = outName,
+                       color = "hsr", facets = facets, savePlots = savePlots)
+
+.createCalibrationPlot(data, "flowHs", outPath, outName = outName,
+                       color = "hsr", facets = facets, savePlots = savePlots)
+
+```
+
+## Stock and flows by vintage
+
+```{r stock and flows by vin}
+
+if (all(c("stockVin", "renVin") %in% data$variable)) {
+  .createCalibrationPlot(data, "stockVin", outPath, outName = outName,
+                         color = "vin", facets = facets, savePlots = savePlots)
+  .createCalibrationPlot(data, "renVin", outPath, outName = outName,
+                         color = "vin", facets = facets, savePlots = savePlots)
+}
+
+```
+
+
+# Absolute stock and flow deviations
+
+## Total absolute stock and flow deviations
+
+```{r Total absolute stock and flow deviations}
 
 .createCalibrationPlot(data, "stockDevAgg", outPath, outName = outName,
                        color = color, savePlots = savePlots)
@@ -126,10 +259,46 @@ if (length(filePath) == 1) {
 
 ```
 
+## Absolute deviations by heating system
 
-## Relative stock and flow deviations
+```{r absolute stock and flow deviations by hs}
 
-```{r relative stock and flow deviations}
+.createCalibrationPlot(data, "stockDevHs", outPath, outName = outName,
+                       color = "hsr", facets = facets, savePlots = savePlots)
+
+.createCalibrationPlot(data, "conDevHs", outPath, outName = outName,
+                       color = "hsr", facets = facets, savePlots = savePlots)
+
+.createCalibrationPlot(data, "renDevHs", outPath, outName = outName,
+                       color = "hsr", facets = facets, savePlots = savePlots)
+
+.createCalibrationPlot(data, "flowDevHs", outPath, outName = outName,
+                       color = "hsr", facets = facets, savePlots = savePlots)
+
+.createCalibrationPlot(data, "renDevSepGabo", outPath, outName = outName,
+                       color = "hsr", facets = facets, savePlots = savePlots,
+                       addColor = c(gabo_id = "Gas identical replacement"),
+                       newColor = data.frame(row.names = "Gas identical replacement", color = "#8B8378"))
+
+```
+
+## Absolute deviations by vintage
+
+```{r absolute stock and flow deviations by vin}
+if (all(c("stockDevVin", "renDevVin") %in% data$variable)) {
+  .createCalibrationPlot(data, "stockDevVin", outPath, outName = outName,
+                         color = "vin", facets = facets, savePlots = savePlots)
+  .createCalibrationPlot(data, "renDevVin", outPath, outName = outName,
+                         color = "vin", facets = facets, savePlots = savePlots)
+}
+```
+
+
+# Relative stock and flow deviations
+
+## Total relative stock and flow deviations
+
+```{r total relative stock and flow deviations}
 
 .createCalibrationPlot(data, "stockDevRel", outPath, outName = outName,
                        color = color, savePlots = savePlots)
@@ -145,42 +314,100 @@ if (length(filePath) == 1) {
 
 ```
 
-## Absolute deviations by heating system
-
-```{r absolute stock and flow deviations by hs}
-
-.createCalibrationPlot(data, "stockDevHs", outPath, outName = outName,
-                       color = "hsr", savePlots = savePlots)
-
-.createCalibrationPlot(data, "conDevHs", outPath, outName = outName,
-                       color = "hsr", savePlots = savePlots)
-
-.createCalibrationPlot(data, "renDevHs", outPath, outName = outName,
-                       color = "hsr", savePlots = savePlots)
-
-.createCalibrationPlot(data, "flowDevHs", outPath, outName = outName,
-                       color = "hsr", savePlots = savePlots)
-
-```
-
 ## Relative deviations by heating system
 
 ```{r relative stock and flow deviation by hs}
 
 .createCalibrationPlot(data, "stockDevHsRel", outPath, outName = outName,
-                       color = "hsr", savePlots = savePlots)
+                       color = "hsr", facets = facets, savePlots = savePlots)
 
 .createCalibrationPlot(data, "conDevHsRel", outPath, outName = outName,
-                       color = "hsr", savePlots = savePlots)
+                       color = "hsr", facets = facets, savePlots = savePlots)
 
 .createCalibrationPlot(data, "renDevHsRel", outPath, outName = outName,
-                       color = "hsr", savePlots = savePlots)
+                       color = "hsr", facets = facets, savePlots = savePlots)
 
 .createCalibrationPlot(data, "flowDevHsRel", outPath, outName = outName,
-                       color = "hsr", savePlots = savePlots)
+                       color = "hsr", facets = facets, savePlots = savePlots)
+
+.createCalibrationPlot(data, "renDevSepGaboRel", outPath, outName = outName,
+                       color = "hsr", facets = facets, savePlots = savePlots,
+                       addColor = c(gabo_id = "Gas identical replacement"),
+                       newColor = data.frame(row.names = "Gas identical replacement", color = "#FAEBD7"))
 
 ```
 
+## Deviation share by heating system
+
+```{r relative stock and flow deviation by hs, alternative 2}
+
+.createCalibrationPlot(data, "stockDevHsShare", outPath, outName = outName,
+                       color = "hsr", facets = facets, savePlots = savePlots)
+.createCalibrationPlot(data, "conDevHsShare", outPath, outName = outName,
+                       color = "hsr", facets = facets, savePlots = savePlots)
+.createCalibrationPlot(data, "renDevHsShare", outPath, outName = outName,
+                       color = "hsr", facets = facets, savePlots = savePlots)
+.createCalibrationPlot(data, "flowDevHsShare", outPath, outName = outName,
+                       color = "hsr", facets = facets, savePlots = savePlots)
+
+```
+
+## Relative deviations by vintage
+
+```{r relative stock and flow deviation by vin}
+
+if (all(c("stockDevVinRel", "renDevVinRel") %in% data$variable)) {
+  .createCalibrationPlot(data, "stockDevVinRel", outPath, outName = outName,
+                         color = "vin", facets = facets, savePlots = savePlots)
+  .createCalibrationPlot(data, "renDevVinRel", outPath, outName = outName,
+                         color = "vin", facets = facets, savePlots = savePlots)
+}
+
+```
+
+
+# Deviations of aggregate quantities
+
+## Total quantities
+
+```{r aggregate stock and flow deviations}
+
+.createCalibrationPlot(data, "stockTotDev", outPath, outName = outName,
+                       color = color, facets = facets, savePlots = savePlots)
+
+.createCalibrationPlot(data, "conTotDev", outPath, outName = outName,
+                       color = color, facets = facets, savePlots = savePlots)
+
+.createCalibrationPlot(data, "renTotDev", outPath, outName = outName,
+                       color = color, facets = facets, savePlots = savePlots)
+
+```
+
+## Quantities by heating system
+
+```{r agg stock and flow deviations by hs}
+
+.createCalibrationPlot(data, "stockTotHsDev", outPath, outName = outName,
+                       color = "hsr", facets = facets, savePlots = savePlots)
+
+.createCalibrationPlot(data, "conTotHsDev", outPath, outName = outName,
+                       color = "hsr", facets = facets, savePlots = savePlots)
+
+.createCalibrationPlot(data, "renTotHsDev", outPath, outName = outName,
+                       color = "hsr", facets = facets, savePlots = savePlots)
+
+```
+
+# Optimization quantities
+
+## Outer objective
+
+```{r outer objective}
+
+.createCalibrationPlot(data, "outerObjective", outPath, outName = outName,
+                       color = color, savePlots = savePlots)
+
+```
 
 ## Step size
 
@@ -190,14 +417,31 @@ if (length(filePath) == 1) {
                        color = color, savePlots = savePlots)
 ```
 
+## Intangible costs by heating system
+
+```{r intangible costs by heating system}
+
+.createCalibrationPlot(data, "specCostCon", outPath, outName = outName,
+                       color = "hsr", savePlots = savePlots)
+
+.createCalibrationPlot(data, "specCostRen", outPath, outName = outName,
+                       color = "hsr", savePlots = savePlots)
+```
+
 
 ## Descent direction by heating system
 
-```{r descent direction}
+```{r descent direction by heating system}
 
 .createCalibrationPlot(data, "descDirCon", outPath, outName = outName,
                        color = "hsr", savePlots = savePlots)
 
 .createCalibrationPlot(data, "descDirRen", outPath, outName = outName,
+                       color = "hsr", savePlots = savePlots)
+
+.createCalibrationPlot(data, "descDirConLate", outPath, outName = outName,
+                       color = "hsr", savePlots = savePlots)
+
+.createCalibrationPlot(data, "descDirRenLate", outPath, outName = outName,
                        color = "hsr", savePlots = savePlots)
 ```
