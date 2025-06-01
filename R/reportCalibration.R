@@ -38,17 +38,18 @@ reportCalibration <- function(gdx, flowTargets = TRUE) {
   tCalib <- cfg[["calibperiods"]]
 
   # Read calibration type and whether vintages are aggregated
-  calibOptim <- cfg[["switches"]][["RUNTYPE"]] == "calibrationOptimization"
-  aggVin <- cfg[["switches"]][["AGGREGATEDIM"]] == "vin"
+  calibOptim <- identical(cfg[["switches"]][["RUNTYPE"]], "optimization")
+  aggVin <- identical(cfg[["switches"]][["AGGREGATEDIM"]], "vin")
+  removeDims <- if (isTRUE(aggVin)) "vin" else NULL
 
 
   ## Diagnostic parameters ====
 
-  diagnostics <- FALSE
-  if (all(file.exists(file.path(path, "stepSizeParamsIter.csv"),
-                      file.path(path, "deviationConIter.csv"),
-                      file.path(path, "deviationRenIter.csv"),
-                      file.path(path, "outerObjectiveAllIter.csv")))) {
+  diagnosticsExist <- all(file.exists(file.path(path, c("stepSizeParamsIter.csv",
+                                                        "deviationConIter.csv",
+                                                        "deviationRenIter.csv",
+                                                        "outerObjectiveAllIter.csv"))))
+  if (diagnosticsExist) {
     stepSize <- read.csv(file.path(path, "stepSizeParamsIter.csv")) %>%
       select(-any_of(c("delta", "phiDeriv", "minOuterObj", "minStepSize"))) %>%
       rename(value = "stepSize")
@@ -61,7 +62,6 @@ reportCalibration <- function(gdx, flowTargets = TRUE) {
       filter(.data$iterA == 1) %>%
       select(-any_of(c("fA", "iterA"))) %>%
       rename(value = "f")
-    diagnostics <- TRUE
   }
 
 
@@ -82,7 +82,7 @@ reportCalibration <- function(gdx, flowTargets = TRUE) {
                                asMagpie = FALSE, ttotFilter = tCalib)
 
   dims <- .getDims(list(stock = v_stock, construction = v_construction, renovation = v_renovation),
-                   removeVin = aggVin)
+                   removeDims = removeDims)
 
   # Apply potential removal of vintage dimension
   v_stock <- .computeSum(v_stock, rprt = dims$stock)
@@ -92,12 +92,12 @@ reportCalibration <- function(gdx, flowTargets = TRUE) {
 
   ## Specific costs ====
 
-  p_specCostCon <- .readGdxIter(gdx, "p_specCostCon",
-                                maxIter, asMagpie = FALSE, ttotFilter = tCalib, replaceVar = TRUE) %>%
+  p_intangCostCon <- .readGdxIter(gdx, "p_specCostCon",
+                                  maxIter, asMagpie = FALSE, ttotFilter = tCalib, replaceVar = TRUE) %>%
     filter(.data$cost == "intangible")
 
-  p_specCostRen <- .readGdxIter(gdx, "p_specCostRen",
-                                maxIter, asMagpie = FALSE, ttotFilter = tCalib) %>%
+  p_intangCostRen <- .readGdxIter(gdx, "p_specCostRen",
+                                  maxIter, asMagpie = FALSE, ttotFilter = tCalib) %>%
     filter(.data$cost == "intangible")
 
 
@@ -198,12 +198,14 @@ reportCalibration <- function(gdx, flowTargets = TRUE) {
 
   ## Aggregate total quantities ====
 
-  if (isTRUE(diagnostics)) {
+  if (isTRUE(diagnosticsExist)) {
     out[["stepSize"]] <- stepSize
 
-    out[["descDirCon"]] <- .computeAvg(descDirCon, rprt = c("iteration", "region", "typ", "loc", "inc", "hsr", "ttot"))
+    out[["descDirCon"]] <- .computeAvg(descDirCon, rprt = c("iteration", "region", "typ", "loc", "inc", "hsr", "ttot"),
+                                       exclude = list(hsr = "h2bo"))
 
-    out[["descDirRen"]] <- .computeAvg(descDirRen, rprt = c("iteration", "region", "typ", "loc", "inc", "hsr", "ttot"))
+    out[["descDirRen"]] <- .computeAvg(descDirRen, rprt = c("iteration", "region", "typ", "loc", "inc", "hsr", "ttot"),
+                                       exclude = list(hs = "h2bo", hsr = "h2bo"))
 
     # Aggregate d, i.e. the direction of steepest descent by heating system for late iterations
     out[["descDirConLate"]] <- out[["descDirCon"]] %>%
@@ -217,13 +219,15 @@ reportCalibration <- function(gdx, flowTargets = TRUE) {
 
   # Aggregate specific costs
   out[["specCostCon"]] <- .computeAvg(
-    p_specCostCon,
-    rprt = c("iteration", "region", "typ", "loc", "inc", "hsr", "ttot")
+    p_intangCostCon,
+    rprt = c("iteration", "region", "typ", "loc", "inc", "hsr", "ttot"),
+    exclude = list(hsr = "h2bo")
   )
 
   out[["specCostRen"]] <- .computeAvg(
-    p_specCostRen,
-    rprt = c("iteration", "region", "typ", "loc", "inc", "hsr", "ttot")
+    p_intangCostRen,
+    rprt = c("iteration", "region", "typ", "loc", "inc", "hsr", "ttot"),
+    exclude = list(hs = "h2bo", hsr = "h2bo")
   )
 
   # Aggregate by heating system (hs)
@@ -391,13 +395,12 @@ reportCalibration <- function(gdx, flowTargets = TRUE) {
 #' one, i.e. \code{qty} and \code{value}.
 #'
 #' @param calibObj list, calibration targets
-#' @param removeVin logical, whether vintage dimension should be removed
+#' @param removeDims character, additional dimensions to be removed from the output
 #'
-.getDims <- function(calibObj, removeVin) {
-  removeDim <- if (isTRUE(removeVin)) "vin" else NULL
+.getDims <- function(calibObj, removeDims = NULL) {
   lapply(calibObj, function(obj) {
     dims <- colnames(obj)
-    setdiff(dims[2:(length(dims) - 1)], removeDim)
+    setdiff(dims, c(removeDims, "qty", "value"))
   })
 }
 
@@ -502,18 +505,39 @@ reportCalibration <- function(gdx, flowTargets = TRUE) {
 
 }
 
+#' Exclude data matching giving filter criteria from a data set
+#'
+#' @param data data frame with the data set
+#' @param exclude named list with entries to be excluded from the data.
+#'   The name gives the column name from which the entries given by the value should
+#'   be removed.
+#' @returns the given data set without the rows identified by the filter criteria
+#'
+#' @importFrom dplyr .data filter
+#'
+.excludeRows <- function(data, exclude) {
+  for (nm in names(exclude)) {
+    data <- filter(data, .data[[nm]] != exclude[[nm]])
+  }
+  data
+}
+
 #' Compute the mean value in a data frame
 #'
 #' @param df data frame, containing the data to be evaluated
 #' @param rprt character, column names for which the mean should be reported separately
+#' @param exclude named list with entries to be excluded from the data.
+#'   The name gives the column name from which the entries given by the value should
+#'   be removed.
 #'
 #' @returns data frame averages as value column
 #'
 #' @importFrom dplyr %>% across any_of .data group_by summarise
 #'
-.computeAvg <- function(df, rprt = "") {
+.computeAvg <- function(df, rprt = "", exclude = list()) {
 
   df %>%
+    .excludeRows(exclude) %>%
     group_by(across(any_of(rprt))) %>%
     summarise(value = mean(.data[["value"]], na.rm = TRUE), .groups = "drop")
 
@@ -523,13 +547,17 @@ reportCalibration <- function(gdx, flowTargets = TRUE) {
 #'
 #' @param df data frame containing the data to be evaluated
 #' @param rprt character, column names for which the sum should be reported separately
+#' @param exclude named list with entries to be excluded from the data.
+#'   The name gives the column name from which the entries given by the value should
+#'   be removed.
 #'
 #' @returns data frame with summed values
 #' @importFrom dplyr %>% .data across any_of group_by summarise
 #'
-.computeSum <- function(df, rprt = "") {
+.computeSum <- function(df, rprt = "", exclude = list()) {
 
   df %>%
+    .excludeRows(exclude) %>%
     group_by(across(any_of(rprt))) %>%
     summarise(value = sum(.data[["value"]], na.rm = TRUE), .groups = "drop")
 
@@ -644,7 +672,7 @@ reportCalibration <- function(gdx, flowTargets = TRUE) {
               rename(ren = "value"),
             by = setdiff(intersect(colnames(con), colnames(ren)), "value")) %>%
     replace_na(list(con = 0)) %>%
-    mutate(value = sign(.data[["con"]] + .data[["ren"]]) * abs(.data[["con"]] + .data[["ren"]])) %>%
+    mutate(value = sign(.data[["con"]] + .data[["ren"]]) * (abs(.data[["con"]]) + abs(.data[["ren"]]))) %>%
     select(-"con", -"ren")
 }
 

@@ -4,12 +4,12 @@
 \alias{.getDims}
 \title{Get dimension names from stock and flow objects}
 \usage{
-.getDims(calibObj, removeVin)
+.getDims(calibObj, removeDims = NULL)
 }
 \arguments{
 \item{calibObj}{list, calibration targets}
 
-\item{removeVin}{logical, whether vintage dimension should be removed}
+\item{removeDims}{character, additional dimensions to be removed from the output}
 }
 \description{
 Gives the column names of a list of data frames except the first and the last

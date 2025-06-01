@@ -4,12 +4,16 @@
 \alias{.computeAvg}
 \title{Compute the mean value in a data frame}
 \usage{
-.computeAvg(df, rprt = "")
+.computeAvg(df, rprt = "", exclude = list())
 }
 \arguments{
 \item{df}{data frame, containing the data to be evaluated}
 
 \item{rprt}{character, column names for which the mean should be reported separately}
+
+\item{exclude}{named list with entries to be excluded from the data.
+The name gives the column name from which the entries given by the value should
+be removed.}
 }
 \value{
 data frame averages as value column
