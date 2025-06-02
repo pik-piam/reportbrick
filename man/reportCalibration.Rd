@@ -4,11 +4,14 @@
 \alias{reportCalibration}
 \title{Read in model results from calibration for each iteration, calculate deviation}
 \usage{
-reportCalibration(gdx)
+reportCalibration(gdx, flowTargets = TRUE)
 }
 \arguments{
 \item{gdx}{path to a gdx; it is assumed that for each iteration a gdx is present
 with this path and the iteration number inserted at the end.}
+
+\item{flowTargets}{logical, if set to FALSE, the function does not expect the presence of targets
+for the flows}
 }
 \description{
 Read in model results from calibration for each iteration, calculate deviation

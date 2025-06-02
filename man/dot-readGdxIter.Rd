@@ -8,9 +8,11 @@
   gdx,
   symbol,
   maxIter,
+  minIter = 0,
   asMagpie = TRUE,
   ttotFilter = NULL,
-  replaceVar = FALSE
+  replaceVar = FALSE,
+  dims = NULL
 )
 }
 \arguments{
@@ -22,11 +24,16 @@ adhere to the structure: If \code{gdx = <path/to/file/name.gdx}, the function lo
 
 \item{maxIter}{Last iteration to be read}
 
+\item{minIter}{First iteration to be read}
+
 \item{asMagpie}{logical, convert to magpie object?}
 
 \item{ttotFilter}{numeric/factor, time periods to filter for}
 
 \item{replaceVar}{logical, replace column names \code{bs} and \code{hs} by \code{bsr} and \code{hsr}?}
+
+\item{dims}{character, containing the colum names expected for the object that is read in.
+Only required if the object does not exist to create replacement with NAs}
 }
 \value{
 data frame of all results read in

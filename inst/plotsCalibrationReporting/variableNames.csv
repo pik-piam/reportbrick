@@ -1,0 +1,41 @@
+variable,description
+targetFunction,Target function of the optimization
+stepSize,Step size of the optimization
+intangCostConHs,Intangible costs of construction by heating system
+intangCostRenHs,Intangible costs of renovation by heating system
+descDirConHs,Direction of the adjustment step in the optimization of intangible construction costs by heating system
+descDirRenHs,Direction of the adjustment step in the optimization of intangible renovation costs by heating system
+descDirConHsLate,"Direction of the adjustment step in the optimization of intangible construction costs by heating system; late iterations"
+descDirRenHsLate,"Direction of the adjustment step in the optimization of intangible renovation costs by heating system; late iterations"
+stockHs,Stock by heating system
+conHs,Construction by heating system
+renHs,Renovation by heating system
+flowHs,All flows (i.e. construction and renovation) by heating system
+stockVin,Stock by vintage
+renVin,Renovation by vintage
+stockDevAgg,Total Deviation of the stock from historic values
+conDevAgg,Total Deviation of construction from historic values
+renDevAgg,Total Deviation of renovation from historic values
+flowDevAgg,Total Deviation of all flows from historic values
+stockDevHs,Deviation of the stock by heating system
+conDevHs,Deviation of construction by heating system
+renDevHs,Deviation of renovation by heating system
+flowDevHs,Deviation of all flows by heating system
+renDevSepGabo,Deviation of renovation by heating system with identical replacement of gas boilers viewed separately
+stockDevVin,Deviation of the stock by vintage
+renDevVin,Deviation of renovations by vintage
+stockDevRel,Total Deviation of the stock relative to total historical stock
+conDevRel,Total Deviation of construction relative to total historical construction
+renDevRel,Total Deviation of renovation relative to historical renovations
+flowDevRel,Total Deviation of all flows relative to historical flows
+stockDevHsRel,Relative Deviation of the stock by heating system
+conDevHsRel,Relative Deviation of construction by heating system
+renDevHsRel,Relative Deviation of renovation by heating system
+flowDevHsRel,Relative Deviation of all flows by heating system
+renDevSepGaboRel,Relative Deviation of renovation by heating system with identical replacement of gas boilers viewed separately
+stockDevHsShare,Share of the total stock deviation by heating system
+conDevHsShare,Share of the total construction deviation by heating system
+renDevHsShare,Share of the total renovation deviation by heating system
+flowDevHsShare,Share of the total flow deviation by heating system
+stockDevVinRel,Relative Deviation of the stock by vintage
+renDevVinRel,Relative Deviation of renovations by vintage
