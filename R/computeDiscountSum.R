@@ -33,7 +33,7 @@ computeDiscountSum <- function(df, dfDt, dfDiscount, ttotNum, ttot2Num) {
                 rename(discountOut = "value"),
               by = c("ttot2" = "ttot", "typ")) %>%
     mutate(discount = .data[["discountOut"]] / .data[["discountIn"]]) %>%
-    group_by(across(any_of(c("hs", "vin", "reg", "loc", "typ", "ttot")))) %>%
+    group_by(across(any_of(c("hs", "vin", "region", "loc", "typ", "ttot")))) %>%
     mutate(cumVal = cumsum(.data[["value"]] * .data[["discount"]] * .data[["dt"]])) %>%
     ungroup() %>%
     select(-"dt", -"discountIn", -"discountOut", -"discount")
