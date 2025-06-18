@@ -21,7 +21,7 @@ computeLCC <- function(dfLt, dfCostsOpe, dfCostsRen, dfDt, dfDiscount) {
     rename(lccOpe = "value") %>%
     rename_with(~ if ("hsr" %in% colnames(dfCostsRen)) paste0(.x, "r") else .x, .cols = "hs") %>%
     left_join(dfCostsRen,
-              by = c(hsName, "vin", "reg", "loc", "typ", "ttot")) %>%
+              by = c(hsName, "vin", "region", "loc", "typ", "ttot")) %>%
     pivot_longer(cols = all_of(c("tangible", "intangible", "lccOpe")),
                  names_to = "costType", values_to = "value") %>%
     mutate(bs = "low")
@@ -49,8 +49,8 @@ computeLCC <- function(dfLt, dfCostsOpe, dfCostsRen, dfDt, dfDiscount) {
   dfCosts <- computeDiscountSum(dfCosts, dfDt, dfDiscount, unique(dfLt[["ttot"]]), unique(dfLt[["ttot2"]]))
 
   # Compute Lifetime operational costs based on lifetime data
-  dfLt%>%
-    left_join(dfCosts, by = c("hs", "vin", "reg", "loc", "typ", "ttot", "ttot2")) %>%
-    group_by(across(all_of(c("qty", "hs", "vin", "reg", "loc", "typ", "ttot")))) %>%
+  dfLt %>%
+    left_join(dfCosts, by = c("hs", "vin", "region", "loc", "typ", "ttot", "ttot2")) %>%
+    group_by(across(all_of(c("qty", "hs", "vin", "region", "loc", "typ", "ttot")))) %>%
     summarise(value = sum(.data[["relVal"]] * .data[["cumVal"]]), .groups = "drop")
 }

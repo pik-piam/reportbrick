@@ -19,12 +19,12 @@ generateQuantShares <- function() {
   #   select(-"hs", -"dt")
   #
   # renLccDiff <- renLcc %>%
-  #   left_join(renLccGabo, by = c("bs", "vin", "reg", "loc", "typ", "inc", "ttot")) %>%
+  #   left_join(renLccGabo, by = c("bs", "vin", "region", "loc", "typ", "inc", "ttot")) %>%
   #   mutate(value = .data[["lcc"]] - .data[["lccGabo"]]) %>%
   #   select(-"lccOpe", -"lccRen", -"discount")
   #
   # renQuantShare <- v_renovationIn %>%
-  #   left_join(v_renovationGabo, by = c("qty", "bs", "vin", "reg", "loc", "typ", "inc", "ttot")) %>%
+  #   left_join(v_renovationGabo, by = c("qty", "bs", "vin", "region", "loc", "typ", "inc", "ttot")) %>%
   #   mutate(value = log(.data[["value"]] / .data[["valGabo"]])) %>%
   #   select(-"dt", -"valGabo")
   #

@@ -10,10 +10,13 @@
 #TODO: Proper handling of hs vs hsr
 #TODO: Proper handling of building shell!!! (Ignored for the time being)
 
-reportLCCShare <- function(gdx, pathLt = NULL) {
+reportLCCShare <- function(path, gdxName = "output.gdx", pathLt = NULL) {
+  
+  gdx <- file.path(path, gdxName)
+  config <- yaml::read_yaml(file.path(path, "config", "config_COMPILED.yaml"))
 
   if (is.null(pathLt)) pathLt <- "C:/Users/ricardar/Documents/PIAM/brick/inst/input/f_lifetimeHeatingSystem.cs4r"
-  pathHs <- getSystemFile("extdata", "sectoral", "heatingSystem.csv",
+  pathHs <- getSystemFile("extdata", "sectoral", "dim_hs.csv",
                           package = "brick", mustWork = TRUE)
   path <- dirname(gdx)
 
@@ -61,21 +64,19 @@ reportLCCShare <- function(gdx, pathLt = NULL) {
   # Load parameters (Discount rate, price sensitivity, UE demand, Weibull parameters)
   p_discountFac <- readGdxSymbol(gdx, "p_discountFac", asMagpie = FALSE) %>%
     mutate(ttot = as.numeric(levels(.data[["ttot"]]))[.data[["ttot"]]])
-  priceSensBs <- readGdxSymbol(gdx, "priceSensBs", asMagpie = FALSE)
-  priceSensHs <- readGdxSymbol(gdx, "priceSensHs", asMagpie = FALSE) %>%
-    pivot_wider(names_from = "var", values_from = "value") %>%
-    unlist()
+  priceSensBs <- unlist(config[["priceSens"]][["bs"]])
+  priceSensHs <- unlist(config[["priceSens"]][["hs"]])
   p_ueDemand <- readGdxSymbol(gdx, "p_ueDemand", asMagpie = FALSE)
   # Weibull parameters have to be read from cs4r!
   lifeTimeHs <- read.csv(pathLt, header = FALSE, comment.char = "*")
-  colnames(lifeTimeHs) <- c("reg", "typ", "hs", "variable", "value")
+  colnames(lifeTimeHs) <- c("region", "typ", "hs", "variable", "value")
   # Energy ladder specifications have to be read from csv
   energyLadder <- read.csv(pathHs) %>%
     select("hs", "energyLadder")
 
   # TODO: Write the filtering properly
   lifeTimeHs <- pivot_wider(lifeTimeHs, names_from = "variable", values_from = "value") %>%
-    filter(.data[["reg"]] %in% levels(v_construction[["reg"]]),
+    filter(.data[["region"]] %in% levels(v_construction[["region"]]),
            .data[["typ"]] %in% levels(v_construction[["typ"]])) %>%
     mutate(across(where(is.character), as.factor))
 
@@ -145,10 +146,28 @@ reportLCCShare <- function(gdx, pathLt = NULL) {
   # COMPUTE EX-ANTE LIFETIME PROBABILITIES -------------------------------------
 
   # Compute life time probabilities of initial stock
-  stockInitLtAnte <- computeLtAnte("stock", v_stockInit, ttotNum, lifeTimeHs, dims, p_dt = p_dt)
-  conLtAnte <- computeLtAnte("construction", conVin, ttotNum, lifeTimeHs, dims)
-  renLtAnte <- computeLtAnte("renovation", v_renovation, ttotNum, lifeTimeHs, dims,
+  stockInitLtAnteC <- computeLtAnte("stock", v_stockInit, ttotNum, lifeTimeHs, dims, p_dt = p_dt)
+  conLtAnteC <- computeLtAnte("construction", conVin, ttotNum, lifeTimeHs, dims)
+  renLtAnteC <- computeLtAnte("renovation", v_renovation, ttotNum, lifeTimeHs, dims,
                                       dataValue = v_renovationIn)
+
+  out[["stockInitLtAnteC"]] <- stockInitLtAnteC
+  out[["conLtAnteC"]] <- conLtAnteC
+  out[["renLtAnteC"]] <- renLtAnteC
+
+  checkLtAnteC <- .checkLifetimeResults(renLtAnteC, dims)
+  checkLtAnteCInitStock <- .checkLifetimeResults(stockInitLtAnteC, dims)
+
+
+  # COMPUTE EX-ANTE LIFETIME PROBABILITIES  (SIMPLE METHOD) --------------------
+
+  # Compute life time probabilities of initial stock
+  stockInitLtAnte <- computeLtAnte("stock", v_stockInit, ttotNum, lifeTimeHs, dims,
+                                   runSimple = TRUE, p_dt = p_dt)
+  conLtAnte <- computeLtAnte("construction", conVin, ttotNum, lifeTimeHs, dims,
+                             runSimple = TRUE, p_dt = p_dt)
+  renLtAnte <- computeLtAnte("renovation", v_renovation, ttotNum, lifeTimeHs, dims,
+                             runSimple = TRUE, p_dt = p_dt, dataValue = v_renovationIn)
 
   out[["stockInitLtAnte"]] <- stockInitLtAnte
   out[["conLtAnte"]] <- conLtAnte
@@ -156,24 +175,6 @@ reportLCCShare <- function(gdx, pathLt = NULL) {
 
   checkLtAnte <- .checkLifetimeResults(renLtAnte, dims)
   checkLtAnteInitStock <- .checkLifetimeResults(stockInitLtAnte, dims)
-
-
-  # COMPUTE EX-ANTE LIFETIME PROBABILITIES  (SIMPLE METHOD) --------------------
-
-  # Compute life time probabilities of initial stock
-  stockInitLtAnteS <- computeLtAnte("stock", v_stockInit, ttotNum, lifeTimeHs, dims,
-                                   runSimple = TRUE, p_dt = p_dt)
-  conLtAnteS <- computeLtAnte("construction", conVin, ttotNum, lifeTimeHs, dims,
-                             runSimple = TRUE, p_dt = p_dt)
-  renLtAnteS <- computeLtAnte("renovation", v_renovation, ttotNum, lifeTimeHs, dims,
-                             runSimple = TRUE, p_dt = p_dt, dataValue = v_renovationIn)
-
-  out[["stockInitLtAnteS"]] <- stockInitLtAnteS
-  out[["conLtAnteS"]] <- conLtAnteS
-  out[["renLtAnteS"]] <- renLtAnteS
-
-  checkLtAnteS <- .checkLifetimeResults(renLtAnteS, dims)
-  checkLtAnteS <- .checkLifetimeResults(stockInitLtAnteS, dims)
 
 
   # COMPUTE EX-POST LIFETIME PROBABILITIES -------------------------------------
@@ -299,8 +300,8 @@ reportLCCShare <- function(gdx, pathLt = NULL) {
   normLambdaCon <- normalizePriceSensitivity(out[["conLccMixed"]], conVin, priceSensHs[["construction"]], dims)
   normLambdaRen <- normalizePriceSensitivity(out[["renLccMixed"]], v_renovationIn, priceSensHs[["renovation"]], dims)
 
-  normLambdaConSubs <- normalizePriceSensitivity(out[["conLccMixed"]], conVin, priceSensHs[["construction"]], dims, groupCols = c("reg", "loc", "typ", "inc"))
-  normLambdaRenSubs <- normalizePriceSensitivity(out[["renLccMixed"]], v_renovationIn, priceSensHs[["renovation"]], dims, groupCols = c("reg", "loc", "typ", "inc"))
+  normLambdaConSubs <- normalizePriceSensitivity(out[["conLccMixed"]], conVin, priceSensHs[["construction"]], dims, groupCols = c("region", "loc", "typ", "inc"))
+  normLambdaRenSubs <- normalizePriceSensitivity(out[["renLccMixed"]], v_renovationIn, priceSensHs[["renovation"]], dims, groupCols = c("region", "loc", "typ", "inc"))
 
   # WRITE ----------------------------------------------------------------------
 

@@ -23,7 +23,7 @@ verifyLtHs <- function(gdx, inflow, v_stockInit, outflow, lifeTimeHs, dims, stan
     rename(stockVal = "value") %>%
     left_join(p_shareRenHSinit %>%
                 rename(shareVal = .data[["value"]]),
-              by = c("hs", "reg", "typ", "ttot")) %>%
+              by = c("hs", "region", "typ", "ttot")) %>%
     mutate(initVal = .data[["stockVal"]] * .data[["shareVal"]]) %>%
     select(-"ttot", -"shareVal", -"stockVal")
 

@@ -9,7 +9,7 @@ output:
 params:
     docTitle: "BRICK Analysis report"
     file: "BRICK_analysis_report.csv"
-    path: "C:/Users/ricardar/Documents/PIAM/brick/output/noShellEUR_2024-11-03_11.33.26"
+    path: "C:/Users/ricardar/Documents/PIAM/brick/output/noShellEUR-lowGran_2025-06-16_16.25.45/"
     scenNames: NULL
     savePlots: TRUE
     name: ""
@@ -64,9 +64,10 @@ outPath <- dirname(filePath[1])
   
   heading <- paste(varName, "by", color)
   
-  if (length(rprt) == 1) {
-    filterVals <- unique(plData[[rprt]])
-    heading <- paste(heading, "|", rprt, "=", filterVals)
+  if (length(rprt) >= 1) {
+    filterVals <- stats::setNames(lapply(rprt, function(col) {
+      unique(plData[[col]])
+    }), rprt)
   } else {
     filterVals <- "None"
   }
@@ -78,15 +79,31 @@ outPath <- dirname(filePath[1])
     yname <- "value"
   }
   
-  for (i in seq_along(filterVals)) {
+  count <- stats::setNames(rep(1, length.out = length(rprt)), rprt)
+  complete <- FALSE
+  
+  while (isFALSE(complete)) {
     
     plDataFiltered <- plData
     
-    if (length(rprt) == 1) plDataFiltered <- filter(plDataFiltered, .data[[rprt]] == filterVals[i])
+    for (col in rprt) {
+      plDataFiltered <- filter(plDataFiltered, .data[[col]] == filterVals[[col]][count[col]])
+    }
+    thisHeading <- paste(heading, paste(lapply(rprt, function(col) {
+      paste(col, "=", filterVals[[col]][count[col]])
+    }), collapse = " | "))
+    
+    countAtMax <- count == unlist(lapply(filterVals, length))
+    if (!all(countAtMax)) {
+      count[!countAtMax][1] <- count[!countAtMax][1] + 1
+      if (any(which(countAtMax)) < which(!countAtMax)[1]) count[countAtMax[1:which(!countAtMax)[1]]] <- 1
+    } else {
+      complete <- TRUE
+    }
     
     pl <- ggplot(plDataFiltered, mapping = aes(x = !!sym(xname), y = !!sym(yname), fill = !!sym(color))) +
       geom_col() +
-      ggtitle(heading[i])
+      ggtitle(thisHeading)
     if (isFALSE(noFacets)) pl <- pl + facet_grid(rows = vars(loc), cols = vars(typ))
     if (!is.null(colorMap)) pl <- pl + ggplot2::scale_fill_manual(values = mip::plotstyle(colorMap))
     if (!is.null(xlabName)) pl <- pl + xlab(xlabName)
@@ -191,13 +208,22 @@ data <- utils::read.csv(filePath)
 
 ```
 
-### Simple ex-ante estimate
+### Complex ex-ante estimate
 
-```{r Plot ex-ante outflow of standing stock (simple)}
+```{r Plot ex-ante outflow of standing stock (complex)}
 
-.createLtPlot(data, "stockInitLtAnteS", yname = "absVal", color = "hs", rprt = "vin",
+.createLtPlot(data, "stockInitLtAnteC", yname = "absVal", color = "hs", rprt = "vin",
               xlabName = "Time of removal", ylabName = "Quantity in million m2")
 
+```
+
+### Ex-ante estimate compared to complex ex-ante estimate
+
+```{r Plot ex-ante initial stock leave time and complex ex-ante estimate}
+
+.createLtTwoBar(data, c("stockInitLtAnte", "stockInitLtAnteC"), yname = "absVal", color = "hs",
+                remCols = c("value", "relVal"), rprt = "ttot",
+                xlabName = "Time of removal", ylabName = "Quantity in million m2")
 ```
 
 ### Mixed estimate
@@ -255,13 +281,22 @@ data <- utils::read.csv(filePath)
 
 ```
 
-### Simple ex-ante estimate
+### Complex ex-ante estimate
 
-```{r Plot ex-ante leave time of constructions (simple)}
+```{r Plot ex-ante leave time of constructions (complex)}
 
-.createLtPlot(data, "conLtAnteS", yname = "absVal", color = "hs", rprt = "ttot",
+.createLtPlot(data, "conLtAnteC", yname = "absVal", color = "hs", rprt = "ttot",
               xlabName = "Time of removal", ylabName = "Quantity in million m2")
 
+```
+
+### Ex-ante estimate compared to complex ex-ante estimate
+
+```{r Plot ex-ante construction leave time and complex ex-ante estimate}
+
+.createLtTwoBar(data, c("conLtAnte", "conLtAnteC"), yname = "absVal", color = "hs",
+                remCols = c("value", "relVal"), rprt = "ttot",
+                xlabName = "Time of removal", ylabName = "Quantity in million m2")
 ```
 
 ### Mixed estimate
@@ -319,13 +354,22 @@ data <- utils::read.csv(filePath)
 
 ```
 
-### Simple ex-ante estimate
+### Complex ex-ante estimate
 
-```{r Plot ex-ante leave time of renovations (simple)}
+```{r Plot ex-ante leave time of renovations (complex)}
 
-.createLtPlot(data, "renLtAnteS", yname = "absVal", color = "hs", rprt = "ttot",
+.createLtPlot(data, "renLtAnteC", yname = "absVal", color = "hs", rprt = "ttot",
               xlabName = "Time of removal", ylabName = "Quantity in million m2")
 
+```
+
+### Ex-ante estimate compared to complex ex-ante estimate
+
+```{r Plot ex-ante renovation leave time and complex ex-ante estimate}
+
+.createLtTwoBar(data, c("renLtAnte", "renLtAnteC"), yname = "absVal", color = "hs",
+                remCols = c("value", "relVal"), rprt = "ttot",
+                xlabName = "Time of removal", ylabName = "Quantity in million m2")
 ```
 
 ### Mixed estimate
@@ -401,32 +445,32 @@ data <- utils::read.csv(filePath)
 ## LCC of construction with ex-ante lifetimes
 
 ```{r Plot ex-ante LCC of construction}
-.createLtPlot(data %>% filter(loc == "rural", typ == "MFH"), "conLccAnte",
-              xname = "hs", yname = "value", color = "costType", rprt = "ttot",
+.createLtPlot(data, "conLccAnte",
+              xname = "hs", yname = "value", color = "costType", rprt = c("ttot", "typ", "loc"),
               noFacets = TRUE, xlabName = "Heating System", ylabName = "Costs in USD/m2")
 ```
 
 ## LCC of construction with mixed lifetimes
 
 ```{r Plot LCC of construction with mixed lifetimes}
-.createLtPlot(data %>% filter(loc == "rural", typ == "MFH"), "conLccMixed",
-              xname = "hs", yname = "value", color = "costType", rprt = "ttot",
+.createLtPlot(data, "conLccMixed",
+              xname = "hs", yname = "value", color = "costType", rprt = c("ttot", "typ", "loc"),
               noFacets = TRUE, xlabName = "Heating System", ylabName = "Costs in USD/m2")
 ```
 
 ## LCC of renovation with ex-ante lifetimes
 
 ```{r Plot ex-ante LCC of renovation}
-.createLtPlot(data %>% filter(loc == "rural", typ == "MFH"), "renLccAnte",
-              xname = "hs", yname = "value", color = "costType", rprt = "ttot", avg = "vin",
+.createLtPlot(data, "renLccAnte",
+              xname = "hs", yname = "value", color = "costType", rprt = c("ttot", "typ", "loc"), avg = "vin",
               noFacets = TRUE, xlabName = "Heating System", ylabName = "Costs in USD/m2")
 ```
 
 ## LCC of renovation with mixed lifetimes
 
 ```{r Plot LCC of renovation with mixed lifetimes}
-.createLtPlot(data %>% filter(loc == "rural", typ == "MFH"), "renLccMixed",
-              xname = "hs", yname = "value", color = "costType", rprt = "ttot", avg = "vin",
+.createLtPlot(data, "renLccMixed",
+              xname = "hs", yname = "value", color = "costType", rprt = c("ttot", "typ", "loc"), avg = "vin",
               noFacets = TRUE, xlabName = "Heating System", ylabName = "Costs in USD/m2")
 ```
 
@@ -435,32 +479,32 @@ data <- utils::read.csv(filePath)
 ## LCOH of construction with ex-ante lifetimes
 
 ```{r Plot LCOH of construction with ex-ante lifetimes}
-.createLtPlot(data %>% filter(loc == "rural", typ == "MFH"), "conLcohAnte",
-              xname = "hs", yname = "value", color = "costType", rprt = "ttot",
+.createLtPlot(data, "conLcohAnte",
+              xname = "hs", yname = "value", color = "costType", rprt = c("ttot", "typ", "loc"),
               noFacets = TRUE, xlabName = "Heating System", ylabName = "Costs in USD/kWh")
 ```
 
 ## LCOH of construction with mixed lifetimes
 
 ```{r Plot LCOH of construction with mixed lifetimes}
-.createLtPlot(data %>% filter(loc == "rural", typ == "MFH"), "conLcohMixed",
-              xname = "hs", yname = "value", color = "costType", rprt = "ttot",
+.createLtPlot(data, "conLcohMixed",
+              xname = "hs", yname = "value", color = "costType", rprt = c("ttot", "typ", "loc"),
               noFacets = TRUE, xlabName = "Heating System", ylabName = "Costs in USD/kWh")
 ```
 
 ## LCOH of renovation with ex-ante lifetimes
 
 ```{r Plot LCOH of renovation with ex-ante lifetimes}
-.createLtPlot(data %>% filter(loc == "rural", typ == "MFH"), "renLcohAnte",
-              xname = "hs", yname = "value", color = "costType", rprt = "ttot",avg = "vin",
+.createLtPlot(data, "renLcohAnte",
+              xname = "hs", yname = "value", color = "costType", rprt = c("ttot", "typ", "loc"), avg = "vin",
               noFacets = TRUE, xlabName = "Heating System", ylabName = "Costs in USD/kWh")
 ```
 
 ## LCOH of renovation with mixed lifetimes
 
 ```{r Plot LCOH of renovation with mixed lifetimes}
-.createLtPlot(data %>% filter(loc == "rural", typ == "MFH"), "renLcohMixed",
-              xname = "hs", yname = "value", color = "costType", rprt = "ttot", avg = "vin",
+.createLtPlot(data, "renLcohMixed",
+              xname = "hs", yname = "value", color = "costType", rprt = c("ttot", "typ", "loc"), avg = "vin",
               noFacets = TRUE, xlabName = "Heating System", ylabName = "Costs in USD/kWh")
 ```
 

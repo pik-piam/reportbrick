@@ -24,22 +24,22 @@ checkMatching <- function(path, tol = 1E-2) {
 
   stockCalibTarget <- read.csv(
     file.path(path, "f_stockCalibTarget.cs4r"),
-    col.names = c("qty", "bs", "hs", "vin", "reg", "loc", "typ", "inc", "ttot", "stock"),
+    col.names = c("qty", "bs", "hs", "vin", "region", "loc", "typ", "inc", "ttot", "stock"),
     header = FALSE, comment.char = "*"
   )
   conCalibTarget <- read.csv(
     file.path(path, "f_constructionCalibTarget.cs4r"),
-    col.names = c("qty", "bs", "hs", "reg", "loc", "typ", "inc", "ttot", "con"),
+    col.names = c("qty", "bs", "hs", "region", "loc", "typ", "inc", "ttot", "con"),
     header = FALSE, comment.char = "*"
   )
   renCalibTarget <- read.csv(
     file.path(path, "f_renovationCalibTarget.cs4r"),
-    col.names = c("qty", "bs", "hs", "bsr", "hsr", "vin", "reg", "loc", "typ", "inc", "ttot", "ren"),
+    col.names = c("qty", "bs", "hs", "bsr", "hsr", "vin", "region", "loc", "typ", "inc", "ttot", "ren"),
     header = FALSE, comment.char = "*"
   )
   demCalibTarget <- read.csv(
     file.path(path, "f_demolitionCalibTarget.cs4r"),
-    col.names = c("qty", "bs", "hs", "vin", "reg", "loc", "typ", "inc", "ttot", "dem"),
+    col.names = c("qty", "bs", "hs", "vin", "region", "loc", "typ", "inc", "ttot", "dem"),
     header = FALSE, comment.char = "*"
   )
 
@@ -73,7 +73,7 @@ checkMatching <- function(path, tol = 1E-2) {
   ## Stock balance for previous time period ====
 
   renPrev <- renCalibTarget %>%
-    group_by(across(all_of(c("qty", "bs", "hs", "vin", "reg", "loc", "typ", "inc", "ttot")))) %>%
+    group_by(across(all_of(c("qty", "bs", "hs", "vin", "region", "loc", "typ", "inc", "ttot")))) %>%
     summarise(renSum = sum(.data$ren), .groups = "drop")
 
   stockBalPrev <- stockCalibTarget %>%
@@ -81,8 +81,8 @@ checkMatching <- function(path, tol = 1E-2) {
     mutate(ttot = .data$ttot + .data$dt) %>%
     filter(!is.na(.data$ttot)) %>%
     select(-"dt") %>%
-    left_join(conCalibTarget, by = c("qty", "bs", "hs", "reg", "loc", "typ", "inc", "ttot")) %>%
-    left_join(renPrev, by = c("qty", "bs", "hs", "vin", "reg", "loc", "typ", "inc", "ttot")) %>%
+    left_join(conCalibTarget, by = c("qty", "bs", "hs", "region", "loc", "typ", "inc", "ttot")) %>%
+    left_join(renPrev, by = c("qty", "bs", "hs", "vin", "region", "loc", "typ", "inc", "ttot")) %>%
     left_join(dt, by = "ttot") %>%
     left_join(p_dtVin, by = c("vin", "ttot")) %>%
     mutate(lhs = .data$stock + .data$con * .data$dtCon,
@@ -95,12 +95,12 @@ checkMatching <- function(path, tol = 1E-2) {
   renNext <- renCalibTarget %>%
     mutate(bsr = ifelse(.data$bsr == "0", .data$bs, .data$bsr),
            hsr = ifelse(.data$hsr == "0", .data$hs, .data$hsr)) %>%
-    group_by(across(all_of(c("qty", "bsr", "hsr", "vin", "reg", "loc", "typ", "inc", "ttot")))) %>%
+    group_by(across(all_of(c("qty", "bsr", "hsr", "vin", "region", "loc", "typ", "inc", "ttot")))) %>%
     summarise(renSum = sum(.data$ren), .groups = "drop")
 
   stockBalNext <- stockCalibTarget %>%
-    left_join(demCalibTarget, by = c("qty", "bs", "hs", "vin", "reg", "loc", "typ", "inc", "ttot")) %>%
-    left_join(renNext, by = c("qty", bs = "bsr", hs = "hsr", "vin", "reg", "loc", "typ", "inc", "ttot")) %>%
+    left_join(demCalibTarget, by = c("qty", "bs", "hs", "vin", "region", "loc", "typ", "inc", "ttot")) %>%
+    left_join(renNext, by = c("qty", bs = "bsr", hs = "hsr", "vin", "region", "loc", "typ", "inc", "ttot")) %>%
     inner_join(dt, by = "ttot") %>%
     mutate(lhs = .data$stock + .data$dem * .data$dt,
            rhs = .data$renSum * .data$dt,

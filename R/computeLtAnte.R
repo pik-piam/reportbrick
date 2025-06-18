@@ -59,7 +59,7 @@ computeLtAnte <- function(variable, data, ttotNum, lifeTimeHs, dims,
   ltAnte <- data %>%
     select(-"value") %>%
     left_join(times, by = "ttot") %>%
-    left_join(lifeTimeHs, by = c("reg", "typ", hsCol))
+    left_join(lifeTimeHs, by = c("region", "typ", hsCol))
 
   # Call the respective functions to compute the lifetime
   if(isFALSE(runSimple)) {
@@ -77,10 +77,10 @@ computeLtAnte <- function(variable, data, ttotNum, lifeTimeHs, dims,
   } else {
     if (!"dt" %in% colnames(ltAnte)) ltAnte <- left_join(ltAnte, p_dt, by = "ttot")
     if (variable == "stock") {
-      ltAnte <- .computeLtAnteSimple(ltAnte, dims, ttotNum[1], standingLifetime = 6)
+      ltAnte <- .computeLtAnteSimple(ltAnte, dims, ttotNum[1], standingLifetime = 12)
     } else if (variable == "construction") {
       ltAnte <- .computeLtAnteSimple(ltAnte, dims, ttotNum[1]) %>%
-        relocate("vin", .before = "reg")
+        relocate("vin", .before = "region")
     } else if (variable == "renovation") {
         ltAnte <- .computeLtAnteSimple(ltAnte, c(dims, "hsr", "bsr"), ttotNum[1]) %>%
           group_by(across(-all_of(c("hs", "value")))) %>%
@@ -126,7 +126,7 @@ computeLtAnte <- function(variable, data, ttotNum, lifeTimeHs, dims,
 #' @importFrom dplyr %>% .data mutate select
 #' @importFrom stats pweibull
 #'
-.computeLtStockAnte <- function(dfLt, standingLifetime = 6) {
+.computeLtStockAnte <- function(dfLt, standingLifetime = 12) {
   dfLt %>%
     mutate(value = (pweibull(.data[["tOut1"]] - .data[["ttot"]] + standingLifetime, .data[["shape"]], .data[["scale"]])
                     - pweibull(.data[["tOut0"]] - .data[["ttot"]] + standingLifetime, .data[["shape"]], .data[["scale"]]))) %>%
@@ -202,23 +202,28 @@ computeLtAnte <- function(variable, data, ttotNum, lifeTimeHs, dims,
 #' @importFrom dplyr %>% across all_of .data group_by mutate select ungroup
 #' @importFrom stats pweibull
 #'
-.computeLtAnteSimple <- function(dfLt, dims, t0, standingLifetime = 0, cutOffShare = 0.95) {
+.computeLtAnteSimple <- function(dfLt, dims, t0, standingLifetime = NULL, cutOffShare = 0.95) {
 
   dfLt <- dfLt %>%
-    select(-"tIn0", -"tIn1", -"tOut0", -"tOut1") %>%
-    mutate(lt = .data[["ttot2"]] - .data[["ttot"]] + .data[["dt"]] / 2
-           + standingLifetime,
-           value = pweibull(.data[["lt"]], .data[["shape"]], .data[["scale"]])) %>%
-    mutate(value = ifelse(.data[["value"]] > cutOffShare, 1, .data[["value"]]))
+    select(-"tIn0", -"tIn1", -"tOut0", -"tOut1")
+  dfLt <- if (is.null(standingLifetime)) {
+    dfLt %>%
+      mutate(lt = .data$ttot2 - (.data$ttot - .data$dt / 2),
+             p0 = 0)
+  } else {
+    dfLt %>%
+      mutate(lt = .data$ttot2 - .data$ttot + standingLifetime,
+             p0 = pweibull(standingLifetime, .data$shape, .data$scale))
+  }
   dfLt <- dfLt %>%
+    mutate(p = pweibull(.data$lt, .data$shape, .data$scale),
+           value = (.data$p - .data$p0) / (1 - .data$p0),
+           value = ifelse(.data[["value"]] > cutOffShare, 1, .data[["value"]])) %>%
     group_by(across(all_of(c(dims, "ttot")))) %>%
-    mutate(value = c(.data[["value"]][[1]], diff(.data[["value"]])))
+    mutate(value = c(.data$value[1], diff(.data$value))) %>%
+    ungroup()
   dfLt <- dfLt %>%
-    mutate(value = ifelse(.data[["ttot2"]] == t0,
-                          .data[["value"]] - pweibull(standingLifetime, .data[["shape"]], .data[["scale"]]),
-                          .data[["value"]])) %>%
-    ungroup() %>%
-    select(-"shape", -"scale", -"lt")
+    select(-"shape", -"scale", -"lt", -"p", -"p0")
 
   return(dfLt)
 
