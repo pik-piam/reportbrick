@@ -10,7 +10,7 @@ bsr:
     "0": No change
   subsets:
     all: [low, med, high]
-    all0: [low, med, high, "0"]
+    allr: [low, med, high, "0"]
   child:
     bs:
       elements: [low, med, high]
@@ -31,7 +31,7 @@ hsr:
     "0": No change
   subsets:
     all: [biom, dihe, ehp1, reel, h2bo, gabo, libo, sobo]
-    all0: [biom, dihe, ehp1, reel, h2bo,  gabo, libo, sobo, "0"]
+    allr: [biom, dihe, ehp1, reel, h2bo,  gabo, libo, sobo, "0"]
     elec: [ehp1, reel]
   child:
     hs:
