@@ -40,7 +40,7 @@ reportRenovation <- function(gdx, brickSets = NULL, silent = TRUE) {
               agg = c(bs = "all", hs = "all", bsr.hsr = "all", vin = "all", loc = "all", typ = "res", inc = "all"),
               silent = silent),
     reportAgg(v_renovation,
-              "Renovation|Residential|Shell(bn m2/yr)", brickSets,
+              "Renovation|Residential|Shell (bn m2/yr)", brickSets,
               agg = c(bs = "all", hs = "all", bsr = "all", hsr = "allr", vin = "all",
                       loc = "all", typ = "res", inc = "all"),
               silent = silent),

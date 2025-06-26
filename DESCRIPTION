@@ -1,8 +1,8 @@
 Type: Package
 Package: reportbrick
 Title: Reporting package for BRICK
-Version: 0.8.2
-Date: 2025-06-25
+Version: 0.9.0
+Date: 2025-07-04
 Authors@R: c(
     person("Robin", "Hasse", , "robin.hasse@pik-potsdam.de",
            role = c("aut", "cre"),
@@ -18,6 +18,7 @@ Imports:
   dplyr,
   gamstransfer (>= 3.0.1),
   ggplot2,
+  ggpubr,
   kableExtra,
   knitr,
   madrat,
@@ -27,11 +28,13 @@ Imports:
   piamutils (>= 0.0.9),
   purrr,
   rmarkdown,
+  scales,
   stringr,
   tidyr,
   yaml
 Suggests:
-    covr,
-    testthat
+  covr,
+  ggsankey,
+  testthat
 Encoding: UTF-8
 RoxygenNote: 7.3.2

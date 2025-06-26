@@ -44,12 +44,19 @@ readGdxSymbol <- function(gdx, symbol, field = "level", asMagpie = TRUE,
     }
   }
 
+  # make temporal dimensions numeric
+  tDims <- intersect(colnames(data), c("ttot", "tall", "ttot2"))
+  for (tDim in tDims) {
+    data[[tDim]] <- as.numeric(as.character(data[[tDim]]))
+  }
+
   # remove columns
   switch(class(obj)[1],
     Variable = {
       data <- data %>%
         select(-all_of(setdiff(allFields, field))) %>%
-        rename(value = field)
+        rename(value = field) %>%
+        mutate(value = as.numeric(.data[["value"]]))
     },
     Set = {
       data <- data %>%
