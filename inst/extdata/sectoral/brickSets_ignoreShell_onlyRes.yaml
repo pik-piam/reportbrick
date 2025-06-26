@@ -7,7 +7,7 @@ bsr:
     "0": No change
   subsets:
     all: low
-    all0: [low, "0"]
+    allr: "0"
   child:
     bs:
       elements: low

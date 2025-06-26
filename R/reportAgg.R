@@ -109,9 +109,17 @@ reportAgg <- function(x,
     out <- do.call(mbind, apply(rprtCombinations, 1, function(comb) {
       # replace dimension tags to get final variable name
       outName <- name
+
       for (r in names(comb)) {
+        label <- brickSets[[r]][["elements"]][[comb[[r]]]]
+        if (label == "") {
+          if (isFALSE(silent)) {
+            message("No label given to item '", comb, "'. Respective variable is skipped.")
+          }
+          return(NULL)
+        }
         outName <- sub(.tag(r),
-                       brickSets[[r]][["elements"]][[comb[[r]]]],
+                       label,
                        outName, fixed = TRUE)
       }
 
@@ -201,8 +209,8 @@ reportAgg <- function(x,
 #'
 #' @param x MagPIE object, BRICK object
 #' @param agg named vector of dimensions to aggregate.
-#' @returns aggregated MagPIE objects without sub dimensions in dim 3
 #' @param silent logical, suppress warnings and printing of dimension mapping
+#' @returns aggregated MagPIE objects without sub dimensions in dim 3
 #'
 #' @importFrom magclass dimSums mselect
 
