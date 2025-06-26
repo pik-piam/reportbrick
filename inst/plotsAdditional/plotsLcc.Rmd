@@ -9,7 +9,7 @@ output:
 params:
     docTitle: "BRICK Analysis report"
     file: "BRICK_analysis_report.csv"
-    path: "C:/Users/ricardar/Documents/PIAM/brick/output/noShellEUR-lowGran_2025-06-16_16.25.45/"
+    path: "C:/Users/ricardar/Documents/PIAM/brick/output/noShellEUR-lowGran_2025-06-16_16.43.49/"
     scenNames: NULL
     savePlots: TRUE
     name: ""
@@ -17,7 +17,10 @@ params:
 
 ```{r setup, include=FALSE}
 library(dplyr) #nolint: undesirable_function_linter.
+library(tidyr)
 library(ggplot2) #nolint: undesirable_function_linter.
+library(ggforce)
+library(colorspace)
 
 knitr::opts_chunk$set(
   echo = FALSE,
@@ -170,6 +173,83 @@ outPath <- dirname(filePath[1])
   
 }
 
+.createLtPieChart <- function(data, varName, color, dimX, dimY, valueName = "value", heading = NULL) {
+  
+  plData <- filter(data, .data[["variable"]] == varName)
+  
+  # Compute pie fractions
+  plData <- plData %>%
+    rename(x = dimX, y = dimY) %>%
+    mutate(
+      x = as.factor(.data$x),
+      y = as.factor(.data$y),
+      xNum = as.numeric(.data$x),
+      yNum = as.numeric(.data$y)
+    ) %>%
+    group_by(across(all_of(c("x", "y")))) %>%
+    mutate(
+      total = sum(.data[[valueName]]),
+      fraction = ifelse(total == 0, 0, .data[[valueName]] / .data$total),
+      end = 2 * pi * cumsum(.data$fraction),
+      start = lag(.data$end, default = 0),
+      r0 = 0
+    ) %>%
+    ungroup()
+  
+  # Normalize pie size
+  maxTotal <- max(plData$total, na.rm = TRUE)
+  desiredMaxRadius <- 0.4
+  plData <- plData %>%
+    mutate(r = sqrt(.data$total / maxTotal) * desiredMaxRadius)
+  
+  # Compute label positions (aligned across each row)
+  dfLabel <- plData %>%
+    select("x", "y", "xNum", "yNum", "total", "r") %>%
+    unique() %>%
+    mutate(total = signif(.data$total, 3)) %>%
+    group_by(y) %>%
+    mutate(yLabel = max(.data$yNum + .data$r + 0.2, na.rm = TRUE)) %>%  # row-aligned above pies
+    ungroup()
+  
+  # Final plot
+  ggplot(plData) +
+    geom_arc_bar(
+      aes(x0 = xNum, y0 = yNum, r0 = r0, r = r,
+          start = start, end = end, fill = .data[[color]]),
+      color = "black", size = 0.3
+    ) +
+    geom_text(
+      data = dfLabel,
+      aes(x = xNum, y = yLabel, label = total),
+      size = 3.5, fontface = "bold"
+    ) +
+    coord_fixed() +
+    scale_fill_brewer(palette = "Set2") +
+    scale_x_continuous(
+      breaks = seq_along(levels(plData$x)),
+      labels = levels(plData$x),
+      expand = expansion(mult = 0.1)
+    ) +
+    scale_y_continuous(
+      breaks = seq_along(levels(plData$y)),
+      labels = levels(plData$y),
+      expand = expansion(mult = 0.2)
+    ) +
+    theme_minimal() +
+    labs(
+      title = heading,
+      x = dimX,
+      y = dimY,
+      fill = color
+    ) +
+    theme(
+      panel.grid = element_blank(),
+      legend.position = "right",
+      axis.text = element_text(size = 10),
+      axis.title = element_text(size = 12)
+    )
+}
+
 .computeResolution <- function(v, default = 10) {
   if (length(v) == 1) {
     return(default)
@@ -179,10 +259,98 @@ outPath <- dirname(filePath[1])
   }
 }
 
+.createLtBarChart <- function(data, varName, color, dimX, dimY, valueName = "value", heading = NULL) {
+  
+  plData <- filter(data, .data[["variable"]] == varName)
+  
+  # Prepare data with factor conversion
+  plData <- plData %>%
+    rename(x = dimX, y = dimY) %>%
+    mutate(
+      x = as.factor(.data$x),
+      y = as.factor(.data$y)
+    )
+  
+  # Compute total values per facet (x, y)
+  dfTotals <- plData %>%
+    group_by(across(all_of(c("x", "y")))) %>%
+    summarise(
+      total = signif(sum(.data[[valueName]]), 3),
+      yLabel = sum(pmax((.data[[valueName]]), 0)),
+      .groups = "drop")
+  
+  # Plot
+  ggplot(plData, aes(x = 1, y = .data[[valueName]], fill = .data[[color]])) +
+    geom_bar(stat = "identity", width = 0.7) +
+    geom_text(
+      data = dfTotals,
+      aes(x = 1, y = yLabel, label = .data$total),
+      position = "stack",
+      inherit.aes = FALSE,
+      size = 3.5,
+      vjust = -0.5
+    ) +
+    facet_grid(rows = vars(y), cols = vars(x)) +
+    scale_y_continuous(expand = expansion(mult = c(0, 0.3))) +  # Top padding
+    scale_fill_brewer(palette = "Set2") +
+    theme_minimal() +
+    theme(
+      axis.text = element_blank(),
+      axis.title = element_blank(),
+      axis.ticks = element_blank(),
+      panel.grid = element_blank(),
+      strip.text = element_text(size = 12),
+      legend.position = "right"
+    ) +
+    labs(
+      title = heading,
+      x = dimX,
+      y = dimY,
+      fill = color
+    )
+}
+
+.createLtHeatMap <- function(data, varName, dimX, dimY, valueName = "value", heading = NULL) {
+  
+  plData <- filter(data, .data[["variable"]] == varName, .data$costType == "intangible")
+
+  # Compute dynamic threshold (median of value column)
+  valueThreshold <- median(plData[[valueName]], na.rm = TRUE)
+
+  # Assign adaptive text color
+  plData <- plData %>%
+    mutate(
+      textColor = ifelse(.data[[valueName]] > valueThreshold, "white", "black"),
+      value = signif(.data[[valueName]], 3)
+    )
+
+  # Build the plot
+  ggplot(plData, aes(x = .data[[dimX]], y = .data[[dimY]], fill = .data[[valueName]])) +
+    geom_tile(color = "white") +
+    geom_text(aes(label = .data[[valueName]], color = .data$textColor), size = 4) +
+    scale_fill_continuous_sequential(palette = "Purple-Yellow", rev = TRUE) +
+    scale_color_identity() +
+    coord_fixed() +
+    theme_minimal() +
+    labs(
+      title = heading,
+      x = NULL,
+      y = NULL,
+      fill = "Value"
+    ) +
+    theme(
+      axis.text = element_text(size = 12),
+      panel.grid = element_blank(),
+      legend.position = "right"
+    )
+
+}
+
 ```
 
-```{r some other text}
-data <- utils::read.csv(filePath)
+```{r Read in data}
+data <- utils::read.csv(filePath) %>%
+  filter(typ == "Res") # Temporary
 
 ```
 

@@ -243,10 +243,12 @@ reportLCCShare <- function(path, gdxName = "output.gdx", pathLt = NULL) {
   out[["conLcohAnte"]] <- computeLCOH(out[["conLccAnte"]], out[["conLtAnte"]], p_ueDemand, p_dt, p_discountFac, dims)
 
   renLccAnteFull <- computeLCC(out[["renLtAnte"]], p_specCostOpe, costRen, p_dt, p_discountFac)
+  out[["renLccAnteFull"]] <- renLccAnteFull
   out[["renLccAnte"]] <- mutate(
-    .avgAlongDim(renLccAnteFull, c("bs", "hs"), hs = "hsr", bs = "bsr"),
+    .avgAlongDim(out[["renLccAnteFull"]], c("bs", "hs"), hs = "hsr", bs = "bsr"),
     bs = "low"
   )
+  out[["renLcohAnteFull"]] <- computeLCOH(out[["renLccAnteFull"]], out[["renLtAnte"]], p_ueDemand, p_dt, p_discountFac, dims)
   out[["renLcohAnte"]] <- computeLCOH(out[["renLccAnte"]], out[["renLtAnte"]], p_ueDemand, p_dt, p_discountFac, dims)
 
   # Compute ex-post LCC and LCOH
@@ -256,21 +258,25 @@ reportLCCShare <- function(path, gdxName = "output.gdx", pathLt = NULL) {
   out[["conLcohMixed"]] <- computeLCOH(out[["conLccMixed"]], out[["conLtMixed"]], p_ueDemand, p_dt, p_discountFac, dims)
 
   renLccMixedFull <- computeLCC(out[["renLtMixed"]], p_specCostOpe, costRen, p_dt, p_discountFac)
+  out[["renLccMixedFull"]] <- renLccMixedFull
   out[["renLccMixed"]] <- mutate(
-    .avgAlongDim(renLccMixedFull, c("bs", "hs"), hs = "hsr", bs = "bsr"),
+    .avgAlongDim(out[["renLccMixedFull"]], c("bs", "hs"), hs = "hsr", bs = "bsr"),
     bs = "low"
   )
+  out[["renLcohMixedFull"]] <- computeLCOH(out[["renLccMixedFull"]], out[["renLtMixed"]], p_ueDemand, p_dt, p_discountFac, dims)
   out[["renLcohMixed"]] <- computeLCOH(out[["renLccMixed"]], out[["renLtMixed"]], p_ueDemand, p_dt, p_discountFac, dims)
 
 
   # COMPUTE LOGIT HEATING SYSTEM SHARES ----------------------------------------
 
   renLogitAnteFull <- computeLogitShare("renovation", renLccAnteFull, c(dims, "bsr", "hsr"), priceSensHs[["renovation"]])
+  out[["renLogitAnteFull"]] <- renLogitAnteFull
   out[["renLogitEl1Ante"]] <- aggregateShare(renLogitAnteFull, select(v_renovationIn, -"dt"),
                                                   energyLadder = energyLadder, energyLadderNo = 1)
   out[["renLogitAllAnte"]] <- aggregateShare(renLogitAnteFull, select(v_renovationIn, -"dt"))
 
   renLogitMixedFull <- computeLogitShare("renovation", renLccMixedFull, c(dims, "bsr", "hsr"), priceSensHs[["renovation"]])
+  out[["renLogitMixedFull"]] <- renLogitMixedFull
   out[["renLogitEl1Mixed"]] <- aggregateShare(renLogitMixedFull, select(v_renovationIn, -"dt"),
                                                    energyLadder = energyLadder, energyLadderNo = 1)
   out[["renLogitAllMixed"]] <- aggregateShare(renLogitMixedFull, select(v_renovationIn, -"dt"))
