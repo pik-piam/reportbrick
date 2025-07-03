@@ -21,7 +21,7 @@
 #'   rename select summarise ungroup
 #'
 computeLtAnte <- function(variable, data, ttotNum, lifeTimeHs, dims,
-                          runSimple = FALSE, dataValue = NULL, p_dt = NULL) {
+                          runSimple = FALSE, dataValue = NULL, p_dt = NULL, returnDistr = FALSE) {
 
   if (is.null(dataValue)) dataValue <- data
   hsCol <- "hs"
@@ -77,12 +77,12 @@ computeLtAnte <- function(variable, data, ttotNum, lifeTimeHs, dims,
   } else {
     if (!"dt" %in% colnames(ltAnte)) ltAnte <- left_join(ltAnte, p_dt, by = "ttot")
     if (variable == "stock") {
-      ltAnte <- .computeLtAnteSimple(ltAnte, dims, ttotNum[1], standingLifetime = 12)
+      ltAnte <- .computeLtAnteSimple(ltAnte, dims, ttotNum[1], standingLifetime = 12, returnDistr = returnDistr)
     } else if (variable == "construction") {
-      ltAnte <- .computeLtAnteSimple(ltAnte, dims, ttotNum[1]) %>%
+      ltAnte <- .computeLtAnteSimple(ltAnte, dims, ttotNum[1], returnDistr = returnDistr) %>%
         relocate("vin", .before = "region")
     } else if (variable == "renovation") {
-        ltAnte <- .computeLtAnteSimple(ltAnte, c(dims, "hsr", "bsr"), ttotNum[1]) %>%
+        ltAnte <- .computeLtAnteSimple(ltAnte, c(dims, "hsr", "bsr"), ttotNum[1], returnDistr = returnDistr) %>%
           group_by(across(-all_of(c("hs", "value")))) %>%
           summarise(value = mean(.data[["value"]]), .groups = "drop") %>%
           select(-"bs") %>%
@@ -202,7 +202,7 @@ computeLtAnte <- function(variable, data, ttotNum, lifeTimeHs, dims,
 #' @importFrom dplyr %>% across all_of .data group_by mutate select ungroup
 #' @importFrom stats pweibull
 #'
-.computeLtAnteSimple <- function(dfLt, dims, t0, standingLifetime = NULL, cutOffShare = 0.95) {
+.computeLtAnteSimple <- function(dfLt, dims, t0, standingLifetime = NULL, cutOffShare = 0.95, returnDistr = FALSE) {
 
   dfLt <- dfLt %>%
     select(-"tIn0", -"tIn1", -"tOut0", -"tOut1")
@@ -219,8 +219,12 @@ computeLtAnte <- function(variable, data, ttotNum, lifeTimeHs, dims,
     mutate(p = pweibull(.data$lt, .data$shape, .data$scale),
            value = (.data$p - .data$p0) / (1 - .data$p0),
            value = ifelse(.data[["value"]] > cutOffShare, 1, .data[["value"]])) %>%
-    group_by(across(all_of(c(dims, "ttot")))) %>%
-    mutate(value = c(.data$value[1], diff(.data$value))) %>%
+    group_by(across(all_of(c(dims, "ttot"))))
+  if (isFALSE(returnDistr)) {
+    dfLt <- dfLt %>%
+      mutate(value = c(.data$value[1], diff(.data$value)))
+  }
+  dfLt <- dfLt %>%
     ungroup()
   dfLt <- dfLt %>%
     select(-"shape", -"scale", -"lt", -"p", -"p0")

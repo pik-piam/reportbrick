@@ -30,9 +30,12 @@ plotBRICKAdditional <- function(path = ".", file = NULL,
                                 outName = "", scenNames = NULL) {
 
   docTitles <- c(plotsCalibration.Rmd = "BRICK Calibration Report",
-                 plotsLcc.Rmd = "BRICK Analysis report")
+                 plotsLcc.Rmd = "BRICK Analysis report",
+                 plotsLccExt.Rmd = "BRICK Analysis report (Extended)")
   allFiles <- c(plotsCalibration.Rmd = "BRICK_calibration_report",
-                plotsLcc.Rmd = "BRICK_analysis_report")
+                plotsLcc.Rmd = "BRICK_analysis_report",
+                plotsLccExt.Rmd = "BRICK_analysis_report")
+  if (grepl("Ext", plottingRoutine)) outName <- paste0("Ext", outName)
 
   # Extract the scenario name from the output directory
   scenario <- sub("_\\d{4}-\\d{2}-\\d{2}_\\d{2}\\.\\d{2}\\.\\d{2}", "", basename(path))
