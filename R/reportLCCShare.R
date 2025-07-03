@@ -1,7 +1,7 @@
 #' Compute life cycle costs and logit share
 #'
 #' @author Ricarda Rosemann
-#' @importFrom dplyr %>% .data filter full_join group_by inner_join last left_join mutate rename right_join select summarise
+#' @importFrom dplyr %>% .data cur_column filter full_join group_by inner_join last left_join mutate rename right_join select summarise
 #' @importFrom piamutils getSystemFile
 #' @importFrom stats pweibull
 #' @importFrom tidyr crossing pivot_wider replace_na
@@ -168,10 +168,27 @@ reportLCCShare <- function(path, gdxName = "output.gdx", pathLt = NULL) {
                              runSimple = TRUE, p_dt = p_dt)
   renLtAnte <- computeLtAnte("renovation", v_renovation, ttotNum, lifeTimeHs, dims,
                              runSimple = TRUE, p_dt = p_dt, dataValue = v_renovationIn)
+  
+  stockInitLtAnteRemain <- computeLtAnte("stock", v_stockInit, ttotNum, lifeTimeHs, dims,
+                                   runSimple = TRUE, p_dt = p_dt, returnDistr = TRUE) %>%
+    mutate(relVal = 1 - .data$relVal) %>%
+    select(-"absVal")
+  conLtAnteRemain <- computeLtAnte("construction", conVin, ttotNum, lifeTimeHs, dims,
+                             runSimple = TRUE, p_dt = p_dt, returnDistr = TRUE) %>%
+    mutate(relVal = 1 - .data$relVal) %>%
+    select(-"absVal")
+  renLtAnteRemain <- computeLtAnte("renovation", v_renovation, ttotNum, lifeTimeHs, dims,
+                             runSimple = TRUE, p_dt = p_dt, dataValue = v_renovationIn, returnDistr = TRUE) %>%
+    mutate(relVal = 1 - .data$relVal) %>%
+    select(-"absVal")
 
   out[["stockInitLtAnte"]] <- stockInitLtAnte
   out[["conLtAnte"]] <- conLtAnte
   out[["renLtAnte"]] <- renLtAnte
+  
+  out[["stockInitLtAnteRemain"]] <- stockInitLtAnteRemain
+  out[["conLtAnteRemain"]] <- conLtAnteRemain
+  out[["renLtAnteRemain"]] <- renLtAnteRemain
 
   checkLtAnte <- .checkLifetimeResults(renLtAnte, dims)
   checkLtAnteInitStock <- .checkLifetimeResults(stockInitLtAnte, dims)
@@ -190,8 +207,15 @@ reportLCCShare <- function(path, gdxName = "output.gdx", pathLt = NULL) {
   )
 
   checkLtPost <- .checkLifetimeResults(ltPost[["stockInitLtPost"]], dims)
+  
+  ltPostRemain <- stats::setNames(lapply(ltPost, function(dfLt) {
+    dfLt %>%
+      select(-"absVal") %>%
+      group_by(across(-all_of(c("ttot2", "relVal")))) %>%
+      mutate(relVal = 1 - cumsum(.data$relVal))
+  }), paste0(names(ltPost), "Remain"))
 
-  out <- c(out, ltPost)
+  out <- c(out, ltPost, ltPostRemain)
 
   # COMPUTE LIFETIMES MATCHING EX-ANTE TO BRICK OUTFLOW ------------------------
 
@@ -207,8 +231,15 @@ reportLCCShare <- function(path, gdxName = "output.gdx", pathLt = NULL) {
   checkRenLtMixed <- .checkLifetimeResults(ltMixed[["renLtMixed"]], dims)
   checkStockLtMixed <- .checkLifetimeResults(ltMixed[["stockInitLtMixed"]], dims)
   checkConLtMixed <- .checkLifetimeResults(ltMixed[["conLtMixed"]], dims)
+  
+  ltMixedRemain <- stats::setNames(lapply(ltMixed, function(dfLt) {
+    dfLt %>%
+      select(-"absVal") %>%
+      group_by(across(-all_of(c("ttot2", "relVal")))) %>%
+      mutate(relVal = 1 - cumsum(.data$relVal))
+  }), paste0(names(ltMixed), "Remain"))
 
-  out <- c(out, ltMixed)
+  out <- c(out, ltMixed, ltMixedRemain)
 
   # SAVE OUTFLOWS --------------------------------------------------------------
 
@@ -236,7 +267,11 @@ reportLCCShare <- function(path, gdxName = "output.gdx", pathLt = NULL) {
     # group_by(across(-all_of(c("bs", "hs", "value")))) %>%
     # summarise(value = mean(.data[["value"]]), .groups = "drop") %>%
     # rename(bs = "bsr", hs = "hsr") %>%
-    pivot_wider(names_from = cost, values_from = value) %>% replace_na(list(intangible = 0))
+    pivot_wider(names_from = cost, values_from = value) %>%
+    mutate(across(contains("hs"), as.character),
+           statusQuoPref = ifelse(.data$hs != .data$hsr, config[["statusQuoPreference"]], 0),
+           across(contains("hs"), ~ factor(.x, levels = levels(v_renovation[[dplyr::cur_column()]])))) %>%
+    replace_na(list(intangible = 0))
 
   # Compute ex-ante LCC and LCOH
   out[["conLccAnte"]] <- computeLCC(out[["conLtAnte"]], p_specCostOpe, costCon, p_dt, p_discountFac)

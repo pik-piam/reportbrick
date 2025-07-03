@@ -22,7 +22,7 @@ computeLCC <- function(dfLt, dfCostsOpe, dfCostsRen, dfDt, dfDiscount) {
     rename_with(~ (if ("hsr" %in% colnames(dfCostsRen)) paste0(.x, "r") else .x), .cols = "hs") %>%
     left_join(dfCostsRen,
               by = c(hsName, "vin", "region", "loc", "typ", "ttot")) %>%
-    pivot_longer(cols = all_of(c("tangible", "intangible", "lccOpe")),
+    pivot_longer(cols = any_of(c("tangible", "intangible", "statusQuoPref", "lccOpe")),
                  names_to = "costType", values_to = "value") %>%
     mutate(bs = "low")
 }
