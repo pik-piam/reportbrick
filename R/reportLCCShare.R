@@ -1,24 +1,37 @@
 #' Compute life cycle costs and logit share
+#' 
+#' Estimate heating system lifetimes and use this to compute lifecycle costs,
+#' levelized costs of heat and logit heatings system shares.
+#' Extract brick model shares for comparison.
 #'
 #' @author Ricarda Rosemann
-#' @importFrom dplyr %>% .data cur_column filter full_join group_by inner_join last left_join mutate rename right_join select summarise
+#'
+#' @param path character, path to the Brick model output folder
+#' @param gdxName character, file name of the gdx to read data from
+#' @param pathLt character, path to the lifetime parameters
+#'
+#' @importFrom dplyr %>% .data cur_column filter full_join group_by inner_join last
+#'   left_join mutate rename right_join select summarise
 #' @importFrom piamutils getSystemFile
 #' @importFrom stats pweibull
 #' @importFrom tidyr crossing pivot_wider replace_na
 #' @importFrom utils read.csv write.csv
+#'
 
-#TODO: Proper handling of hs vs hsr
 #TODO: Proper handling of building shell!!! (Ignored for the time being)
 
 reportLCCShare <- function(path, gdxName = "output.gdx", pathLt = NULL) {
   
   gdx <- file.path(path, gdxName)
   config <- yaml::read_yaml(file.path(path, "config", "config_COMPILED.yaml"))
+  
+  if (isFALSE(config[["ignoreShell"]])) {
+    stop("This analysis currently only supports runs with ignoreShell set to TRUE.")
+  }
 
   if (is.null(pathLt)) pathLt <- "C:/Users/ricardar/Documents/PIAM/brick/inst/input/f_lifetimeHeatingSystem.cs4r"
   pathHs <- getSystemFile("extdata", "sectoral", "dim_hs.csv",
                           package = "brick", mustWork = TRUE)
-  path <- dirname(gdx)
 
   # READ IN DATA ---------------------------------------------------------------
 
@@ -89,19 +102,27 @@ reportLCCShare <- function(path, gdxName = "output.gdx", pathLt = NULL) {
   conVin <- v_construction %>%
     left_join(p_dtVin,
               by = intersect(colnames(v_construction), colnames(p_dtVin))) %>%
-    mutate(value = .data[["value"]] * .data[["dt"]])
+    mutate(value = .data[["value"]] * .data[["dt"]]) %>%
+    select(-"dt") %>%
+    rename(ttotIn = "ttot")
 
-  v_constructionIn <- select(conVin, -"vin", -"dt")
+  v_constructionIn <- select(conVin, -"vin")
 
 
   #TODO: Temporary, should handle bsr properly eventually
   # Compute renovation in- and outflow
+  v_renovationInDim <- v_renovation %>%
+    select(-"value") %>%
+    rename(ttotIn = "ttot")
+  
   v_renovationOut <- v_renovation %>%
     filter(hsr != "0") %>%
     group_by(across(-all_of(c("hsr", "bsr", "value")))) %>%
     summarise(value = sum(value), .groups = "drop") %>%
     left_join(p_dt, by = "ttot") %>%
-    mutate(value = .data[["value"]] * .data[["dt"]])
+    mutate(value = .data[["value"]] * .data[["dt"]]) %>%
+    select(-"dt") %>%
+    rename(ttotOut = "ttot")
 
   v_renovationIn <- v_renovation %>%
     filter(hsr != "0") %>%
@@ -109,18 +130,22 @@ reportLCCShare <- function(path, gdxName = "output.gdx", pathLt = NULL) {
     summarise(value = sum(value), .groups = "drop") %>%
     rename(hs = "hsr", bs = "bsr") %>%
     left_join(p_dt, by = "ttot") %>%
-    mutate(value = .data[["value"]] * .data[["dt"]])
+    mutate(value = .data[["value"]] * .data[["dt"]]) %>%
+    select(-"dt") %>%
+    rename(ttotIn = "ttot")
 
   v_demolitionOut <- v_demolition %>%
     left_join(p_dt, by = "ttot") %>%
-    mutate(value = .data[["value"]] * .data[["dt"]])
+    mutate(value = .data[["value"]] * .data[["dt"]]) %>%
+    select(-"dt") %>%
+    rename(ttotOut = "ttot")
 
   # Compute total in- and outflow
   outflow <- v_renovationOut %>%
     rename(ren = "value") %>%
     full_join(v_demolitionOut %>%
                 rename(dem = "value"),
-              by = c(dims, "ttot", "dt")) %>%
+              by = c(dims, "ttotOut")) %>%
     mutate(value = ren + dem) %>%
     select(-"ren", -"dem")
 
@@ -128,27 +153,28 @@ reportLCCShare <- function(path, gdxName = "output.gdx", pathLt = NULL) {
     rename(ren = "value") %>%
     full_join(conVin %>%
                 rename(con = "value"),
-              by = c(dims, "ttot", "dt")) %>%
+              by = c(dims, "ttotIn")) %>%
     replace_na(list(con = 0)) %>%
     mutate(value = .data[["con"]] + .data[["ren"]],
            share = ifelse(.data[["value"]] != 0, .data[["con"]] / .data[["value"]], 0)) %>%
     select(-"con", -"ren")
 
-  conShare <- select(inflow, -"value", -"dt")
+  conShare <- select(inflow, -"value")
   renShare <- mutate(conShare, share = 1 - .data[["share"]])
   inflow <- select(inflow, -"share")
 
   # Compute initial stock
   v_stockInit <- v_stock %>%
-    filter(ttot == t0)
+    filter(.data$ttot == t0) %>%
+    rename(ttotIn = "ttot")
 
 
   # COMPUTE EX-ANTE LIFETIME PROBABILITIES -------------------------------------
 
   # Compute life time probabilities of initial stock
   stockInitLtAnteC <- computeLtAnte("stock", v_stockInit, ttotNum, lifeTimeHs, dims, p_dt = p_dt)
-  conLtAnteC <- computeLtAnte("construction", conVin, ttotNum, lifeTimeHs, dims)
-  renLtAnteC <- computeLtAnte("renovation", v_renovation, ttotNum, lifeTimeHs, dims,
+  conLtAnteC <- computeLtAnte("construction", conVin, ttotNum, lifeTimeHs, dims, p_dt = p_dt)
+  renLtAnteC <- computeLtAnte("renovation", v_renovationInDim, ttotNum, lifeTimeHs, dims,
                                       dataValue = v_renovationIn)
 
   out[["stockInitLtAnteC"]] <- stockInitLtAnteC
@@ -166,7 +192,7 @@ reportLCCShare <- function(path, gdxName = "output.gdx", pathLt = NULL) {
                                    runSimple = TRUE, p_dt = p_dt)
   conLtAnte <- computeLtAnte("construction", conVin, ttotNum, lifeTimeHs, dims,
                              runSimple = TRUE, p_dt = p_dt)
-  renLtAnte <- computeLtAnte("renovation", v_renovation, ttotNum, lifeTimeHs, dims,
+  renLtAnte <- computeLtAnte("renovation", v_renovationInDim, ttotNum, lifeTimeHs, dims,
                              runSimple = TRUE, p_dt = p_dt, dataValue = v_renovationIn)
   
   stockInitLtAnteRemain <- computeLtAnte("stock", v_stockInit, ttotNum, lifeTimeHs, dims,
@@ -177,7 +203,7 @@ reportLCCShare <- function(path, gdxName = "output.gdx", pathLt = NULL) {
                              runSimple = TRUE, p_dt = p_dt, returnDistr = TRUE) %>%
     mutate(relVal = 1 - .data$relVal) %>%
     select(-"absVal")
-  renLtAnteRemain <- computeLtAnte("renovation", v_renovation, ttotNum, lifeTimeHs, dims,
+  renLtAnteRemain <- computeLtAnte("renovation", v_renovationInDim, ttotNum, lifeTimeHs, dims,
                              runSimple = TRUE, p_dt = p_dt, dataValue = v_renovationIn, returnDistr = TRUE) %>%
     mutate(relVal = 1 - .data$relVal) %>%
     select(-"absVal")
@@ -199,7 +225,7 @@ reportLCCShare <- function(path, gdxName = "output.gdx", pathLt = NULL) {
   ltPost <- computeLtPost(
     inflow,
     outflow,
-    list(stock = v_stockInit, construction = v_construction, renovation = v_renovationIn),
+    list(stock = v_stockInit, construction = conVin, renovation = v_renovationIn),
     conShare,
     p_ttotVin,
     ttotNum,
@@ -211,11 +237,14 @@ reportLCCShare <- function(path, gdxName = "output.gdx", pathLt = NULL) {
   ltPostRemain <- stats::setNames(lapply(ltPost, function(dfLt) {
     dfLt %>%
       select(-"absVal") %>%
-      group_by(across(-all_of(c("ttot2", "relVal")))) %>%
-      mutate(relVal = 1 - cumsum(.data$relVal))
+      group_by(across(-all_of(c("ttotOut", "relVal")))) %>%
+      mutate(relVal = 1 - cumsum(.data$relVal)) %>%
+      ungroup()
   }), paste0(names(ltPost), "Remain"))
 
   out <- c(out, ltPost, ltPostRemain)
+  
+  
 
   # COMPUTE LIFETIMES MATCHING EX-ANTE TO BRICK OUTFLOW ------------------------
 
@@ -235,24 +264,29 @@ reportLCCShare <- function(path, gdxName = "output.gdx", pathLt = NULL) {
   ltMixedRemain <- stats::setNames(lapply(ltMixed, function(dfLt) {
     dfLt %>%
       select(-"absVal") %>%
-      group_by(across(-all_of(c("ttot2", "relVal")))) %>%
-      mutate(relVal = 1 - cumsum(.data$relVal))
+      group_by(across(-all_of(c("ttotOut", "relVal")))) %>%
+      mutate(relVal = 1 - cumsum(.data$relVal)) %>%
+      ungroup()
   }), paste0(names(ltMixed), "Remain"))
 
-  out <- c(out, ltMixed, ltMixedRemain)
+  out <- c(out, ltMixed, ltMixedRemain)  
+  
+  
 
   # SAVE OUTFLOWS --------------------------------------------------------------
 
-  out[["outflow"]] <- outflow %>%
-    select(-"dt") %>%
-    rename(ttot2 = "ttot")
+  out[["outflow"]] <- outflow
 
+  
+  
   # VERIFY THE LIFETIME INEQUALITY ---------------------------------------------
 
   ltIneq <- verifyLtHs(gdx, inflow, v_stockInit, outflow, lifeTimeHs, dims)
 
   out <- c(out, ltIneq)
 
+
+  
   # COMPUTE LCC AND LCOH -------------------------------------------------------
 
   costCon <- p_specCostCon %>%
@@ -264,9 +298,6 @@ reportLCCShare <- function(path, gdxName = "output.gdx", pathLt = NULL) {
   costRen <- p_specCostRen %>%
     inner_join(renAllowed, by = c("bs", "hs", "bsr", "hsr")) %>%
     filter(.data[["bsr"]] == 0) %>%
-    # group_by(across(-all_of(c("bs", "hs", "value")))) %>%
-    # summarise(value = mean(.data[["value"]]), .groups = "drop") %>%
-    # rename(bs = "bsr", hs = "hsr") %>%
     pivot_wider(names_from = cost, values_from = value) %>%
     mutate(across(contains("hs"), as.character),
            statusQuoPref = ifelse(.data$hs != .data$hsr, config[["statusQuoPreference"]], 0),
@@ -275,6 +306,7 @@ reportLCCShare <- function(path, gdxName = "output.gdx", pathLt = NULL) {
 
   # Compute ex-ante LCC and LCOH
   out[["conLccAnte"]] <- computeLCC(out[["conLtAnte"]], p_specCostOpe, costCon, p_dt, p_discountFac)
+  out[["conLccAnteScaled"]] <- normalizeLCC(out[["conLccAnte"]], out[["conLtAnte"]], p_dt)
   out[["conLcohAnte"]] <- computeLCOH(out[["conLccAnte"]], out[["conLtAnte"]], p_ueDemand, p_dt, p_discountFac, dims)
 
   renLccAnteFull <- computeLCC(out[["renLtAnte"]], p_specCostOpe, costRen, p_dt, p_discountFac)
@@ -283,6 +315,8 @@ reportLCCShare <- function(path, gdxName = "output.gdx", pathLt = NULL) {
     .avgAlongDim(out[["renLccAnteFull"]], c("bs", "hs"), hs = "hsr", bs = "bsr"),
     bs = "low"
   )
+  renLccAnteScaledFull <- normalizeLCC(out[["renLccAnteFull"]], out[["renLtAnte"]], p_dt)
+  out[["renLccAnteScaledFull"]] <- renLccAnteScaledFull
   out[["renLcohAnteFull"]] <- computeLCOH(out[["renLccAnteFull"]], out[["renLtAnte"]], p_ueDemand, p_dt, p_discountFac, dims)
   out[["renLcohAnte"]] <- computeLCOH(out[["renLccAnte"]], out[["renLtAnte"]], p_ueDemand, p_dt, p_discountFac, dims)
 
@@ -290,6 +324,7 @@ reportLCCShare <- function(path, gdxName = "output.gdx", pathLt = NULL) {
 
   # Compute mixed LCC and LCOH
   out[["conLccMixed"]] <- computeLCC(out[["conLtMixed"]], p_specCostOpe, costCon, p_dt, p_discountFac)
+  out[["conLccMixedScaled"]] <- normalizeLCC(out[["conLccMixed"]], out[["conLtMixed"]], p_dt)
   out[["conLcohMixed"]] <- computeLCOH(out[["conLccMixed"]], out[["conLtMixed"]], p_ueDemand, p_dt, p_discountFac, dims)
 
   renLccMixedFull <- computeLCC(out[["renLtMixed"]], p_specCostOpe, costRen, p_dt, p_discountFac)
@@ -298,23 +333,26 @@ reportLCCShare <- function(path, gdxName = "output.gdx", pathLt = NULL) {
     .avgAlongDim(out[["renLccMixedFull"]], c("bs", "hs"), hs = "hsr", bs = "bsr"),
     bs = "low"
   )
+  renLccMixedScaledFull <- normalizeLCC(out[["renLccMixedFull"]], out[["renLtMixed"]], p_dt)
+  out[["renLccMixedScaledFull"]] <- renLccMixedScaledFull
   out[["renLcohMixedFull"]] <- computeLCOH(out[["renLccMixedFull"]], out[["renLtMixed"]], p_ueDemand, p_dt, p_discountFac, dims)
   out[["renLcohMixed"]] <- computeLCOH(out[["renLccMixed"]], out[["renLtMixed"]], p_ueDemand, p_dt, p_discountFac, dims)
 
 
+
   # COMPUTE LOGIT HEATING SYSTEM SHARES ----------------------------------------
 
-  renLogitAnteFull <- computeLogitShare("renovation", renLccAnteFull, c(dims, "bsr", "hsr"), priceSensHs[["renovation"]])
+  renLogitAnteFull <- computeLogitShare("renovation", renLccAnteFull, priceSensHs[["renovation"]])
   out[["renLogitAnteFull"]] <- renLogitAnteFull
-  out[["renLogitEl1Ante"]] <- aggregateShare(renLogitAnteFull, select(v_renovationIn, -"dt"),
+  out[["renLogitEl1Ante"]] <- aggregateShare(renLogitAnteFull, weight = v_renovationIn,
                                                   energyLadder = energyLadder, energyLadderNo = 1)
-  out[["renLogitAllAnte"]] <- aggregateShare(renLogitAnteFull, select(v_renovationIn, -"dt"))
+  out[["renLogitAllAnte"]] <- aggregateShare(renLogitAnteFull, weight = v_renovationIn)
 
-  renLogitMixedFull <- computeLogitShare("renovation", renLccMixedFull, c(dims, "bsr", "hsr"), priceSensHs[["renovation"]])
+  renLogitMixedFull <- computeLogitShare("renovation", renLccMixedFull, priceSensHs[["renovation"]])
   out[["renLogitMixedFull"]] <- renLogitMixedFull
-  out[["renLogitEl1Mixed"]] <- aggregateShare(renLogitMixedFull, select(v_renovationIn, -"dt"),
+  out[["renLogitEl1Mixed"]] <- aggregateShare(renLogitMixedFull, weight = v_renovationIn,
                                                    energyLadder = energyLadder, energyLadderNo = 1)
-  out[["renLogitAllMixed"]] <- aggregateShare(renLogitMixedFull, select(v_renovationIn, -"dt"))
+  out[["renLogitAllMixed"]] <- aggregateShare(renLogitMixedFull, weight = v_renovationIn)
 
   outRenLogitAnte <- .splitDataByHs(renLogitAnteFull, unique(renLogitAnteFull[["hs"]]), "renLogitAnte")
   outRenLogitMixed <- .splitDataByHs(renLogitMixedFull, unique(renLogitMixedFull[["hs"]]), "renLogitMixed")
@@ -325,12 +363,12 @@ reportLCCShare <- function(path, gdxName = "output.gdx", pathLt = NULL) {
   # COMPUTE BRICK HEATING SYSTEM SHARES ----------------------------------------
 
   # Shares of initial systems when renovating
-  out[["renBrickIn"]] <- computeBrickShare("renovationIn", select(v_renovationIn, -"dt"))
+  out[["renBrickIn"]] <- computeBrickShare("renovationIn", v_renovationIn)
 
-  renBrickFull <- computeBrickShare("renovation", v_renovation)
-  out[["renBrickEl1"]] <- aggregateShare(renBrickFull, weight = select(v_renovationIn, -"dt"),
+  renBrickFull <- computeBrickShare("renovation", rename(v_renovation, ttotIn = "ttot"))
+  out[["renBrickEl1"]] <- aggregateShare(renBrickFull, weight = v_renovationIn,
                                          energyLadder = energyLadder, energyLadderNo = 1)
-  out[["renBrickAll"]] <- aggregateShare(renBrickFull, weight = select(v_renovationIn, -"dt"))
+  out[["renBrickAll"]] <- aggregateShare(renBrickFull, weight = v_renovationIn)
 
   outBrick <- .splitDataByHs(renBrickFull, unique(renBrickFull[["hs"]]), "renBrick")
 
@@ -358,11 +396,15 @@ reportLCCShare <- function(path, gdxName = "output.gdx", pathLt = NULL) {
 
 }
 
-#' Read in Gdx and slightly modify
+#' Clean data that has been read from gdx
+#'
+#' @param df data frame with data as read from a gdx
+#' @param vinExists data frame with existing vintage and time period combinations
+#' @param renAllowed data frame with all possible renovation transitions
 #'
 #' @importFrom dplyr %>% across any_of .data filter mutate right_join
 #'
-.cleanReadGdx <- function(df, vinExists, renAllowed = NULL, bsToZero = TRUE) {
+.cleanReadGdx <- function(df, vinExists, renAllowed = NULL) {
 
   if ("qty" %in% colnames(df)) {
     df <- df %>%
@@ -391,12 +433,15 @@ reportLCCShare <- function(path, gdxName = "output.gdx", pathLt = NULL) {
 
 #' Check plausibility of lifetime results
 #'
+#' @param dfLt data frame with lifetime data
+#' @param dims character, dimensions to group by
+#'
 #' @importFrom dplyr %>% .data across all_of group_by mutate summarise
 #'
 .checkLifetimeResults <- function(dfLt, dims) {
 
   dfLt %>%
-    group_by(across(all_of(c(dims, "ttot")))) %>%
+    group_by(across(all_of(c(dims, "ttotIn")))) %>%
     summarise(value = sum(.data[["relVal"]]), .groups = "drop") %>%
     mutate(error = .data[["value"]] <= 0.95)
 
@@ -404,7 +449,11 @@ reportLCCShare <- function(path, gdxName = "output.gdx", pathLt = NULL) {
 
 #' Compute data average along given dimensions
 #'
-#' @importFrom dplyr
+#' @param df data frame with the data to be manipulated
+#' @param dimToAvg character column name of the column to average over
+#' @param ... named character vector to with tuples to be renamed
+#'
+#' @importFrom dplyr %>% .data across any_of group_by rename summarise
 #'
 .avgAlongDim <- function(df, dimToAvg, ...) {
 

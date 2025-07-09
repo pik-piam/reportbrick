@@ -6,8 +6,6 @@
 #'
 normalizePriceSensitivity <- function(dfLcc, brickRes, lambda, dims, groupCols = NULL) {
 
-  # browser()
-
   brickWeights <- brickRes %>%
     group_by(across(any_of(groupCols))) %>%
     mutate(total = sum(.data[["value"]]),
@@ -21,7 +19,7 @@ normalizePriceSensitivity <- function(dfLcc, brickRes, lambda, dims, groupCols =
     summarise(value = sum(.data[["value"]]), .groups = "drop")
   weightedAvg <- weightedAvg %>%
     left_join(brickWeights,
-              by = c(dims, "ttot"))
+              by = c(dims, "ttotIn"))
   weightedAvg <- weightedAvg %>%
     group_by(across(any_of(groupCols))) %>%
     summarise(value = sum(.data[["value"]] * .data[["weight"]] * lambda), .groups = "drop")

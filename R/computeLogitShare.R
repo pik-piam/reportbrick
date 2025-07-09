@@ -7,30 +7,28 @@
 #'
 #' @param variable character, flow variable for which the share is computed
 #' @param lcc data frame, lifecycle costs
-#' @param dims character, dimensions of the lcc data, without time peridos
 #' @param lambda numeric, price sensitivity
-#' @param energyLadder data frame, mapping between heating systems and energy ladder position
-#'   (only required for renovation flows)
-#' @param energyLadderNo numeric, maximum energy ladder position to be included in the share
-#'   (only required for renovation flows)
 #'
 #' @importFrom dplyr %>% across all_of .data filter group_by left_join mutate
 #'   select summarise ungroup
 #'
-computeLogitShare <- function(variable, lcc, dims, lambda) {
+computeLogitShare <- function(variable, lcc, lambda) {
 
-  # For renovation data with full resolution will need to sum over hsr
-  hsName <- "hs"
-  if (variable == "renovation" && "hsr" %in% colnames(lcc)) hsName <- "hsr"
+  # For renovation data with full resolution we will need to sum over hsr
+  hsName <- if (variable == "renovation" && "hsr" %in% colnames(lcc)) "hsr" else "hs"
 
-  # Compute total lcc
+  # Compute logit shares from LCC and the price sensitivity lambda
   lcc  %>%
-    group_by(across(all_of(c(dims, "ttot")))) %>%
+    
+    # Sum over all cost types to obtain total LCC
+    group_by(across(-all_of(c("costType", "value")))) %>%
     summarise(value = sum(.data[["value"]]), .groups = "drop") %>%
-    mutate(expVal = exp(-lambda * .data[["value"]])) %>%
-    group_by(across(-all_of(c(hsName, "expVal", "value")))) %>%
-    mutate(totVal = sum(.data[["expVal"]])) %>%
+    
+    # Compute the logit share
+    mutate(expoVal = exp(-lambda * .data[["value"]])) %>%
+    group_by(across(-all_of(c(hsName, "expoVal", "value")))) %>%
+    mutate(totVal = sum(.data[["expoVal"]])) %>%
     ungroup() %>%
-    mutate(value = .data[["expVal"]] / .data[["totVal"]]) %>%
-    select(-"expVal", -"totVal")
+    mutate(value = .data[["expoVal"]] / .data[["totVal"]]) %>%
+    select(-"expoVal", -"totVal")
 }

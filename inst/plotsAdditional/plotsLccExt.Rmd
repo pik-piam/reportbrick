@@ -85,7 +85,7 @@ knitr::opts_chunk$set(
 .showLtPlot <- function(plotType, data, varName, yname, color,
                         linetype = NULL, facets = c("loc", "typ"),
                         rprt = NULL, avg = NULL, remCols = NULL,
-                        xname = "ttot2", suppressLateTtot = TRUE,
+                        xname = "ttotOut", suppressLateTtot = TRUE,
                         xlabName = NULL, ylabName = NULL, tmpl = NULL) {
   
   plData <- data %>%
@@ -113,13 +113,13 @@ knitr::opts_chunk$set(
   if (!is.null(facetMap)) {
     plData <- mutate(plData, across(
       any_of(facets),
-      ~ factor(facetMap[[cur_column()]][.x], levels = facetMap[[cur_column()]])
+      ~ factor(facetMap[[dplyr::cur_column()]][.x], levels = facetMap[[dplyr::cur_column()]])
     ))
   }
   
   # Remove late time step from data due to end of horizon effects
-  if (isTRUE(suppressLateTtot) && "ttot" %in% colnames(plData) && length(unique(plData[["ttot"]])) > 4) {
-    plData <- filter(plData, .data[["ttot"]] < sort(unique(.data[["ttot"]]), decreasing = TRUE)[[3]])
+  if (isTRUE(suppressLateTtot) && "ttotIn" %in% colnames(plData) && length(unique(plData[["ttotIn"]])) > 4) {
+    plData <- filter(plData, .data[["ttotIn"]] < sort(unique(.data[["ttotIn"]]), decreasing = TRUE)[[3]])
   }
   
   heading <- paste(paste(varName, collapse = " and "), "by", color)
@@ -208,206 +208,12 @@ if (!file.exists(filePath)) {
   knitr::knit_exit()
 }
 
+config <- yaml::read_yaml(file.path(params$path, "config", "config_COMPILED.yaml"))
+tmpl <- config[["reportingTemplate"]]
+
 outName <- params$name
 outPath <- dirname(filePath[1])
 
-# Standard procedure to write a calibration plot
-# .createLtPlot <- function(data, varName, yname, color,
-#                           rprt = NULL, avg = NULL, xname = "ttot2", suppressLateTtot = TRUE,
-#                           facets = c("loc", "typ"), xlabName = NULL, ylabName = NULL) {
-#   
-#   colorMap <- unlist(readBrickSets(NULL)[[color]][["elements"]])
-#   
-#   plData <- filter(data, .data[["variable"]] == varName)
-#   if (!is.null(colorMap)) {
-#     plData <- mutate(plData, across(any_of(color), ~ factor(colorMap[.x], levels = colorMap)))
-#   }
-#   if (isTRUE(suppressLateTtot) && "ttot" %in% colnames(plData) && length(unique(plData[["ttot"]])) > 4) {
-#     plData <- filter(plData, .data[["ttot"]] < sort(unique(.data[["ttot"]]), decreasing = TRUE)[[3]])
-#   }
-#   
-#   heading <- paste(varName, "by", color)
-#   
-#   if (length(rprt) >= 1) {
-#     filterVals <- stats::setNames(lapply(rprt, function(col) {
-#       unique(plData[[col]])
-#     }), rprt)
-#   } else {
-#     filterVals <- "None"
-#   }
-# 
-#   if (!is.null(avg)) {
-#     plData <- plData %>%
-#       group_by(across(-any_of(c(avg, yname, "absVal", "relVal")))) %>%
-#       summarise(value = mean(.data[[yname]], na.rm = TRUE), .groups = "drop")
-#     yname <- "value"
-#   }
-#   
-#   count <- stats::setNames(rep(1, length.out = length(rprt)), rprt)
-#   complete <- FALSE
-#   
-#   while (isFALSE(complete)) {
-#     
-#     plDataFiltered <- plData
-#     
-#     for (col in rprt) {
-#       plDataFiltered <- filter(plDataFiltered, .data[[col]] == filterVals[[col]][count[col]])
-#     }
-#     thisHeading <- paste(heading, paste(lapply(rprt, function(col) {
-#       paste(col, "=", filterVals[[col]][count[col]])
-#     }), collapse = " | "))
-#     
-#     countAtMax <- count == unlist(lapply(filterVals, length))
-#     if (!all(countAtMax)) {
-#       count[!countAtMax][1] <- count[!countAtMax][1] + 1
-#       if (any(which(countAtMax)) < which(!countAtMax)[1]) count[countAtMax[1:which(!countAtMax)[1]]] <- 1
-#     } else {
-#       complete <- TRUE
-#     }
-#     
-#     if (nrow(plDataFiltered) == 0) next
-#     
-#     pl <- ggplot(plDataFiltered, mapping = aes(x = !!sym(xname), y = !!sym(yname), fill = !!sym(color))) +
-#       geom_col() +
-#       ggtitle(thisHeading)
-#     if (length(facets) == 1) pl <- pl + facet_wrap(facets = vars(.data[[facets[1]]]))
-#     if (length(facets) == 2) pl <- pl + facet_grid(rows = vars(.data[[facets[1]]]), cols = vars(.data[[facets[2]]]))
-#     if (!is.null(colorMap)) pl <- pl + ggplot2::scale_fill_manual(values = mip::plotstyle(colorMap))
-#     if (!is.null(xlabName)) pl <- pl + xlab(xlabName)
-#     if (!is.null(ylabName)) pl <- pl + ylab(ylabName)
-#     print(pl)
-#   }
-# }
-# 
-# .createLtTwoBar <- function(data, varName, yname, color,
-#                             xname = "ttot2", suppressLateTtot = TRUE,
-#                             remCols = NULL, rprt = NULL, xlabName = NULL, ylabName = NULL) {
-#   
-#   colorMap <- unlist(readBrickSets(NULL)[[color]][["elements"]])
-#   
-#   alphaMap <- c(1, 0.5)
-#   names(alphaMap) <- varName
-#   
-#   plData <- data %>%
-#     filter(.data[["variable"]] %in% varName) %>%
-#     mutate(across(any_of(color), ~ factor(colorMap[.x], levels = colorMap)))
-#   if (isTRUE(suppressLateTtot) && "ttot" %in% colnames(plData) && length(unique(plData[["ttot"]])) > 4) {
-#     plData <- filter(plData, .data[["ttot"]] < sort(unique(.data[["ttot"]]), decreasing = TRUE)[[3]])
-#   }
-#   plData <- plData %>%
-#     select(-any_of(remCols)) %>%
-#     group_by(across(-all_of(c(xname, yname)))) %>%
-#     mutate(width = .computeResolution(.data[[xname]])) %>%
-#     ungroup() %>%
-#     mutate(t = ifelse(.data[["variable"]] == varName[1],
-#                          .data[[xname]] - 0.225 * .data[["width"]],
-#                          .data[[xname]] + 0.225 * .data[["width"]]),
-#            width = 0.4 * .data[["width"]],
-#            alpha = factor(ifelse(.data[["variable"]] == varName[1],
-#                           1,
-#                           0.5)))
-#   
-#   heading <- paste(varName[1], "and", varName[2], "by", color)
-#   
-#   if (length(rprt) == 1) {
-#     filterVals <- unique(plData[[rprt]])
-#     heading <- paste(heading, "|", rprt, "=", filterVals)
-#   } else {
-#     filterVals <- "None"
-#   }
-#   
-#   for (i in seq_along(filterVals)) {
-#     
-#     plDataFiltered <- plData
-#     
-#     if (length(rprt) == 1) plDataFiltered <- filter(plDataFiltered, .data[[rprt]] == filterVals[i])
-#     
-#     pl <- ggplot(plDataFiltered) +
-#       geom_col(mapping = aes(x = t, y = !!sym(yname), fill = !!sym(color),
-#                              width = width, alpha = variable)) +
-#       ggplot2::scale_fill_manual(values = mip::plotstyle(colorMap)) +
-#       ggplot2::scale_alpha_manual(values = alphaMap)
-#     if (!is.null(xlabName)) pl <- pl + xlab(xlabName)
-#     if (!is.null(ylabName)) pl <- pl + ylab(ylabName)
-#     pl <- pl +
-#       ggtitle(heading[i]) +
-#       facet_grid(rows = vars(loc), cols = vars(typ), scales = "free")
-#     print(pl)
-#   }
-#   
-# }
-```
-
-# Line plot
-
-```{r line plot}
-# Standard procedure to write a calibration plot
-# .createLtLinePlot <- function(data, varName, yname, color, linetype,
-#                               rprt = NULL, avg = NULL, xname = "ttot2", suppressLateTtot = TRUE,
-#                               facets = c("loc", "typ"), xlabName = NULL, ylabName = NULL) {
-#   
-#   colorMap <- unlist(readBrickSets(NULL)[[color]][["elements"]])
-#   
-#   plData <- filter(data, .data[["variable"]] %in% varName, !is.na(.data[[yname]]))
-#   if (!is.null(colorMap)) {
-#     plData <- mutate(plData, across(any_of("hs"), ~ factor(colorMap[.x], levels = colorMap)))
-#   }
-#   if (isTRUE(suppressLateTtot) && "ttot" %in% colnames(plData) && length(unique(plData[["ttot"]])) > 4) {
-#     plData <- filter(plData, .data[["ttot"]] < sort(unique(.data[["ttot"]]), decreasing = TRUE)[[3]])
-#   }
-#   
-#   heading <- paste(varName, "by", color)
-#   
-#   if (length(rprt) >= 1) {
-#     filterVals <- stats::setNames(lapply(rprt, function(col) {
-#       unique(plData[[col]])
-#     }), rprt)
-#   } else {
-#     filterVals <- "None"
-#   }
-# 
-#   if (!is.null(avg)) {
-#     plData <- plData %>%
-#       group_by(across(-any_of(c(avg, yname, "absVal", "relVal")))) %>%
-#       summarise(value = mean(.data[[yname]], na.rm = TRUE), .groups = "drop")
-#     yname <- "value"
-#   }
-#   
-#   count <- stats::setNames(rep(1, length.out = length(rprt)), rprt)
-#   complete <- FALSE
-#   
-#   while (isFALSE(complete)) {
-#     
-#     plDataFiltered <- plData
-#     
-#     for (col in rprt) {
-#       plDataFiltered <- filter(plDataFiltered, .data[[col]] == filterVals[[col]][count[col]])
-#     }
-#     thisHeading <- paste(heading, paste(lapply(rprt, function(col) {
-#       paste(col, "=", filterVals[[col]][count[col]])
-#     }), collapse = " | "))
-#     
-#     countAtMax <- count == unlist(lapply(filterVals, length))
-#     if (!all(countAtMax)) {
-#       count[!countAtMax][1] <- count[!countAtMax][1] + 1
-#       if (any(which(countAtMax)) < which(!countAtMax)[1]) count[countAtMax[1:which(!countAtMax)[1]]] <- 1
-#     } else {
-#       complete <- TRUE
-#     }
-#     
-#     if (nrow(plDataFiltered) == 0) next
-#     
-#     pl <- ggplot(plDataFiltered) +
-#       geom_line(mapping = aes(x = .data[[xname]], y = .data[[yname]], color = .data[[color]], linetype = .data[[linetype]]), linewidth = 1) +
-#     ggtitle(thisHeading)
-#     if (length(facets) == 1) pl <- pl + facet_wrap(facets = vars(.data[[facets[1]]]))
-#     if (length(facets) == 2) pl <- pl + facet_grid(rows = vars(.data[[facets[1]]]), cols = vars(.data[[facets[2]]]))
-#     if (!is.null(colorMap)) pl <- pl + ggplot2::scale_color_manual(values = mip::plotstyle(colorMap))
-#     if (!is.null(xlabName)) pl <- pl + xlab(xlabName)
-#     if (!is.null(ylabName)) pl <- pl + ylab(ylabName)
-#     print(pl)
-#   }
-# }
 ```
 
 ```{r matric plots}
@@ -592,15 +398,15 @@ data <- utils::read.csv(filePath) %>%
 
 wbRemainStub <- data %>%
   filter(grepl("Remain", .data$variable), !grepl("stock", .data$variable)) %>%
-  select(-"variable", -"ttot2", -"relVal", -"absVal", -"value", -"costType", -"hsr", -"bsr") %>%
+  select(-"variable", -"ttotOut", -"relVal", -"absVal", -"value", -"costType", -"hsr", -"bsr") %>%
   unique() %>%
   mutate(absVal = NA, value = NA, costType = NA, hsr = NA, bsr = NA)
 
 wbRemainStockStub <- data %>%
   filter(grepl("stock.*Remain", .data$variable)) %>%
-  select(-"variable", -"ttot", -"ttot2", -"relVal", -"absVal", -"value", -"costType", -"hsr", -"bsr") %>%
+  select(-"variable", -"ttotIn", -"ttotOut", -"relVal", -"absVal", -"value", -"costType", -"hsr", -"bsr") %>%
   unique() %>%
-  mutate(ttot = 2000, absVal = NA, value = NA, costType = NA, hsr = NA, bsr = NA)
+  mutate(ttotIn = 2000, absVal = NA, value = NA, costType = NA, hsr = NA, bsr = NA)
 
 pathLt <- "C:/Users/ricardar/Documents/PIAM/brick/inst/input/f_lifetimeHeatingSystem.cs4r" # Temporary
 lifeTimeHs <- read.csv(pathLt, header = FALSE, comment.char = "*")
@@ -615,13 +421,13 @@ wbRemain <- lifeTimeHs %>%
 
 wbRemainStock <- wbRemain %>%
   left_join(wbRemainStockStub, by = c("region", "typ", "hs")) %>%
-  mutate(ttot2 = 2000 - 12 + .data$x,
+  mutate(ttotOut = 2000 - 12 + .data$x,
          variable = "wbRemainStock") %>%
   select(-"x")
 
 wbRemain <- wbRemain %>%
   left_join(wbRemainStub, by = c("region", "typ", "hs")) %>%
-  mutate(ttot2 = .data$ttot + .data$x - 5/2,
+  mutate(ttotOut = .data$ttotIn + .data$x - 5/2,
          variable = "wbRemain") %>%
   select(-"x")
 
@@ -630,25 +436,25 @@ dataRemain <- data %>%
   rbind(wbRemain)
 # dataRemain1 <- dataRemain %>% 
 #   pivot_wider(names_from = "variable", values_from = "relVal") %>%
-#   group_by(across(all_of(c("qty", "bs", "hs", "vin", "region", "loc", "typ", "inc", "ttot", "costType", "hsr", "bsr")))) %>%
-#   mutate(across(matches("^(?!wb).*Remain$", perl = TRUE), ~ .data$wbRemain[.data$ttot2 == .data$ttot] * .x)) %>%
+#   group_by(across(all_of(c("qty", "bs", "hs", "vin", "region", "loc", "typ", "inc", "ttotIn", "costType", "hsr", "bsr")))) %>%
+#   mutate(across(matches("^(?!wb).*Remain$", perl = TRUE), ~ .data$wbRemain[.data$ttotOut == .data$ttotIn] * .x)) %>%
 #   ungroup()
 
 dataRemainStock <- data %>%
   filter(grepl("stock.*Remain", .data$variable))
 
 dataRemainStock <- wbRemainStockStub %>%
-  crossing(ttot2 = unique(dataRemainStock$ttot2), variable = unique(dataRemainStock$variable)) %>%
+  crossing(ttotOut = unique(dataRemainStock$ttotOut), variable = unique(dataRemainStock$variable)) %>%
   left_join(dataRemainStock) %>%
   mutate(relVal = ifelse(
-    is.na(.data$relVal) & .data$ttot2 == 2000,
+    is.na(.data$relVal) & .data$ttotOut == 2000,
     1,
     .data$relVal
   )) %>%
   rbind(wbRemainStock) %>%
   pivot_wider(names_from = "variable", values_from = "relVal") %>%
-  group_by(across(all_of(c("qty", "bs", "hs", "vin", "region", "loc", "typ", "inc", "ttot", "costType", "hsr", "bsr")))) %>%
-  mutate(across(matches("stock.*Remain"), ~ .data$wbRemainStock[.data$ttot2 == 2000] * .x)) %>%
+  group_by(across(all_of(c("qty", "bs", "hs", "vin", "region", "loc", "typ", "inc", "ttotIn", "costType", "hsr", "bsr")))) %>%
+  mutate(across(matches("stock.*Remain"), ~ .data$wbRemainStock[.data$ttotOut == 2000] * .x)) %>%
   ungroup() %>%
   pivot_longer(cols = matches("stock", ignore.case = TRUE), names_to = "variable", values_to = "relVal")
 
@@ -697,7 +503,7 @@ dataRemainStock <- wbRemainStockStub %>%
 ```{r Plot ex-ante initial stock leave time and complex ex-ante estimate}
 
 .showLtPlot("twoBar", data, c("stockInitLtAnte", "stockInitLtAnteC"), yname = "absVal", color = "hs",
-            remCols = c("value", "relVal"), rprt = "ttot",
+            remCols = c("value", "relVal"), rprt = "ttotIn",
             xlabName = "Time of removal", ylabName = "Quantity in million m2", tmpl = tmpl)
 ```
 
@@ -718,7 +524,7 @@ dataRemainStock <- wbRemainStockStub %>%
 
 ```{r Plot mixed initial stock leave time and ex-ante estimate}
 .showLtPlot("twoBar", data, c("stockInitLtMixed", "stockInitLtAnte"), yname = "absVal",
-            color = "hs", remCols = c("value", "relVal"), rprt = "ttot",
+            color = "hs", remCols = c("value", "relVal"), rprt = "ttotIn",
             xlabName = "Time of removal", ylabName = "Quantity in million m2", tmpl = tmpl)
 ```
 
@@ -727,7 +533,7 @@ dataRemainStock <- wbRemainStockStub %>%
 ```{r Plot ex-post outflow of standing stock, relative values}
 
 .showLtPlot("bar", data, "stockInitLtPost", yname = "relVal", color = "hs",
-            rprt = "vin", avg = "ttot",
+            rprt = "vin", avg = "ttotIn",
             xlabName = "Time of removal", ylabName = "Share of installations", tmpl = tmpl)
 
 ```
@@ -737,7 +543,7 @@ dataRemainStock <- wbRemainStockStub %>%
 ```{r Plot ex-ante outflow of standing stock, relative values}
 
 .showLtPlot("bar", data, "stockInitLtAnte", yname = "relVal", color = "hs",
-            rprt = "vin", avg = "ttot",
+            rprt = "vin", avg = "ttotIn",
             xlabName = "Time of removal", ylabName = "Share of installations", tmpl = tmpl)
 
 ```
@@ -748,7 +554,7 @@ dataRemainStock <- wbRemainStockStub %>%
 
 ```{r Plot ex-post leave time of constructions}
 
-.showLtPlot("bar", data, "conLtPost", yname = "absVal", color = "hs", rprt = "ttot",
+.showLtPlot("bar", data, "conLtPost", yname = "absVal", color = "hs", rprt = "ttotIn",
             xlabName = "Time of removal", ylabName = "Quantity in million m2", tmpl = tmpl)
 
 ```
@@ -757,7 +563,7 @@ dataRemainStock <- wbRemainStockStub %>%
 
 ```{r Plot ex-ante leave time of constructions}
 
-.showLtPlot("bar", data, "conLtAnte", yname = "absVal", color = "hs", rprt = "ttot",
+.showLtPlot("bar", data, "conLtAnte", yname = "absVal", color = "hs", rprt = "ttotIn",
             xlabName = "Time of removal", ylabName = "Quantity in million m2", tmpl = tmpl)
 
 ```
@@ -766,7 +572,7 @@ dataRemainStock <- wbRemainStockStub %>%
 
 ```{r Plot ex-ante leave time of constructions (complex)}
 
-.showLtPlot("bar", data, "conLtAnteC", yname = "absVal", color = "hs", rprt = "ttot",
+.showLtPlot("bar", data, "conLtAnteC", yname = "absVal", color = "hs", rprt = "ttotIn",
             xlabName = "Time of removal", ylabName = "Quantity in million m2", tmpl = tmpl)
 
 ```
@@ -776,7 +582,7 @@ dataRemainStock <- wbRemainStockStub %>%
 ```{r Plot ex-ante construction leave time and complex ex-ante estimate}
 
 .showLtPlot("twoBar", data, c("conLtAnte", "conLtAnteC"), yname = "absVal", color = "hs",
-            remCols = c("value", "relVal"), rprt = "ttot",
+            remCols = c("value", "relVal"), rprt = "ttotIn",
             xlabName = "Time of removal", ylabName = "Quantity in million m2", tmpl = tmpl)
 ```
 
@@ -784,7 +590,7 @@ dataRemainStock <- wbRemainStockStub %>%
 
 ```{r Plot mixture leave time of constructions}
 
-.showLtPlot("bar", data, "conLtMixed", yname = "absVal", color = "hs", rprt = "ttot",
+.showLtPlot("bar", data, "conLtMixed", yname = "absVal", color = "hs", rprt = "ttotIn",
             xlabName = "Time of removal", ylabName = "Quantity in million m2", tmpl = tmpl)
 
 ```
@@ -793,7 +599,7 @@ dataRemainStock <- wbRemainStockStub %>%
 
 ```{r Plot mixed construction leave time and ex-ante estimate}
 .showLtPlot("twoBar", data, c("conLtMixed", "conLtAnte"), yname = "absVal", color = "hs",
-            remCols = c("value", "relVal"), rprt = "ttot",
+            remCols = c("value", "relVal"), rprt = "ttotIn",
             xlabName = "Time of removal", ylabName = "Quantity in million m2", tmpl = tmpl)
 ```
 
@@ -801,7 +607,7 @@ dataRemainStock <- wbRemainStockStub %>%
 
 ```{r Plot ex-post leave time of constructions, relative values}
 
-.showLtPlot("bar", data, "conLtPost", yname = "relVal", color = "hs", rprt = "ttot",
+.showLtPlot("bar", data, "conLtPost", yname = "relVal", color = "hs", rprt = "ttotIn",
             xlabName = "Time of removal", ylabName = "Share of installations", tmpl = tmpl)
 
 ```
@@ -810,7 +616,7 @@ dataRemainStock <- wbRemainStockStub %>%
 
 ```{r Plot ex-ante leave time of constructions, relative values}
 
-.showLtPlot("bar", data, "conLtAnte", yname = "relVal", color = "hs", rprt = "ttot",
+.showLtPlot("bar", data, "conLtAnte", yname = "relVal", color = "hs", rprt = "ttotIn",
             xlabName = "Time of removal", ylabName = "Share of installations", tmpl = tmpl)
 
 ```
@@ -821,11 +627,11 @@ dataRemainStock <- wbRemainStockStub %>%
 
 ```{r Plot ex-post leave time of renovations}
 
-.showLtPlot("bar", data, "renLtPost", yname = "absVal", color = "hs", rprt = "ttot",
+.showLtPlot("bar", data, "renLtPost", yname = "absVal", color = "hs", rprt = "ttotIn",
             xlabName = "Time of removal", ylabName = "Quantity in million m2", tmpl = tmpl)
 
 .showLtPlot("line", dataRemain, c("renLtPostRemain", "wbRemain"), yname = "relVal",
-            color = "hs", linetype = "variable", rprt = c("vin", "ttot"),
+            color = "hs", linetype = "variable", rprt = c("vin", "ttotIn"),
             xlabName = "Time of removal", ylabName = "Quantity in million m2", tmpl = tmpl)
 ```
 
@@ -833,11 +639,11 @@ dataRemainStock <- wbRemainStockStub %>%
 
 ```{r Plot ex-ante leave time of renovations}
 
-.showLtPlot("bar", data, "renLtAnte", yname = "absVal", color = "hs", rprt = "ttot",
+.showLtPlot("bar", data, "renLtAnte", yname = "absVal", color = "hs", rprt = "ttotIn",
             xlabName = "Time of removal", ylabName = "Quantity in million m2", tmpl = tmpl)
 
 .showLtPlot("line", dataRemain, c("renLtAnteRemain", "wbRemain"), yname = "relVal",
-            color = "hs", linetype = "variable", rprt = c("vin", "ttot"),
+            color = "hs", linetype = "variable", rprt = c("vin", "ttotIn"),
             xlabName = "Time of removal", ylabName = "Quantity in million m2", tmpl = tmpl)
 ```
 
@@ -845,7 +651,7 @@ dataRemainStock <- wbRemainStockStub %>%
 
 ```{r Plot ex-ante leave time of renovations (complex)}
 
-.showLtPlot("bar", data, "renLtAnteC", yname = "absVal", color = "hs", rprt = "ttot",
+.showLtPlot("bar", data, "renLtAnteC", yname = "absVal", color = "hs", rprt = "ttotIn",
             xlabName = "Time of removal", ylabName = "Quantity in million m2", tmpl = tmpl)
 
 ```
@@ -855,7 +661,7 @@ dataRemainStock <- wbRemainStockStub %>%
 ```{r Plot ex-ante renovation leave time and complex ex-ante estimate}
 
 .showLtPlot("twoBar", data, c("renLtAnte", "renLtAnteC"), yname = "absVal", color = "hs",
-            remCols = c("value", "relVal"), rprt = "ttot",
+            remCols = c("value", "relVal"), rprt = "ttotIn",
             xlabName = "Time of removal", ylabName = "Quantity in million m2", tmpl = tmpl)
 ```
 
@@ -863,11 +669,11 @@ dataRemainStock <- wbRemainStockStub %>%
 
 ```{r Plot mixture leave time of renovations}
 
-.showLtPlot("bar", data, "renLtMixed", yname = "absVal", color = "hs", rprt = c("vin", "ttot"),
+.showLtPlot("bar", data, "renLtMixed", yname = "absVal", color = "hs", rprt = c("vin", "ttotIn"),
             xlabName = "Time of removal", ylabName = "Quantity in million m2", tmpl = tmpl)
 
 .showLtPlot("line", dataRemain, c("renLtMixedRemain", "wbRemain"), yname = "relVal",
-            color = "hs", linetype = "variable", rprt = c("vin", "ttot"),
+            color = "hs", linetype = "variable", rprt = c("vin", "ttotIn"),
             xlabName = "Time of removal", ylabName = "Quantity in million m2", tmpl = tmpl)
 ```
 
@@ -876,16 +682,16 @@ dataRemainStock <- wbRemainStockStub %>%
 ```{r Plot mixed renovation leave time and ex-ante estimate}
 
 .showLtPlot("twoBar", data, c("renLtMixed", "renLtAnte"), yname = "absVal", color = "hs",
-            remCols = c("value", "relVal"), rprt = "ttot",
+            remCols = c("value", "relVal"), rprt = "ttotIn",
             xlabName = "Time of removal", ylabName = "Quantity in million m2", tmpl = tmpl)
 ```
 
-### Ex-post esimate, relative values
+### Ex-post estimate, relative values
 
 ```{r Plot ex-post leave time of renovations, relative values}
 
 .showLtPlot("bar", data, "renLtPost", yname = "relVal", color = "hs",
-            rprt = "ttot", avg = "vin",
+            rprt = "ttotIn", avg = "vin",
             xlabName = "Time of removal", ylabName = "Share of installations", tmpl = tmpl)
 
 ```
@@ -895,7 +701,7 @@ dataRemainStock <- wbRemainStockStub %>%
 ```{r Plot ex-ante leave time of renovations, relative values}
 
 .showLtPlot("bar", data, "renLtAnte", yname = "relVal", color = "hs",
-            rprt = "ttot", avg = "vin",
+            rprt = "ttotIn", avg = "vin",
             xlabName = "Time of removal", ylabName = "Share of installations", tmpl = tmpl)
 
 ```
@@ -905,7 +711,7 @@ dataRemainStock <- wbRemainStockStub %>%
 ```{r Plot mixed leave time of renovations, relative values}
 
 .showLtPlot("bar", data, "renLtMixed", yname = "relVal", color = "hs",
-            rprt = "ttot", avg = "vin",
+            rprt = "ttotIn", avg = "vin",
             xlabName = "Time of removal", ylabName = "Share of installations", tmpl = tmpl)
 
 ```
@@ -936,7 +742,7 @@ dataRemainStock <- wbRemainStockStub %>%
 
 ```{r Plot ex-ante LCC of construction}
 .showLtPlot("bar", data, "conLccAnte",
-            xname = "hs", yname = "value", color = "costType", rprt = c("ttot", "typ", "loc"),
+            xname = "hs", yname = "value", color = "costType", rprt = c("ttotIn", "typ", "loc"),
             facets = NULL, xlabName = "Heating System", ylabName = "Costs in USD/m2", tmpl = tmpl)
 ```
 
@@ -944,7 +750,7 @@ dataRemainStock <- wbRemainStockStub %>%
 
 ```{r Plot LCC of construction with mixed lifetimes}
 .showLtPlot("bar", data, "conLccMixed",
-            xname = "hs", yname = "value", color = "costType", rprt = c("ttot", "typ", "loc"),
+            xname = "hs", yname = "value", color = "costType", rprt = c("ttotIn", "typ", "loc"),
             facets = NULL, xlabName = "Heating System", ylabName = "Costs in USD/m2", tmpl = tmpl)
 ```
 
@@ -952,7 +758,7 @@ dataRemainStock <- wbRemainStockStub %>%
 
 ```{r Plot ex-ante LCC of renovation}
 .showLtPlot("bar", data, "renLccAnte",
-            xname = "hs", yname = "value", color = "costType", rprt = c("ttot", "typ", "loc"), avg = "vin",
+            xname = "hs", yname = "value", color = "costType", rprt = c("ttotIn", "typ", "loc"), avg = "vin",
             facets = NULL, xlabName = "Heating System", ylabName = "Costs in USD/m2", tmpl = tmpl)
 ```
 
@@ -960,7 +766,7 @@ dataRemainStock <- wbRemainStockStub %>%
 
 ```{r Plot LCC of renovation with mixed lifetimes}
 .showLtPlot("bar", data, "renLccMixed",
-            xname = "hs", yname = "value", color = "costType", rprt = c("ttot", "typ", "loc"), avg = "vin",
+            xname = "hs", yname = "value", color = "costType", rprt = c("ttotIn", "typ", "loc"), avg = "vin",
             facets = NULL, xlabName = "Heating System", ylabName = "Costs in USD/m2", tmpl = tmpl)
 ```
 
@@ -970,32 +776,32 @@ dataRemainStock <- wbRemainStockStub %>%
 
 ```{r Plot LCOH of construction with ex-ante lifetimes}
 .showLtPlot("bar", data, "conLcohAnte",
-            xname = "hs", yname = "value", color = "costType", rprt = c("ttot", "typ", "loc"),
-            facets = NULL, xlabName = "Heating System", ylabName = "Costs in USD/kWh", tmpl = tmpl)
+            xname = "hs", yname = "value", color = "costType", rprt = c("ttotIn", "typ", "loc"),
+            facets = NULL, xlabName = "Heating System", ylabName = "Costs in US Cents/kWh", tmpl = tmpl)
 ```
 
 ## LCOH of construction with mixed lifetimes
 
 ```{r Plot LCOH of construction with mixed lifetimes}
 .showLtPlot("bar", data, "conLcohMixed",
-            xname = "hs", yname = "value", color = "costType", rprt = c("ttot", "typ", "loc"),
-            facets = NULL, xlabName = "Heating System", ylabName = "Costs in USD/kWh", tmpl = tmpl)
+            xname = "hs", yname = "value", color = "costType", rprt = c("ttotIn", "typ", "loc"),
+            facets = NULL, xlabName = "Heating System", ylabName = "Costs in US Cents/kWh", tmpl = tmpl)
 ```
 
 ## LCOH of renovation with ex-ante lifetimes
 
 ```{r Plot LCOH of renovation with ex-ante lifetimes}
 .showLtPlot("bar", data, "renLcohAnte",
-            xname = "hs", yname = "value", color = "costType", rprt = c("ttot", "typ", "loc"), avg = "vin",
-            facets = NULL, xlabName = "Heating System", ylabName = "Costs in USD/kWh", tmpl = tmpl)
+            xname = "hs", yname = "value", color = "costType", rprt = c("ttotIn", "typ", "loc"), avg = "vin",
+            facets = NULL, xlabName = "Heating System", ylabName = "Costs in US Cents/kWh", tmpl = tmpl)
 ```
 
 ## LCOH of renovation with mixed lifetimes
 
 ```{r Plot LCOH of renovation with mixed lifetimes}
 .showLtPlot("bar", data, "renLcohMixed",
-            xname = "hs", yname = "value", color = "costType", rprt = c("ttot", "typ", "loc"), avg = "vin",
-            facets = NULL, xlabName = "Heating System", ylabName = "Costs in USD/kWh", tmpl = tmpl)
+            xname = "hs", yname = "value", color = "costType", rprt = c("ttotIn", "typ", "loc"), avg = "vin",
+            facets = NULL, xlabName = "Heating System", ylabName = "Costs in US Cents/kWh", tmpl = tmpl)
 ```
 
 # Logit Shares
@@ -1004,7 +810,7 @@ dataRemainStock <- wbRemainStockStub %>%
 
 ```{r Plot logit shares of renovation with ex-ante lifetimes, all}
 .showLtPlot("bar", data, "renLogitAllAnte",
-            xname = "ttot", yname = "value", color = "hs", rprt = "vin",
+            xname = "ttotIn", yname = "value", color = "hs", rprt = "vin",
             xlabName = "Time of installation", ylabName = "Shares", tmpl = tmpl)
 ```
 
@@ -1012,7 +818,7 @@ dataRemainStock <- wbRemainStockStub %>%
 
 ```{r Plot logit shares of renovation with mixed lifetimes, energy ladder 1}
 .showLtPlot("bar", data, "renLogitAllMixed",
-            xname = "ttot", yname = "value", color = "hs", rprt = "vin",
+            xname = "ttotIn", yname = "value", color = "hs", rprt = "vin",
             xlabName = "Time of installation", ylabName = "Shares", tmpl = tmpl)
 ```
 
@@ -1022,7 +828,7 @@ dataRemainStock <- wbRemainStockStub %>%
 # This is the share computed based on the already aggregated inflow data
 # Needs to be taken with a grain of salt!
 .showLtPlot("bar", data, "renBrickIn",
-            xname = "ttot", yname = "value", color = "hs", rprt = "vin",
+            xname = "ttotIn", yname = "value", color = "hs", rprt = "vin",
             xlabName = "Time of installation", ylabName = "Shares", tmpl = tmpl)
 ```
 
@@ -1032,7 +838,7 @@ dataRemainStock <- wbRemainStockStub %>%
 
 ```{r Plot Logit and brick Share with ex-ante lifetimes, all}
 .showLtPlot("twoBar", data, c("renLogitAllAnte", "renBrickAll"),
-            yname = "value", xname = "ttot", color = "hs", rprt = "vin",
+            yname = "value", xname = "ttotIn", color = "hs", rprt = "vin",
             xlabName = "Time of installation", ylabName = "Shares", tmpl = tmpl)
 ```
 
@@ -1040,7 +846,7 @@ dataRemainStock <- wbRemainStockStub %>%
 
 ```{r Plot Logit and brick Share with ex-ante lifetimes, energy ladder 1}
 .showLtPlot("twoBar", data, c("renLogitEl1Ante", "renBrickEl1"),
-            yname = "value", xname = "ttot", color = "hs", rprt = "vin",
+            yname = "value", xname = "ttotIn", color = "hs", rprt = "vin",
             xlabName = "Time of installation", ylabName = "Shares", tmpl = tmpl)
 ```
 
@@ -1050,7 +856,7 @@ dataRemainStock <- wbRemainStockStub %>%
 hsNames <- unique(data[["hs"]])
 for (h in hsNames) {
   .showLtPlot("twoBar", data, paste0(c("renLogitAnte", "renBrick"), h),
-              yname = "value", xname = "ttot", color = "hs", rprt = "vin",
+              yname = "value", xname = "ttotIn", color = "hs", rprt = "vin",
               xlabName = "Time of installation", ylabName = "Shares", tmpl = tmpl)
 }
 ```
@@ -1061,7 +867,7 @@ for (h in hsNames) {
 
 ```{r Plot Logit and brick Share with mixed lifetimes, all}
 .showLtPlot("twoBar", data, c("renLogitAllMixed", "renBrickAll"),
-            yname = "value", xname = "ttot", color = "hs", rprt = "vin",
+            yname = "value", xname = "ttotIn", color = "hs", rprt = "vin",
             xlabName = "Time of installation", ylabName = "Shares", tmpl = tmpl)
 ```
 
@@ -1069,7 +875,7 @@ for (h in hsNames) {
 
 ```{r Plot Logit and brick Share with mixed lifetimes, energy ladder 1}
 .showLtPlot("twoBar", data, c("renLogitEl1Mixed", "renBrickEl1"),
-            yname = "value", xname = "ttot", color = "hs", rprt = "vin",
+            yname = "value", xname = "ttotIn", color = "hs", rprt = "vin",
             xlabName = "Time of installation", ylabName = "Shares", tmpl = tmpl)
 ```
 
@@ -1079,7 +885,7 @@ for (h in hsNames) {
 hsNames <- unique(data[["hs"]])
 for (h in hsNames) {
   .showLtPlot("twoBar", data, paste0(c("renLogitMixed", "renBrick"), h),
-              yname = "value", xname = "ttot", color = "hs", rprt = "vin",
+              yname = "value", xname = "ttotIn", color = "hs", rprt = "vin",
               xlabName = "Time of installation", ylabName = "Shares", tmpl = tmpl)
 }
 ```

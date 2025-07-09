@@ -23,26 +23,28 @@ computeLtMixed <- function(ltAnte, outflow, brickRes, conShare, ttotNum, dims) {
 
   renShare <- mutate(conShare, share = 1 - .data[["share"]])
 
+  # Compute ex-ante outflows, i.e. according to the Weibull distribution
   outAnte <- .prepareLtAnte(ltAnte[["stock"]], c(stock = "absVal")) %>%
-    full_join(.prepareLtAnte(ltAnte[["construction"]], c(con = "absVal"), sumTtot = TRUE), by = c(dims, "ttot2")) %>%
-    full_join(.prepareLtAnte(ltAnte[["renovation"]], c(ren = "absVal"), sumTtot = TRUE), by = c(dims, "ttot2")) %>%
+    full_join(.prepareLtAnte(ltAnte[["construction"]], c(con = "absVal"), sumTtot = TRUE), by = c(dims, "ttotOut")) %>%
+    full_join(.prepareLtAnte(ltAnte[["renovation"]], c(ren = "absVal"), sumTtot = TRUE), by = c(dims, "ttotOut")) %>%
     replace_na(list(stock = 0, con = 0)) %>%
     mutate(value = .data[["stock"]] + .data[["con"]] + .data[["ren"]]) %>%
     select(-"stock", -"con", -"ren")
 
+  # Compare ex-ante and model outflows (temporary, for diagnostics)
   outAnteSum <- outAnte %>%
-    group_by(across(all_of(dims))) %>%
+    group_by(across(-all_of(c("ttotOut", "value")))) %>%
     summarise(value = sum(.data[["value"]], na.rm = TRUE), .groups = "drop")
 
   outModelSum <- outflow %>%
-    group_by(across(all_of(dims))) %>%
+    group_by(across(-all_of(c("ttotOut", "value")))) %>%
     summarise(value = sum(.data[["value"]], na.rm = TRUE), .groups = "drop")
 
   outDiff <- outAnte %>%
     rename(valAnte = "value") %>%
     left_join(outflow %>%
                 rename(valModel = "value"),
-              by = c(dims, ttot2 = "ttot")) %>%
+              by = c(dims, "ttotOut")) %>%
     mutate(value = .data[["valAnte"]] - .data[["valModel"]])
 
   outDiffSum <- outAnteSum %>%
@@ -52,76 +54,57 @@ computeLtMixed <- function(ltAnte, outflow, brickRes, conShare, ttotNum, dims) {
               by = c(dims)) %>%
     mutate(value = .data[["valAnte"]] - .data[["valModel"]])
 
-  stockInitLtDirect <- .computeLtDirect(ltAnte[["stock"]], outAnte, outflow, dims)
-  conLtDirect <- .computeLtDirect(ltAnte[["construction"]], outAnte, outflow, dims)
-  renLtDirect <- .computeLtDirect(ltAnte[["renovation"]], outAnte, outflow, dims)
+  # Compute direct lifetime estimate as the ex-ante lifetime,
+  # scaled by the ratio between ex-ante and model outflow
+  ltDirect <- lapply(ltAnte, function(dfLt) .computeLtDirect(dfLt, outAnte, outflow, dims))
 
-  # #Test (temporary)
-  # conTest <- conLtDirect %>%
-  #   rename(directVal = "value") %>%
-  #   left_join(brickRes[["construction"]] %>%
-  #               rename(totVal = "value")) %>%
-  #   left_join(ltAnte[["construction"]] %>%
-  #               rename(anteVal = "absVal")) %>%
-  #   mutate(totShare = .data[["directVal"]] / .data[["totVal"]])
+  # add results columns "addAttr" and "value" to all DFs and fill with zero
+  ltMixed <- lapply(ltDirect, .prepareLtMixed)
 
-  # Compute leave times of initial stock and inflows
-  # add results column to all DFs and fill with zero
-  stockInitLtMixed <- .prepareLtMixed(stockInitLtDirect)
-  conLtMixed <- .prepareLtMixed(conLtDirect)
-  renLtMixed <- .prepareLtMixed(renLtDirect)
+  for (tOut in tRun) {
+    # Compute inflow that remains after previous time periods, compute unattributed outflow
+    unattrOut <- stats::setNames(lapply(names(ltMixed), function(nm) {
+      dimsBrick <- if ("vin" %in% colnames(brickRes[[nm]])) dims else setdiff(dims, "vin")
+      .computeUnattrOut(ltMixed[[nm]], brickRes[[nm]], tOut, dims, dimsBrick = dimsBrick)
+    }), names(ltMixed))
 
-  for (t2 in tRun) {
-    # Compute unattributed outflow
-    stockInitLtMixed <- .computeUnattrOut(stockInitLtMixed, brickRes[["stock"]], t2, dims)
-    conLtMixed <- .computeUnattrOut(conLtMixed, brickRes[["construction"]], t2, setdiff(dims, "vin"))
-    renLtMixed <- .computeUnattrOut(renLtMixed, select(brickRes[["renovation"]], -"dt"), t2, dims)
-
-    unattrTot <- rbind(
-      stockInitLtMixed %>%
-        mutate(variable = "stock"),
-      conLtMixed %>%
-        mutate(variable = "con"),
-      renLtMixed %>%
-        mutate(variable = "ren")
-    ) %>%
-      select("variable", dims, "ttot", "ttot2", "remInflow", "unattr") %>%
-      filter(.data[["ttot2"]] == t2)
-    unattrTot <- unattrTot %>%
-      group_by(across(any_of(c(dims, "ttot2")))) %>%
-      summarise(sumUnattr = sum(.data[["unattr"]]))
+    # Compute total of unattributed outflow of stock and flows
+    unattrTot <- do.call(rbind, lapply(names(unattrOut), function(nm) {
+      mutate(unattrOut[[nm]], variable = nm)
+    })) %>%
+      select("variable", dims, "ttotIn", "ttotOut", "remInflow", "unattr") %>%
+      filter(.data[["ttotOut"]] == tOut) %>%
+      group_by(across(-any_of(c("variable", "ttotIn", "remInflow", "unattr")))) %>%
+      summarise(sumUnattr = sum(.data[["unattr"]]), .groups = "drop")
 
     # compute initial stock lt and save to new column
-    stockThis <- .computeLtMixed(stockInitLtMixed, unattrTot, t0, t2, dims)
-    stockInitLtMixed <- .addResultsMixed(stockInitLtMixed, stockThis, t0, t2, dims, addDims = c("directVal", "remInflow", "unattr"))
+    stockThis <- .computeLtMixed(ltMixed[["stock"]], unattrOut[["stock"]], unattrTot, t0, tOut, dims)
+    ltMixed[["stock"]] <- .addResultsMixed(ltMixed[["stock"]], stockThis, t0, tOut, c(dims, "directVal"))
 
-    for (t1 in tRun[tRun <= t2]) {
+    for (tIn in tRun[tRun <= tOut]) {
       # Compute lifetimes for construction and renovation flow
-      conThis <- .computeLtMixed(conLtMixed, unattrTot, t1, t2, dims, dfStock = stockThis, dfShare = conShare)
-      renThis <- .computeLtMixed(renLtMixed, unattrTot, t1, t2, dims, dfStock = stockThis, dfShare = renShare)
+      conThis <- .computeLtMixed(ltMixed[["construction"]], unattrOut[["construction"]], unattrTot, tIn, tOut, dims, dfStock = stockThis, dfShare = conShare)
+      renThis <- .computeLtMixed(ltMixed[["renovation"]], unattrOut[["renovation"]], unattrTot, tIn, tOut, dims, dfStock = stockThis, dfShare = renShare)
 
-      conLtMixed <- .addResultsMixed(conLtMixed, .combineAddAttr(conThis, renThis, dims), t1, t2, dims,
-                                     addDims = c("directVal", "remInflow", "unattr"))
-      renLtMixed <- .addResultsMixed(renLtMixed, .combineAddAttr(renThis, conThis, dims), t1, t2, dims,
-                                     addDims = c("directVal", "remInflow", "unattr"))
+      # Save results in lt data frame, save combined additional attributions of construction and renovation
+      ltMixed[["construction"]] <- .addResultsMixed(ltMixed[["construction"]], .combineAddAttr(conThis, renThis, dims), tIn, tOut, c(dims, "directVal"))
+      ltMixed[["renovation"]] <- .addResultsMixed(ltMixed[["renovation"]], .combineAddAttr(renThis, conThis, dims), tIn, tOut, c(dims, "directVal"))
     }
   }
 
-  out <- list()
-  out[["stockInitLtMixed"]] <- .processLtMixed(stockInitLtMixed, brickRes[["stock"]], ltAnte[["stock"]], dims)
-  out[["conLtMixed"]] <- .processLtMixed(conLtMixed, brickRes[["construction"]], ltAnte[["construction"]], dims, removeVin = TRUE)
-  out[["renLtMixed"]] <- .processLtMixed(renLtMixed, brickRes[["renovation"]], ltAnte[["renovation"]], dims)
-
-  return(out)
+  stats::setNames(lapply(names(ltMixed), function(nm) {
+    dimsBrick <- if ("vin" %in% colnames(brickRes[[nm]])) dims else setdiff(dims, "vin")
+    .processLtMixed(ltMixed[[nm]], brickRes[[nm]], ltAnte[[nm]], dims, dimsBrick = dimsBrick)
+  }), c("stockInitLtMixed", "conLtMixed", "renLtMixed"))
 }
 
 #' Prepare ex-ante lifetime data to be used in mixed lifetime computation
 #'
-#' Remove not required columns, rename columns and sum over ttot as indicated
+#' Remove not required columns, rename columns and sum over ttotIn as indicated
 #'
 #' @param df data frame, lifetime data to manipulate
 #' @param toRename named character, old (value) and new name (name) of columns to be renamed
-#' @param sumTtot logical, whether to sum over ttot
+#' @param sumTtot logical, whether to sum over ttotIn
 #'
 #' @importFrom dplyr %>% across all_of any_of .data group_by rename select summarise
 #'
@@ -132,12 +115,12 @@ computeLtMixed <- function(ltAnte, outflow, brickRes, conShare, ttotNum, dims) {
 
   if (isTRUE(sumTtot)) {
     df <- df %>%
-      group_by(across(-all_of(c("ttot", "absVal")))) %>%
+      group_by(across(-all_of(c("ttotIn", "absVal")))) %>%
       summarise(absVal = sum(.data[["absVal"]]), .groups = "drop")
   }
 
-  df <- df %>%
-    select(-any_of("ttot")) %>%
+  df %>%
+    select(-any_of("ttotIn")) %>%
     rename(toRename)
 }
 
@@ -154,22 +137,18 @@ computeLtMixed <- function(ltAnte, outflow, brickRes, conShare, ttotNum, dims) {
 #' @importFrom dplyr %>% .data left_join mutate rename select
 #'
 .computeLtDirect <- function(dfLtAnte, outAnte, outflow, dims) {
-
   dfLtAnte %>%
     select(-"relVal") %>%
     left_join(outAnte %>%
                 rename(outAnte = "value"),
-              by = c(dims, "ttot2")) %>%
+              by = c(dims, "ttotOut")) %>%
     left_join(outflow %>%
-                select(-"dt") %>%
-                rename(outflow = "value", ttot2 = "ttot"),
-              by = c(dims, "ttot2")) %>%
+                rename(outflow = "value"),
+              by = c(dims, "ttotOut")) %>%
     mutate(value = ifelse(.data[["absVal"]] == 0, #Only then should outAnte be zero
                           0,
                           .data[["absVal"]] * .data[["outflow"]] / .data[["outAnte"]])) %>%
     select(-"absVal", -"outflow", -"outAnte")
-
-
 }
 
 #' Rename direct lifetime estimate and add zero columns
@@ -179,6 +158,7 @@ computeLtMixed <- function(ltAnte, outflow, brickRes, conShare, ttotNum, dims) {
 #' @param dfLtDirect data frame, direct lifetime estimates
 #'
 #' @importFrom dplyr %>% mutate rename
+#'
 .prepareLtMixed <- function(dfLtDirect) {
 
   dfLtDirect %>%
@@ -188,40 +168,41 @@ computeLtMixed <- function(ltAnte, outflow, brickRes, conShare, ttotNum, dims) {
 
 #' Compute the unattributed outflow
 #'
-#' Compute the amount of the brick outflow that has not been attributed to an
-#' inflow by the direct lifetime estimate when also reflecting what remains of
-#' the inflow at the current time period.
+#' Compute the remaining inflow that has not yet been attributed to any outflows
+#' in the time periods before \code{tOut}.
+#' If the direct estimate surpasses this amount, then the difference is the un-
+#' attributed outflow.
 #'
 #' @param dfLtMixed data frame, direct lifetime estimates of current time period and
-#'   mixed lifetime estimates of previous time periods
-#' @param dfTotVal data frame, inflows in brick results
+#'   mixed lifetime estimates of previous time periods.
+#'   Required (value) columns: \code{directVal}, \code{addAttr}, \code{value}.
+#' @param dfBrickIn data frame, inflows in brick results
 #' @param tOut numeric, time period of removal for which we are computing the
 #'   unattributed outflows
 #' @param dims character, dimensions of the data without time periods
+#' @param dimsBrick character, dimensions of the brick object without time periods
 #'
 #' @importFrom dplyr %>% across any_of .data filter group_by left_join mutate
 #'   rename right_join select summarise
 #'
-.computeUnattrOut <- function(dfLtMixed, dfTotVal, tOut, dims) {
+.computeUnattrOut <- function(dfLtMixed, dfBrickIn, tOut, dims, dimsBrick = dims) {
 
   # Compute the sum of previous outflows by the mixed estimate
-  dfLtMixedTmp <- dfLtMixed %>%
-    filter(.data[["ttot2"]] <= tOut) %>%
-    group_by(across(any_of(c(dims, "ttot")))) %>%
-    summarise(sumVal = sum(.data[["value"]]), .groups = "drop")
-  # Compute the remaining inflow from the total inflow and the previous outflows
-  # attributed to this inflow.
-  # Compute the unattributed outflow as the portion of the direct estimate that
-  # cannot be covered by the remaining inflow.
-  dfLtMixed <- dfLtMixedTmp %>%
-    dplyr::right_join(dfLtMixed, by = c(dims, "ttot")) %>%
-    left_join(dfTotVal %>%
-                rename(totVal = "value"),
-              by = c(dims, "ttot")) %>%
-    mutate(remInflow =  .data[["totVal"]] - .data[["sumVal"]],
-           unattr = pmax(.data[["directVal"]] - .data[["remInflow"]], 0))
-  dfLtMixed <- dfLtMixed %>%
-    select(-"totVal", -"sumVal")
+  dfLtMixed %>%
+    filter(.data[["ttotOut"]] <= tOut) %>%
+    group_by(across(-any_of(c("ttotOut", "directVal", "addAttr", "value")))) %>%
+    summarise(sumVal = sum(.data[["value"]]), .groups = "drop") %>%
+    dplyr::right_join(dfLtMixed, by = c(dims, "ttotIn")) %>%
+    left_join(dfBrickIn %>%
+                rename(inVal = "value"),
+              by = c(dimsBrick, "ttotIn")) %>%
+    # Compute the remaining inflow from the total inflow and the previous outflows
+    # attributed to this inflow.
+    mutate(remInflow =  .data[["inVal"]] - .data[["sumVal"]],
+           # Compute the unattributed outflow as the portion of the direct estimate that
+           # cannot be covered by the remaining inflow.
+           unattr = pmax(.data[["directVal"]] - .data[["remInflow"]], 0)) %>%
+    select(-"inVal", -"sumVal", -"directVal", -"addAttr", -"value")
 
 }
 
@@ -247,27 +228,27 @@ computeLtMixed <- function(ltAnte, outflow, brickRes, conShare, ttotNum, dims) {
 #'   rename select summarise
 #' @importFrom tidyr replace_na
 #'
-.computeLtMixed <- function(dfLtMixed, unattrTot, tIn, tOut, dims, dfStock = NULL, dfShare = NULL) {
+.computeLtMixed <- function(dfLtMixed, unattrOut, unattrTot, tIn, tOut, dims, dfStock = NULL, dfShare = NULL) {
 
-  dfLtMixed <- filter(dfLtMixed, .data[["ttot2"]] == tOut)
+  dfLtMixed <- filter(dfLtMixed, .data[["ttotOut"]] == tOut)
 
   if (!is.null(dfStock)) {
 
     # Isolate additional attribution in stock data frame
     dfStock <- dfStock %>%
       rename(stockAttr = "addAttr") %>%
-      select(all_of(c(dims, "ttot2", "stockAttr")))
-
+      select(all_of(c(dims, "ttotOut", "stockAttr")))
+    
     # Sum over additional attributions to previous inflows
     dfLtMixed <- dfLtMixed %>%
-      filter(.data[["ttot"]] <= tIn) %>%
-      group_by(across(any_of(c(dims, "ttot2")))) %>%
+      filter(.data[["ttotIn"]] <= tIn) %>%
+      group_by(across(any_of(c(dims, "ttotOut")))) %>%
       summarise(addAttrSum = sum(.data[["addAttr"]]), .groups = "drop") %>%
-      mutate(ttot = tIn) %>%
-      left_join(dfLtMixed, by = c(dims, "ttot", "ttot2")) %>%
-      left_join(dfStock, by = c(dims, "ttot2")) %>%
+      mutate(ttotIn = tIn) %>%
+      left_join(dfLtMixed, by = c(dims, "ttotIn", "ttotOut")) %>%
+      left_join(dfStock, by = c(dims, "ttotOut")) %>%
       replace_na(list(stockAttr = 0)) %>%
-      left_join(dfShare, by = c(dims, "ttot"))
+      left_join(dfShare, by = c(dims, "ttotIn"))
 
   }
 
@@ -275,15 +256,16 @@ computeLtMixed <- function(ltAnte, outflow, brickRes, conShare, ttotNum, dims) {
   # as the sum of the direct estimate and the appropriate share of the still unattributed outflow.
   # Set the final mixed estimate to this maximum possible outflow, unless this surpasses the
   # remaining inflow. In that case, set the mixed estimate to the remaining inflow.
-  dfLtMixed <- dfLtMixed %>%
-    left_join(unattrTot, by = c(dims, "ttot2")) %>%
-    mutate(maxOutflow = if (is.null(dfStock)) .data[["directVal"]] + .data[["sumUnattr"]]
-           else .data[["directVal"]] + .data[["share"]] * (.data[["sumUnattr"]] - .data[["stockAttr"]] - .data[["addAttrSum"]]),
-           value = pmin(.data[["maxOutflow"]], .data[["remInflow"]]),
-           addAttr = pmax(.data[["value"]] - .data[["directVal"]], 0)) %>%
-    select(-any_of(c("maxOutflow", "sumUnattr", "addAttrSum", "stockAttr", "share")))
-
-  return(dfLtMixed)
+  dfLtMixed %>%
+    left_join(unattrOut, by = c(dims, "ttotIn", "ttotOut")) %>%
+    left_join(unattrTot, by = c(dims, "ttotOut")) %>%
+    mutate(
+      maxOutflow = if (is.null(dfStock)) .data[["directVal"]] + .data[["sumUnattr"]]
+      else .data[["directVal"]] + .data[["share"]] * (.data[["sumUnattr"]] - .data[["stockAttr"]] - .data[["addAttrSum"]]),
+      value = pmin(.data[["maxOutflow"]], .data[["remInflow"]]),
+      addAttr = pmax(.data[["value"]] - .data[["directVal"]], 0)
+    ) %>%
+    select(-any_of(c("maxOutflow", "sumUnattr", "addAttrSum", "stockAttr", "share", "remInflow", "unattr")))
 
 }
 
@@ -295,21 +277,20 @@ computeLtMixed <- function(ltAnte, outflow, brickRes, conShare, ttotNum, dims) {
 #' @param tIn numeric, time period of installation / inflow of the newly computed mixed estimates
 #' @param tOut numeric, time period of removal / outflow of the newly computed mixed estimates
 #' @param dims character, dimensions of the data without time periods
-#' @param addDims character, additional dimensions present in the data
 #'
 #' @importFrom dplyr %>% .data left_join mutate select
 #'
-.addResultsMixed <- function(dfOrig, dfNew, tIn, tOut, dims, addDims = NULL) {
+.addResultsMixed <- function(dfOrig, dfNew, tIn, tOut, dims) {
 
   dfOrig %>%
-    left_join(dfNew, by = c(dims, "ttot", "ttot2", addDims)) %>%
+    left_join(dfNew, by = c(dims, "ttotIn", "ttotOut")) %>%
     mutate(value = ifelse(
-      .data[["ttot"]] == tIn & .data[["ttot2"]] == tOut,
+      .data[["ttotIn"]] == tIn & .data[["ttotOut"]] == tOut,
       .data[["value.y"]],
       .data[["value.x"]]
     ),
     addAttr = ifelse(
-      .data[["ttot"]] == tIn & .data[["ttot2"]] == tOut,
+      .data[["ttotIn"]] == tIn & .data[["ttotOut"]] == tOut,
       .data[["addAttr.y"]],
       .data[["addAttr.x"]]
     )) %>%
@@ -335,10 +316,10 @@ computeLtMixed <- function(ltAnte, outflow, brickRes, conShare, ttotNum, dims) {
   # Rename addAttr column
   dfOther <- dfOther %>%
     rename(addAttrOther = "addAttr") %>%
-    select(any_of(c(dims, "ttot", "ttot2", "addAttrOther")))
+    select(any_of(c(dims, "ttotIn", "ttotOut", "addAttrOther")))
 
   dfThis %>%
-    left_join(dfOther, by = c(dims, "ttot", "ttot2")) %>%
+    left_join(dfOther, by = c(dims, "ttotIn", "ttotOut")) %>%
     replace_na(list(addAttrOther = 0)) %>%
     mutate(addAttr = .data[["addAttr"]] + .data[["addAttrOther"]]) %>%
     select(-"addAttrOther")
@@ -353,31 +334,28 @@ computeLtMixed <- function(ltAnte, outflow, brickRes, conShare, ttotNum, dims) {
 #' set this to the ex-ante value.
 #'
 #' @param dfLt data frame, mixed lifetime estimates
-#' @param dfVal data frame, total inflows as given by brick results
+#' @param dfBrickIn data frame, total inflows as given by brick results
 #' @param dfAnte data frame, ex-ante lifetime estimates
 #' @param dims character, dimensions of the data without time periods
-#' @param removeVin logical, whether to remove the vintage column from the dimensions
+#' @param dimsBrick character, dimensions of the brick results
 #'
 #' @importFrom dplyr %>% any_of .data left_join mutate rename select
 #'
-.processLtMixed <- function(dfLt, dfVal, dfAnte, dims, removeVin = FALSE) {
+.processLtMixed <- function(dfLt, dfBrickIn, dfAnte, dims, dimsBrick = dims) {
 
-  if (isTRUE(removeVin)) dims <- setdiff(dims, "vin")
-
-  dfLt <- dfLt %>%
-    select(-any_of(c("directVal", "remInflow", "unattr", "addAttr"))) %>%
+  dfLt %>%
+    select(-any_of(c("directVal", "addAttr"))) %>%
     rename(absVal = "value") %>%
-    left_join(dfVal, by = c(dims, "ttot")) %>%
+    left_join(dfBrickIn %>%
+                rename(inVal = "value"),
+              by = c(dimsBrick, "ttotIn")) %>%
     left_join(dfAnte %>%
                 select(-"absVal") %>%
                 rename(anteVal = "relVal"),
-              by = c(union(dims, "vin"), "ttot", "ttot2")) %>%
-    mutate(relVal = ifelse(.data[["absVal"]] <= 1E-9 & .data[["value"]] <= 1E-9, # TODO: Check on this heuristic, find a meaningful way to handle this!
+              by = c(union(dims, "vin"), "ttotIn", "ttotOut")) %>%
+    mutate(relVal = ifelse(.data[["absVal"]] <= 1E-9 & .data[["inVal"]] <= 1E-9, # TODO: Check on this heuristic, find a meaningful way to handle this!
                            .data[["anteVal"]],
-                           .data[["absVal"]] / .data[["value"]]))
-  dfLt <- dfLt %>%
-    select(-any_of(c("dt", "value", "anteVal")))
-
-  return(dfLt)
+                           .data[["absVal"]] / .data[["inVal"]])) %>%
+    select(-any_of(c("inVal", "anteVal")))
 
 }

@@ -23,33 +23,35 @@ verifyLtHs <- function(gdx, inflow, v_stockInit, outflow, lifeTimeHs, dims, stan
     rename(stockVal = "value") %>%
     left_join(p_shareRenHSinit %>%
                 rename(shareVal = .data[["value"]]),
-              by = c("hs", "region", "typ", "ttot")) %>%
+              by = c("hs", "region", "typ", "ttotIn")) %>%
     mutate(initVal = .data[["stockVal"]] * .data[["shareVal"]]) %>%
-    select(-"ttot", -"shareVal", -"stockVal")
+    select(-"ttotIn", -"shareVal", -"stockVal")
+  
 
   # Compute the left-hand side of the inequality as the sum over ttot of the outflows
   # Compute the sum of over ttot of the inflows weighted by the shares
   ltIneq <- outflow %>%
-    rename(outVal = "value") %>%
+    rename(outVal = "value", ttotSum = "ttotOut") %>%
     left_join(inflow %>%
                 rename(inVal = "value"),
-              by = c(dims, "ttot", "dt")) %>%
-    crossing(ttot2 = unique(.data[["ttot"]])[-1]) %>%
-    filter(.data[["ttot2"]] >= .data[["ttot"]]) %>%
+              by = c(dims, ttotSum = "ttotIn")) %>%
+    crossing(ttotOut = unique(.data[["ttotSum"]])[-1]) %>%
+    filter(.data[["ttotOut"]] >= .data[["ttotSum"]]) %>%
     left_join(p_shareRenHS %>%
                 rename(shareVal = "value"),
-              by = c(intersect(dims, colnames(p_shareRenHS)), "ttot", "ttot2"))
+              by = c(intersect(dims, colnames(p_shareRenHS)), ttotSum = "ttotIn", "ttotOut"))
   ltIneq <- ltIneq %>%
-    group_by(across(all_of(c(dims, "ttot2")))) %>%
-    summarise(lhsLtIneq = sum(.data[["outVal"]]),
-              inSum = sum(.data[["inVal"]] * .data[["shareVal"]]), .groups = "drop")
+    group_by(across(all_of(c(dims, "ttotOut")))) %>%
+    summarise(inSum = sum(.data[["inVal"]] * .data[["shareVal"]]),
+              lhsLtIneq = sum(.data$outVal),
+              .groups = "drop") %>%
+    left_join(stockInit, by = c(dims, "ttotOut")) %>%
+    replace_na(list(initVal = 0)) %>%
+    mutate(rhsLtIneq = .data[["inSum"]] + .data[["initVal"]])
 
   # Compute the right-hand side from the weighted sum of the inflows and the weighter initial stock
   # Check if the inequality holds and is binding.
   ltIneq <- ltIneq %>%
-    left_join(stockInit, by = c(dims, "ttot2")) %>%
-    replace_na(list(initVal = 0)) %>%
-    mutate(rhsLtIneq = .data[["inSum"]] + .data[["initVal"]]) %>%
     mutate(ineqHolds = .data[["lhsLtIneq"]] + 1E-6 >= .data[["rhsLtIneq"]],
            ineqBinding = abs(.data[["lhsLtIneq"]] - .data[["rhsLtIneq"]]) <= 1E-6) %>%
     select(-"initVal", -"inSum")
@@ -88,7 +90,8 @@ verifyLtHs <- function(gdx, inflow, v_stockInit, outflow, lifeTimeHs, dims, stan
 
   .removeColNumbering(df, offset = 1) %>%
     mutate(ttot = as.numeric(levels(.data[["ttot"]]))[.data[["ttot"]]],
-           ttot2 = as.numeric(levels(.data[["ttot2"]]))[.data[["ttot2"]]])
+           ttot2 = as.numeric(levels(.data[["ttot2"]]))[.data[["ttot2"]]]) %>%
+    rename(ttotIn = "ttot", ttotOut = "ttot2")
 
 }
 
