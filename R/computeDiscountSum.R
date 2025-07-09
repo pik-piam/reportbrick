@@ -16,26 +16,32 @@
 #' @importFrom dplyr %>% .data filter group_by left_join mutate rename select ungroup
 #' @importFrom tidyr crossing
 #'
-computeDiscountSum <- function(df, dfDt, dfDiscount, ttotNum, ttot2Num) {
+computeDiscountSum <- function(df, dfDt, dfDiscount, ttotInNum, ttotOutNum) {
 
-  if (!"ttot" %in% colnames(df)) df <- tidyr::crossing(df, ttot = ttotNum)
+  if (!"ttot" %in% colnames(df)) df <- tidyr::crossing(df, ttot = ttotInNum)
 
-  df <- df %>%
+  df %>%
     select(-"bs") %>%
-    filter(.data[["ttot"]] %in% ttotNum) %>%
+    filter(.data[["ttot"]] %in% ttotInNum) %>%
     left_join(dfDt, by = "ttot") %>%
     left_join(dfDiscount %>%
                 rename(discountIn = "value"),
               by = c("ttot", "typ")) %>%
-    tidyr::crossing(ttot2 = ttot2Num) %>%
-    filter(.data[["ttot"]] <= .data[["ttot2"]]) %>%
+    rename(ttotIn = "ttot") %>%
+    tidyr::crossing(ttotOut = ttotOutNum) %>%
+    filter(.data[["ttotIn"]] <= .data[["ttotOut"]]) %>%
+    
+    # Compute discounting between ttotIn and ttotOut
     left_join(dfDiscount %>%
                 rename(discountOut = "value"),
-              by = c("ttot2" = "ttot", "typ")) %>%
+              by = c("ttotOut" = "ttot", "typ")) %>%
     mutate(discount = .data[["discountOut"]] / .data[["discountIn"]]) %>%
-    group_by(across(any_of(c("hs", "vin", "region", "loc", "typ", "ttot")))) %>%
-    mutate(cumVal = cumsum(.data[["value"]] * .data[["discount"]] * .data[["dt"]])) %>%
+    select(-"discountIn", -"discountOut") %>%
+    
+    # Compute the cumulative discounted sum along ttotOut
+    group_by(across(-any_of(c("ttotOut", "discount", "dt", "value")))) %>%
+    mutate(value = cumsum(.data[["value"]] * .data[["discount"]] * .data[["dt"]])) %>%
     ungroup() %>%
-    select(-"dt", -"discountIn", -"discountOut", -"discount")
+    select(-"dt", -"discount")
 
 }

@@ -16,6 +16,7 @@
 #'   absolute removed quantities separately
 #' @param p_dt data frame, lengths of the time periods
 #'   (only required for simple formula)
+#' @param returnDistr logical, whether to return the distribution rather than the density function
 #'
 #' @importFrom dplyr %>% across all_of .data filter group_by left_join mutate
 #'   rename select summarise ungroup
@@ -26,75 +27,67 @@ computeLtAnte <- function(variable, data, ttotNum, lifeTimeHs, dims,
   if (is.null(dataValue)) dataValue <- data
   hsCol <- "hs"
 
-  # dtTtotNum <- ttotNum[[length(ttotNum)]] - ttotNum[[length(ttotNum) - 1]]
-  # ttotExtended <- c(ttotNum, ttotNum[[length(ttotNum)]] + seq(dtTtotNum, 50, by = dtTtotNum))
-
   # Assemble in and out time periods and compute starting and end point
-  times <- expand.grid(ttot = ttotNum, ttot2 = ttotNum) %>%
-    filter(.data[["ttot2"]] >= .data[["ttot"]]) %>%
-    group_by(ttot2) %>%
-    mutate(tIn0 = .extractInitTime(.data[["ttot"]]),
-           tIn1 = .data[["ttot"]]) %>%
+  times <- expand.grid(ttotIn = ttotNum, ttotOut = ttotNum) %>%
+    filter(.data[["ttotOut"]] >= .data[["ttotIn"]]) %>%
+    group_by(across(all_of("ttotOut"))) %>%
+    mutate(tIn0 = .extractInitTime(.data[["ttotIn"]]),
+           tIn1 = .data[["ttotIn"]]) %>%
     ungroup() %>%
-    group_by(ttot) %>%
-    mutate(tOut0 = .extractInitTime(.data[["ttot2"]], ttotNum = ttotNum),
-           tOut1 = .data[["ttot2"]])
+    group_by(across(all_of("ttotIn"))) %>%
+    mutate(tOut0 = .extractInitTime(.data[["ttotOut"]], ttotNum = ttotNum),
+           tOut1 = .data[["ttotOut"]])
 
   # Specific treatment of construction and renovation input data:
   # Filter time vector, rename or remove columns
   if (variable %in% c("construction", "renovation")) {
-    data <- filter(data, .data[["ttot"]] != ttotNum[1])
-    dataValue <- select(dataValue, -"dt")
+    data <- filter(data, .data[["ttotIn"]] != ttotNum[1])
     if (variable == "renovation") {
       data <- filter(data, .data[["hsr"]] != "0")
       lifeTimeHs <- rename(lifeTimeHs, hsr = "hs")
       hsCol <- "hsr"
-    } else if (variable == "construction") {
-      data <- select(data, -"dt")
     }
   }
 
   # Create data frame for lifetime computations from input data, the correct in and out times,
   # and the parameters of the Weibull distribution
   ltAnte <- data %>%
-    select(-"value") %>%
-    left_join(times, by = "ttot") %>%
+    select(-any_of("value")) %>%
+    left_join(times, by = "ttotIn") %>%
     left_join(lifeTimeHs, by = c("region", "typ", hsCol))
 
   # Call the respective functions to compute the lifetime
   if(isFALSE(runSimple)) {
-    if (variable == "stock") {
-      ltAnte <- .computeLtStockAnte(select(ltAnte, -"tIn0", -"tIn1"))
-    } else if (variable == "construction") {
-      ltAnte <- .computeLtAnte(ltAnte, 4)
-    } else if (variable == "renovation") {
-      ltAnte <- .computeLtAnte(ltAnte, 4) %>%
+    ltAnte <- switch(
+      variable,
+      stock = .computeLtStockAnte(select(ltAnte, -"tIn0", -"tIn1")),
+      construction = .computeLtAnte(ltAnte, 4),
+      renovation = .computeLtAnte(ltAnte, 4) %>%
         group_by(across(-all_of(c("hs", "value")))) %>%
         summarise(value = mean(.data[["value"]]), .groups = "drop") %>%
         select(-"bs") %>%
         rename(bs = "bsr", hs = "hsr")
-    }
+    )
   } else {
-    if (!"dt" %in% colnames(ltAnte)) ltAnte <- left_join(ltAnte, p_dt, by = "ttot")
-    if (variable == "stock") {
-      ltAnte <- .computeLtAnteSimple(ltAnte, dims, ttotNum[1], standingLifetime = 12, returnDistr = returnDistr)
-    } else if (variable == "construction") {
-      ltAnte <- .computeLtAnteSimple(ltAnte, dims, ttotNum[1], returnDistr = returnDistr) %>%
-        relocate("vin", .before = "region")
-    } else if (variable == "renovation") {
-        ltAnte <- .computeLtAnteSimple(ltAnte, c(dims, "hsr", "bsr"), ttotNum[1], returnDistr = returnDistr) %>%
-          group_by(across(-all_of(c("hs", "value")))) %>%
-          summarise(value = mean(.data[["value"]]), .groups = "drop") %>%
-          select(-"bs") %>%
-          rename(bs = "bsr", hs = "hsr")
-    }
-    ltAnte <- select(ltAnte, -"dt")
+    ltAnte <- left_join(ltAnte, p_dt, by = c(ttotIn = "ttot"))
+    ltAnte <- switch(
+      variable,
+      stock = .computeLtAnteSimple(ltAnte, dims, ttotNum[1], standingLifetime = 12, returnDistr = returnDistr),
+      construction = .computeLtAnteSimple(ltAnte, dims, ttotNum[1], returnDistr = returnDistr) %>%
+        relocate("vin", .before = "region"),
+      renovation = .computeLtAnteSimple(ltAnte, c(dims, "hsr", "bsr"), ttotNum[1], returnDistr = returnDistr) %>%
+        group_by(across(-all_of(c("hs", "value")))) %>%
+        summarise(value = mean(.data[["value"]]), .groups = "drop") %>%
+        select(-"bs") %>%
+        rename(bs = "bsr", hs = "hsr")
+    ) %>%
+      select(-"dt")
   }
 
-
+  # Compute absolute floorspace being removed from the stock from relative share
   ltAnte <- ltAnte %>%
     rename(relVal = "value") %>%
-    left_join(dataValue, by = c(dims, "ttot")) %>%
+    left_join(dataValue, by = c(dims, "ttotIn")) %>%
     mutate(absVal = .data[["value"]] * .data[["relVal"]]) %>%
     select(-"value")
 
@@ -128,8 +121,8 @@ computeLtAnte <- function(variable, data, ttotNum, lifeTimeHs, dims,
 #'
 .computeLtStockAnte <- function(dfLt, standingLifetime = 12) {
   dfLt %>%
-    mutate(value = (pweibull(.data[["tOut1"]] - .data[["ttot"]] + standingLifetime, .data[["shape"]], .data[["scale"]])
-                    - pweibull(.data[["tOut0"]] - .data[["ttot"]] + standingLifetime, .data[["shape"]], .data[["scale"]]))) %>%
+    mutate(value = (pweibull(.data[["tOut1"]] - .data[["ttotIn"]] + standingLifetime, .data[["shape"]], .data[["scale"]])
+                    - pweibull(.data[["tOut0"]] - .data[["ttotIn"]] + standingLifetime, .data[["shape"]], .data[["scale"]]))) %>%
     mutate(value = .data[["value"]] / (1 - pweibull(standingLifetime, .data[["shape"]], .data[["scale"]]))) %>%
     select(-"tOut0", -"tOut1", -"shape", -"scale")
 }
@@ -208,24 +201,23 @@ computeLtAnte <- function(variable, data, ttotNum, lifeTimeHs, dims,
     select(-"tIn0", -"tIn1", -"tOut0", -"tOut1")
   dfLt <- if (is.null(standingLifetime)) {
     dfLt %>%
-      mutate(lt = .data$ttot2 - (.data$ttot - .data$dt / 2),
+      mutate(lt = .data$ttotOut - (.data$ttotIn - .data$dt / 2),
              p0 = 0)
   } else {
     dfLt %>%
-      mutate(lt = .data$ttot2 - .data$ttot + standingLifetime,
+      mutate(lt = .data$ttotOut - .data$ttotIn + standingLifetime,
              p0 = pweibull(standingLifetime, .data$shape, .data$scale))
   }
   dfLt <- dfLt %>%
     mutate(p = pweibull(.data$lt, .data$shape, .data$scale),
            value = (.data$p - .data$p0) / (1 - .data$p0),
-           value = ifelse(.data[["value"]] > cutOffShare, 1, .data[["value"]])) %>%
-    group_by(across(all_of(c(dims, "ttot"))))
+           value = ifelse(.data[["value"]] > cutOffShare, 1, .data[["value"]]))
   if (isFALSE(returnDistr)) {
     dfLt <- dfLt %>%
-      mutate(value = c(.data$value[1], diff(.data$value)))
+      group_by(across(all_of(c(dims, "ttotIn")))) %>%
+      mutate(value = c(.data$value[1], diff(.data$value))) %>%
+      ungroup()
   }
-  dfLt <- dfLt %>%
-    ungroup()
   dfLt <- dfLt %>%
     select(-"shape", -"scale", -"lt", -"p", -"p0")
 

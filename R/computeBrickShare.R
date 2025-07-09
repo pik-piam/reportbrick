@@ -4,11 +4,9 @@
 #'
 #' @param variable character, Brick variable that is evaluated
 #' @param data data frame, Brick stock and flow data
-#' @param energyLadder data frame, mapping of heating systems and energy ladder position
-#' @param energyLadderNo numeric, energy ladder position to be considered in the share
 #'
-#' @importFrom dplyr %>% across all_of .data filter group_by left_join mutate
-#'   rename select summarise ungroup
+#' @importFrom dplyr %>% across all_of .data filter group_by mutate
+#'   rename select ungroup
 #'
 computeBrickShare <- function(variable, data) {
 
@@ -20,11 +18,14 @@ computeBrickShare <- function(variable, data) {
     hsName <- "hs"
   }
 
-  data %>%
+  # Compute the share of each hs/hsr entry
+  tmp <- data %>%
     group_by(across(-all_of(c(hsName, "value")))) %>%
     mutate(totVal = sum(.data[["value"]]),
            shareVal = .data[["value"]] / .data[["totVal"]]) %>%
     ungroup() %>%
-    select(-"totVal", -"value") %>%
+    select(-"totVal", -"value")
+  tmp <- tmp %>%
     rename(value = "shareVal")
+  return(tmp)
 }

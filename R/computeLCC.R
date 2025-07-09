@@ -10,7 +10,7 @@
 #' @param dfDt data frame, lengths of time periods
 #' @param dfDiscount data frame, discount factors
 #'
-#' @importFrom dplyr all_of left_join mutate rename rename_with
+#' @importFrom dplyr %>% .data any_of left_join mutate rename rename_with
 #' @importFrom tidyr pivot_longer
 #'
 computeLCC <- function(dfLt, dfCostsOpe, dfCostsRen, dfDt, dfDiscount) {
@@ -21,7 +21,7 @@ computeLCC <- function(dfLt, dfCostsOpe, dfCostsRen, dfDt, dfDiscount) {
     rename(lccOpe = "value") %>%
     rename_with(~ (if ("hsr" %in% colnames(dfCostsRen)) paste0(.x, "r") else .x), .cols = "hs") %>%
     left_join(dfCostsRen,
-              by = c(hsName, "vin", "region", "loc", "typ", "ttot")) %>%
+              by = c(hsName, "vin", "region", "loc", "typ", ttotIn = "ttot")) %>%
     pivot_longer(cols = any_of(c("tangible", "intangible", "statusQuoPref", "lccOpe")),
                  names_to = "costType", values_to = "value") %>%
     mutate(bs = "low")
@@ -31,13 +31,15 @@ computeLCC <- function(dfLt, dfCostsOpe, dfCostsRen, dfDt, dfDiscount) {
 #'
 #' @param dfLt data frame, lifetime estimate
 #' @param dfCosts data frame, costs
-#' @param dfDiscount data frame, discount factor
+#' @param dfDiscount numeric or data frame, discount rate if numeric
+#'   or data frame containing the discount factor
 #'
 #' @importFrom dplyr %>% across all_of .data group_by left_join mutate summarise
 #' @importFrom tidyr crossing
 #'
 .computeLCCOpe <- function(dfLt, dfCosts, dfDt, dfDiscount) {
 
+  # Construct discount factor as data frame if passed as discount rate
   if (!is.data.frame(dfDiscount)) {
     dfDiscount <- data.frame(
       value = dfDiscount
@@ -46,11 +48,12 @@ computeLCC <- function(dfLt, dfCostsOpe, dfCostsRen, dfDt, dfDiscount) {
       mutate(value = 1 / (1 + .data[["value"]])^.data[["ttot"]])
   }
 
-  dfCosts <- computeDiscountSum(dfCosts, dfDt, dfDiscount, unique(dfLt[["ttot"]]), unique(dfLt[["ttot2"]]))
+  dfCosts <- computeDiscountSum(dfCosts, dfDt, dfDiscount, unique(dfLt[["ttotIn"]]), unique(dfLt[["ttotOut"]])) %>%
+    rename(discountSum = "value")
 
   # Compute Lifetime operational costs based on lifetime data
   dfLt %>%
-    left_join(dfCosts, by = c("hs", "vin", "region", "loc", "typ", "ttot", "ttot2")) %>%
-    group_by(across(all_of(c("qty", "hs", "vin", "region", "loc", "typ", "ttot")))) %>%
-    summarise(value = sum(.data[["relVal"]] * .data[["cumVal"]]), .groups = "drop")
+    left_join(dfCosts, by = c("hs", "vin", "region", "loc", "typ", "ttotIn", "ttotOut")) %>%
+    group_by(across(all_of(c("qty", "hs", "vin", "region", "loc", "typ", "ttotIn")))) %>%
+    summarise(value = sum(.data[["relVal"]] * .data[["discountSum"]]), .groups = "drop")
 }

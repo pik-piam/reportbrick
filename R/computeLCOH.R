@@ -1,4 +1,6 @@
 #' Compute LCOH from LCC
+#' 
+#' Compute the levelized costs of heat (LCOH) by scaling the LCC with discounted UE demand
 #'
 #' @author Ricarda Rosemann
 #'
@@ -13,19 +15,23 @@
 #'
 computeLCOH <- function(dfLcc, dfLt, dfUe, dfDt, dfDiscount, dims) {
 
-  dfUe <- computeDiscountSum(dfUe, dfDt, dfDiscount, unique(dfLt[["ttot"]]), unique(dfLt[["ttot2"]])) %>%
-    select(-"value") # Handle this in computeDiscountSum instead?
+  # Compute the sum of discounted UE demand
+  dfUe <- computeDiscountSum(dfUe, dfDt, dfDiscount, unique(dfLt[["ttotIn"]]), unique(dfLt[["ttotOut"]])) %>%
+    rename(discountSum = "value")
 
+  # Compute the (discounted) expected UE demand based on the heating system lifetime
   expUe <- dfLt %>%
-    rename(ltProb = relVal) %>%
+    rename(ltProb = "relVal") %>%
     select(-"absVal") %>%
-    left_join(dfUe, by = c(intersect(dims, colnames(dfUe)), "ttot", "ttot2")) %>%
-    group_by(across(all_of(c(dims, "ttot")))) %>%
-    summarise(ue = sum(.data[["ltProb"]] * .data[["cumVal"]]), .groups = "drop")
+    left_join(dfUe, by = c(intersect(dims, colnames(dfUe)), "ttotIn", "ttotOut")) %>%
+    group_by(across(all_of(c(dims, "ttotIn")))) %>%
+    summarise(ue = sum(.data[["ltProb"]] * .data[["discountSum"]]), .groups = "drop")
 
+  # Scale LCC by expected UE demand to obtain LCOH
   dfLcc %>%
     rename(lcc = "value") %>%
-    left_join(expUe, by = c(dims, "ttot")) %>%
-    mutate(value = .data[["lcc"]] / .data[["ue"]]) %>%
+    left_join(expUe, by = c(dims, "ttotIn")) %>%
+    mutate(value = .data[["lcc"]] / .data[["ue"]],
+           value = .data$value * 100) %>% # Convert USD to US cents
     select(-"ue", -"lcc")
 }

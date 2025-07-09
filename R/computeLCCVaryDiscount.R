@@ -1,4 +1,7 @@
-#' Compute LCC for varying discount rate
+#' Compute LCC for varying discount rates
+#'
+#' This was a function to test the effect of a varying discount rate and perspectively
+#' can be removed
 #'
 #' @author Ricarda Rosemann
 #'

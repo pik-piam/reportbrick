@@ -20,59 +20,56 @@ computeLtPost <- function(inflow, outflow, data, conShare, p_ttotVin, ttotNum, d
 
   # Initialize data frames to collect leave times of initial stock and inflows
   inAll <- inflow %>%
-    crossing(ttot2 = ttotNum[-1]) %>%
-    filter(.data[["ttot2"]] >= .data[["ttot"]], .data[["ttot"]] != t0) %>%
+    crossing(ttotOut = ttotNum[-1]) %>%
+    filter(.data[["ttotOut"]] >= .data[["ttotIn"]], .data[["ttotIn"]] != t0) %>%
     mutate(value = 0)
 
   stockAll <- data[["stock"]] %>%
     select(-"value") %>%
-    crossing(ttot2 = ttotNum) %>%
+    crossing(ttotOut = ttotNum) %>%
     mutate(value = 0)
 
   # Compute leave times of initial stock and inflows
-  for (t2 in tRun) {
-    stockThis <- .computeLeaveInitStock(t2, data[["stock"]], stockAll, outflow, dims)
-    stockAll <- .addResults(stockAll, stockThis, t0, t2, dims)
+  for (tOut in tRun) {
+    stockThis <- .computeLeaveInitStock(tOut, data[["stock"]], stockAll, outflow, dims)
+    stockAll <- .addResults(stockAll, stockThis, t0, tOut, dims)
 
-    for (t1 in tRun[tRun <= t2]) {
-      inThis <- .computeLeaveInFlow(t1, t2, inAll, stockAll, inflow, outflow, dims)
-      inAll <- .addResults(inAll, inThis, t1, t2, dims, addDims = "dt")
+    for (tIn in tRun[tRun <= tOut]) {
+      inThis <- .computeLeaveInFlow(tIn, tOut, inAll, stockAll, inflow, outflow, dims)
+      inAll <- .addResults(inAll, inThis, tIn, tOut, dims)
     }
   }
 
   # Process leave time results and separate construction and renovation
   stockAll <- stockAll %>%
-    filter(.data[["ttot2"]] != t0) %>%
-    mutate(ttot = t0, .before = "ttot2")
+    filter(.data[["ttotOut"]] != t0) %>%
+    mutate(ttotIn = t0, .before = "ttotOut")
 
   conAll <- inAll %>%
-    select(-"dt") %>%
-    left_join(conShare, by = c(dims, "ttot")) %>%
+    left_join(conShare, by = c(dims, "ttotIn")) %>%
     mutate(value = .data[["value"]] * .data[["share"]]) %>%
     dplyr::right_join(p_ttotVin %>%
                         filter(.data[["ttot"]] != t0),
-                      by = c("ttot", "vin")) %>%
+                      by = c(ttotIn = "ttot", "vin")) %>%
     select(-"share")
 
   renAll <- inAll %>%
-    select(-"dt") %>%
-    left_join(conShare, by = c(dims, "ttot")) %>%
+    left_join(conShare, by = c(dims, "ttotIn")) %>%
     mutate(value = .data[["value"]] * (1 - .data[["share"]])) %>%
     select(-"share")
 
   # Further processing: Compute relative value
   stockInitLtPost <- .processLtPost(stockAll, data[["stock"]], dims)
-  conLtPost <- .processLtPost(conAll, data[["construction"]], setdiff(dims, "vin"))
+  conLtPost <- .processLtPost(conAll, data[["construction"]], dims)
   renLtPost <- .processLtPost(
     renAll,
-    data[["renovation"]] %>%
-      select(-"dt"),
+    data[["renovation"]],
     dims
   )
 
   # Test that for construction all entries with non-matching vintage are zero
   conTest <- conAll %>%
-    dplyr::anti_join(p_ttotVin, by = c("ttot", "vin"))
+    dplyr::anti_join(p_ttotVin, by = c(ttotIn = "ttot", "vin"))
   if (any(conTest[["value"]] > 0)) {
     message("Ex-post lifetime probabilites of construction are implausible: ",
             "Non-zero entries for vintages that do not match the given time period.")
@@ -96,19 +93,18 @@ computeLtPost <- function(inflow, outflow, data, conShare, p_ttotVin, ttotNum, d
 .computeLeaveInitStock <- function(tOut, dfStockInit, dfStock, dfOut, dims) {
 
   dfStock <- dfStock %>%
-    filter(.data[["ttot2"]] < tOut) %>%
+    filter(.data[["ttotOut"]] < tOut) %>%
     group_by(across(any_of(dims))) %>%
     summarise(valueCumSum = sum(value), .groups = "drop") %>%
     left_join(dfOut %>%
-                rename(valueOut = "value", dtOut = "dt", ttot2 = "ttot") %>%
-                filter(.data[["ttot2"]] == tOut),
+                rename(valueOut = "value") %>%
+                filter(.data[["ttotOut"]] == tOut),
               by = dims) %>%
     left_join(dfStockInit %>%
                 rename(valueTot = "value"),
               by = dims) %>%
-    mutate(value = pmin(.data[["dtOut"]] * .data[["valueOut"]], .data[["valueTot"]] - .data[["valueCumSum"]]))
-  dfStock <- dfStock %>%
-    select(-"valueOut", -"valueTot", -"valueCumSum", -"dtOut")
+    mutate(value = pmin(.data[["valueOut"]], .data[["valueTot"]] - .data[["valueCumSum"]])) %>%
+    select(-"valueOut", -"valueTot", -"valueCumSum")
 }
 
 #' Determine leave time of inflows
@@ -127,38 +123,34 @@ computeLtPost <- function(inflow, outflow, data, conShare, p_ttotVin, ttotNum, d
 .computeLeaveInFlow <- function(tIn, tOut, dfInAll, dfStock, dfIn, dfOut, dims) {
 
   dfInPrev <- dfInAll %>%
-    filter(.data[["ttot"]] == tIn, .data[["ttot2"]] >= tIn, .data[["ttot2"]] <= tOut) %>%
+    filter(.data[["ttotIn"]] == tIn, .data[["ttotOut"]] >= tIn, .data[["ttotOut"]] <= tOut) %>%
     group_by(across(any_of(dims))) %>%
-    summarise(prevCumSum = sum(.data[["dt"]] * .data[["value"]]), .groups = "drop")
+    summarise(prevCumSum = sum(.data[["value"]]), .groups = "drop")
 
   dfInAll <- dfInAll %>%
-    filter(.data[["ttot"]] <= tIn, .data[["ttot2"]] == tOut)
-  dfInAll <- dfInAll %>%
+    filter(.data[["ttotIn"]] <= tIn, .data[["ttotOut"]] == tOut) %>%
     group_by(across(any_of(dims))) %>%
-    summarise(valueCumSum = sum(.data[["dt"]] * .data[["value"]]), .groups = "drop")
-  dfInAll <- dfInAll %>%
-    left_join(dfInPrev, by = dims)
-  dfInAll <- dfInAll %>%
+    summarise(valueCumSum = sum(.data[["value"]]), .groups = "drop") %>%
+    left_join(dfInPrev, by = dims) %>%
     left_join(dfOut %>%
-                rename(valueOut = "value", ttot2 = "ttot", dtOut = "dt") %>%
-                filter(.data[["ttot2"]] == tOut),
-              by = dims)
-  dfInAll <- dfInAll %>%
+                rename(valueOut = "value") %>%
+                filter(.data[["ttotOut"]] == tOut),
+              by = dims) %>%
     dplyr::right_join(dfIn %>%
                         rename(valueIn = "value") %>%
-                        filter(.data[["ttot"]] == tIn),
-                      by = dims)
-  dfInAll <- dfInAll %>%
+                        filter(.data[["ttotIn"]] == tIn),
+                      by = dims) %>%
     left_join(dfStock %>%
                 rename(valueStock = "value") %>%
-                filter(.data[["ttot2"]] == tOut),
-              by = c(dims, "ttot", "ttot2")) %>%
-    replace_na(list(valueStock = 0))
-  dfInAll <- dfInAll %>%
-    mutate(value = pmin(.data[["dtOut"]] * .data[["valueOut"]] - .data[["valueStock"]] - .data[["valueCumSum"]],
-                        .data[["dt"]] * .data[["valueIn"]] - .data[["prevCumSum"]]) / .data[["dt"]])
-  dfInAll <- dfInAll %>%
-    select(-"valueOut", -"valueIn", -"valueStock", -"valueCumSum", -"prevCumSum", -"dtOut")
+                filter(.data[["ttotOut"]] == tOut) %>%
+                select(-"ttotIn"),
+              by = c(dims, "ttotOut"))
+  tmp <- dfInAll %>%
+    # replace_na(list(valueStock = 0)) %>%
+    mutate(value = pmin(.data[["valueOut"]] - .data[["valueStock"]] - .data[["valueCumSum"]],
+                        .data[["valueIn"]] - .data[["prevCumSum"]])) %>%
+    select(-"valueOut", -"valueIn", -"valueStock", -"valueCumSum", -"prevCumSum")
+  return(tmp)
 }
 
 #' Add the ex-post estimate results of a specific in and a specific out time period
@@ -169,16 +161,15 @@ computeLtPost <- function(inflow, outflow, data, conShare, p_ttotVin, ttotNum, d
 #' @param tIn numeric, time period of installation / inflow of the newly computed ex-post estimates
 #' @param tOut numeric, time period of removal / outflow of the newly computed ex-post estimates
 #' @param dims character, dimensions of the data without time periods
-#' @param addDims character, additional dimensions present in the data
 #'
 #' @importFrom dplyr %>% .data left_join mutate select
 #'
-.addResults <- function(dfOrig, dfNew, tIn, tOut, dims, addDims = NULL) {
+.addResults <- function(dfOrig, dfNew, tIn, tOut, dims) {
 
   dfOrig %>%
-    left_join(dfNew, by = c(dims, "ttot", "ttot2", addDims)) %>%
+    left_join(dfNew, by = c(dims, "ttotIn", "ttotOut")) %>%
     mutate(value = ifelse(
-      .data[["ttot"]] == tIn & .data[["ttot2"]] == tOut,
+      .data[["ttotIn"]] == tIn & .data[["ttotOut"]] == tOut,
       .data[["value.y"]],
       .data[["value.x"]]
     )) %>%
@@ -202,7 +193,7 @@ computeLtPost <- function(inflow, outflow, data, conShare, p_ttotVin, ttotNum, d
 
   ltPost <- ltPost %>%
     rename(absVal = "value") %>%
-    left_join(data, by = c(dims, "ttot")) %>%
+    left_join(data, by = c(dims, "ttotIn")) %>%
     mutate(relVal = .data[["absVal"]] / .data[["value"]]) %>%
     select(-"value")
 
