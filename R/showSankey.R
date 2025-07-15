@@ -39,10 +39,6 @@ showSankey <- function(path, # nolint: cyclocomp_linter.
                        maxPeriodsInRow = NULL,
                        save = TRUE) {
 
-  if (isFALSE(requireNamespace("ggsankey", quietly = TRUE))) {
-    warning("Can't plot sankey. Install 'ggsankey' from GitHub.")
-    return(invisible(NULL))
-  }
 
   fill <- match.arg(fill)
 

@@ -19,6 +19,7 @@ Imports:
   gamstransfer (>= 3.0.1),
   ggplot2,
   ggpubr,
+  ggsankey,
   kableExtra,
   knitr,
   madrat,
@@ -34,7 +35,6 @@ Imports:
   yaml
 Suggests:
   covr,
-  ggsankey,
   testthat
 Encoding: UTF-8
 RoxygenNote: 7.3.2
