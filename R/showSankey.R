@@ -39,10 +39,6 @@ showSankey <- function(path, # nolint: cyclocomp_linter.
                        maxPeriodsInRow = NULL,
                        save = TRUE) {
 
-  if (isFALSE(requireNamespace("ggsankey", quietly = TRUE))) {
-    warning("Can't plot sankey. Install 'ggsankey' from GitHub.")
-    return(invisible(NULL))
-  }
 
   fill <- match.arg(fill)
 
@@ -599,6 +595,8 @@ showSankey <- function(path, # nolint: cyclocomp_linter.
 
   # READ DATA ------------------------------------------------------------------
 
+  m <- gamstransfer::Container$new(gdx)
+
   dt <- readGdxSymbol(gdx, "p_dt", asMagpie = FALSE) %>%
     select("ttot", dt = "value") %>%
     mutate(dtNext = lead(.data$dt))
@@ -607,7 +605,11 @@ showSankey <- function(path, # nolint: cyclocomp_linter.
     Stock        = "v_stock",
     Construction = "v_construction",
     Demolition   = "v_demolition",
-    Renovation   = "v_renovation"
+    Renovation   = if (m$hasSymbols("v_renovationBS")) {
+      switch(fill, bs = "v_renovationBS", hs = "v_renovationHS")
+    } else {
+      "v_renovation"
+    }
   )
 
   data <- lapply(vars, function(v) {
