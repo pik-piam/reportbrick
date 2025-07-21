@@ -19,13 +19,11 @@ computeBrickShare <- function(variable, data) {
   }
 
   # Compute the share of each hs/hsr entry
-  tmp <- data %>%
+  data %>%
     group_by(across(-all_of(c(hsName, "value")))) %>%
     mutate(totVal = sum(.data[["value"]]),
            shareVal = .data[["value"]] / .data[["totVal"]]) %>%
     ungroup() %>%
-    select(-"totVal", -"value")
-  tmp <- tmp %>%
+    select(-"totVal", -"value") %>%
     rename(value = "shareVal")
-  return(tmp)
 }

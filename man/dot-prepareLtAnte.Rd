@@ -11,8 +11,8 @@
 
 \item{toRename}{named character, old (value) and new name (name) of columns to be renamed}
 
-\item{sumTtot}{logical, whether to sum over ttot}
+\item{sumTtot}{logical, whether to sum over ttotIn}
 }
 \description{
-Remove not required columns, rename columns and sum over ttot as indicated
+Remove not required columns, rename columns and sum over ttotIn as indicated
 }

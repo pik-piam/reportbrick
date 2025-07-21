@@ -6,6 +6,11 @@
 \usage{
 .checkLifetimeResults(dfLt, dims)
 }
+\arguments{
+\item{dfLt}{data frame with lifetime data}
+
+\item{dims}{character, dimensions to group by}
+}
 \description{
 Check plausibility of lifetime results
 }

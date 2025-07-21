@@ -127,7 +127,7 @@ computeLtPost <- function(inflow, outflow, data, conShare, p_ttotVin, ttotNum, d
     group_by(across(any_of(dims))) %>%
     summarise(prevCumSum = sum(.data[["value"]]), .groups = "drop")
 
-  dfInAll <- dfInAll %>%
+  dfInAll %>%
     filter(.data[["ttotIn"]] <= tIn, .data[["ttotOut"]] == tOut) %>%
     group_by(across(any_of(dims))) %>%
     summarise(valueCumSum = sum(.data[["value"]]), .groups = "drop") %>%
@@ -144,13 +144,10 @@ computeLtPost <- function(inflow, outflow, data, conShare, p_ttotVin, ttotNum, d
                 rename(valueStock = "value") %>%
                 filter(.data[["ttotOut"]] == tOut) %>%
                 select(-"ttotIn"),
-              by = c(dims, "ttotOut"))
-  tmp <- dfInAll %>%
-    # replace_na(list(valueStock = 0)) %>%
+              by = c(dims, "ttotOut")) %>%
     mutate(value = pmin(.data[["valueOut"]] - .data[["valueStock"]] - .data[["valueCumSum"]],
                         .data[["valueIn"]] - .data[["prevCumSum"]])) %>%
     select(-"valueOut", -"valueIn", -"valueStock", -"valueCumSum", -"prevCumSum")
-  return(tmp)
 }
 
 #' Add the ex-post estimate results of a specific in and a specific out time period

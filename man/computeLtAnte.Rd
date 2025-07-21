@@ -4,22 +4,13 @@
 \alias{computeLtAnte}
 \title{Compute heating system lifetimes ex-ante}
 \usage{
-computeLtAnte(
-  variable,
-  data,
-  ttotNum,
-  lifeTimeHs,
-  dims,
-  runSimple = FALSE,
-  dataValue = NULL,
-  p_dt = NULL
-)
+computeLtAnte(data, shareRen, t0, isFlow = TRUE)
 }
 \arguments{
-\item{variable}{character, variable for which the lifetime is computed}
-
 \item{data}{data frame, dimensions of desired lifetimes,
 usually also contains values to compute the absolute removed quantities}
+
+\item{variable}{character, variable for which the lifetime is computed}
 
 \item{ttotNum}{numeric, all time periods to be considered}
 
@@ -34,6 +25,8 @@ absolute removed quantities separately}
 
 \item{p_dt}{data frame, lengths of the time periods
 (only required for simple formula)}
+
+\item{returnDistr}{logical, whether to return the distribution rather than the density function}
 }
 \description{
 Determine the lifetime of the heating system according to the respective Weibull distribution.

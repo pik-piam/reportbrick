@@ -6,6 +6,9 @@
 \usage{
 normalizePriceSensitivity(dfLcc, brickRes, lambda, dims, groupCols = NULL)
 }
+\arguments{
+\item{dfLcc}{data frame containing LCC data}
+}
 \description{
 Compute a normalized price sensitivity from life-cycle costs
 }

@@ -5,7 +5,7 @@
 \title{Add the mixed estimate results of a specific in and a specific out time period
 to the data frame storing all mixed estimates}
 \usage{
-.addResultsMixed(dfOrig, dfNew, tIn, tOut, dims, addDims = NULL)
+.addResultsMixed(dfOrig, dfNew, tIn, tOut, dims)
 }
 \arguments{
 \item{dfOrig}{data frame, contains all previous mixed estimates}
@@ -17,8 +17,6 @@ to the data frame storing all mixed estimates}
 \item{tOut}{numeric, time period of removal / outflow of the newly computed mixed estimates}
 
 \item{dims}{character, dimensions of the data without time periods}
-
-\item{addDims}{character, additional dimensions present in the data}
 }
 \description{
 Add the mixed estimate results of a specific in and a specific out time period

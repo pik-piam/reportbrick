@@ -4,16 +4,12 @@
 \alias{computeBrickShare}
 \title{Estimate Brick model heating system shares}
 \usage{
-computeBrickShare(variable, data, energyLadder = NULL, energyLadderNo = NULL)
+computeBrickShare(variable, data)
 }
 \arguments{
 \item{variable}{character, Brick variable that is evaluated}
 
 \item{data}{data frame, Brick stock and flow data}
-
-\item{energyLadder}{data frame, mapping of heating systems and energy ladder position}
-
-\item{energyLadderNo}{numeric, energy ladder position to be considered in the share}
 }
 \description{
 Estimate Brick model heating system shares

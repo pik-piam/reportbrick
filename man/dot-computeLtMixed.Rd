@@ -6,6 +6,7 @@
 \usage{
 .computeLtMixed(
   dfLtMixed,
+  unattrOut,
   unattrTot,
   tIn,
   tOut,

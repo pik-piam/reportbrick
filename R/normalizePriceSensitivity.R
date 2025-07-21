@@ -1,6 +1,6 @@
 #' Compute a normalized price sensitivity from life-cycle costs
 #'
-#' @param
+#' @param dfLcc data frame containing LCC data
 #'
 #' @author Ricarda Rosemann
 #'
