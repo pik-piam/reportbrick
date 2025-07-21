@@ -2,10 +2,23 @@
 % Please edit documentation in R/reportLCCShare.R
 \name{.cleanReadGdx}
 \alias{.cleanReadGdx}
-\title{Read in Gdx and slightly modify}
+\title{Read data from gdx and clean}
 \usage{
-.cleanReadGdx(df, vinExists, renAllowed = NULL, bsToZero = TRUE)
+.cleanReadGdx(
+  gdx,
+  symbol,
+  vinExists = NULL,
+  renAllowed = NULL,
+  asMagpie = FALSE
+)
+}
+\arguments{
+\item{vinExists}{data frame with existing vintage and time period combinations}
+
+\item{renAllowed}{data frame with all possible renovation transitions}
+
+\item{df}{data frame with data as read from a gdx}
 }
 \description{
-Read in Gdx and slightly modify
+Read data from gdx and clean
 }

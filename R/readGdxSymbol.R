@@ -79,6 +79,15 @@ readGdxSymbol <- function(gdx, symbol, field = "level", asMagpie = NULL,
       }
     }
   )
+  
+  # make temporal dimensions numeric
+  tDims <- intersect(
+    colnames(data),
+    c("ttot", "tall", "ttot2", "t", "ttotIn", "ttotOut", "thist", "tinit", "tcalib")
+  )
+  for (tDim in tDims) {
+    data[[tDim]] <- as.numeric(as.character(data[[tDim]]))
+  }
 
   # convert to MagPIE object
   if (isTRUE(asMagpie)) {

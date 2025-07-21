@@ -4,7 +4,7 @@
 \alias{computeDiscountSum}
 \title{Compute the discounted sum of a given variable between two time periods}
 \usage{
-computeDiscountSum(df, dfDt, dfDiscount, ttotNum, ttot2Num)
+computeDiscountSum(df, dfDt, dfDiscount, ttotInNum, ttotOutNum)
 }
 \arguments{
 \item{df}{data frame, should contain one time vector}

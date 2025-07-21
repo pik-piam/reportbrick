@@ -4,19 +4,9 @@
 \alias{verifyLtHs}
 \title{Verify the lifetime constraint of heating systems}
 \usage{
-verifyLtHs(
-  gdx,
-  inflow,
-  v_stockInit,
-  outflow,
-  lifeTimeHs,
-  dims,
-  standingLtStock = 6
-)
+verifyLtHs(inflow, v_stockInit, outflow, p_shareRenHSinit, p_shareRenHS, dims)
 }
 \arguments{
-\item{gdx}{character, path to input gdx file}
-
 \item{inflow}{data frame, all inflows}
 
 \item{v_stockInit}{data frame, brick results on initial stock}
@@ -25,7 +15,7 @@ verifyLtHs(
 
 \item{dims}{character, dimensions of the data without time periods}
 
-\item{standingLtStock}{numeric, assumed prior standing lifetime of the initial stock}
+\item{gdx}{character, path to input gdx file}
 }
 \description{
 Verify the lifetime constraint of heating systems

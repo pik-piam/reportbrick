@@ -5,7 +5,7 @@
 \title{Add the ex-post estimate results of a specific in and a specific out time period
 to the data frame storing all ex-post estimates}
 \usage{
-.addResults(dfOrig, dfNew, tIn, tOut, dims, addDims = NULL)
+.addResults(dfOrig, dfNew, tIn, tOut, dims)
 }
 \arguments{
 \item{dfOrig}{data frame, contains all previous ex-post estimates}
@@ -17,8 +17,6 @@ to the data frame storing all ex-post estimates}
 \item{tOut}{numeric, time period of removal / outflow of the newly computed ex-post estimates}
 
 \item{dims}{character, dimensions of the data without time periods}
-
-\item{addDims}{character, additional dimensions present in the data}
 }
 \description{
 Add the ex-post estimate results of a specific in and a specific out time period

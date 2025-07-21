@@ -7,16 +7,12 @@
 #' @param v_stockInit data frame, brick results on initial stock
 #' @param outflow data frame, all outflows
 #' @param dims character, dimensions of the data without time periods
-#' @param standingLtStock numeric, assumed prior standing lifetime of the initial stock
 #'
 #' @importFrom dplyr %>% across all_of .data filter group_by left_join mutate
 #'   rename select summarise
 #' @importFrom tidyr crossing pivot_longer replace_na
 #'
-verifyLtHs <- function(gdx, inflow, v_stockInit, outflow, lifeTimeHs, dims, standingLtStock = 6) {
-
-  p_shareRenHSinit <- .prepareShare(readGdxSymbol(gdx, "p_shareRenHSinit", asMagpie = FALSE))
-  p_shareRenHS <- .prepareShare(readGdxSymbol(gdx, "p_shareRenHs", asMagpie = FALSE))
+verifyLtHs <- function(inflow, v_stockInit, outflow, p_shareRenHSinit, p_shareRenHS, dims) {
 
   # Compute the initial stock that needs to be demolished
   stockInit <- v_stockInit %>%
@@ -75,45 +71,4 @@ verifyLtHs <- function(gdx, inflow, v_stockInit, outflow, lifeTimeHs, dims, stan
   )
 
 
-}
-
-#' Adjust the column names to obtain proper numbering of duplicates
-#' and convert time period columns to factors
-#'
-#' This is targeted at the shares read from gdx
-#'
-#' @param df data frame for which the adjustment of column names and time periods should be done
-#'
-#' @importFrom dplyr %>% .data mutate
-#'
-.prepareShare <- function(df) {
-
-  .removeColNumbering(df, offset = 1) %>%
-    mutate(ttot = as.numeric(levels(.data[["ttot"]]))[.data[["ttot"]]],
-           ttot2 = as.numeric(levels(.data[["ttot2"]]))[.data[["ttot2"]]]) %>%
-    rename(ttotIn = "ttot", ttotOut = "ttot2")
-
-}
-
-#' Remove column numbering and renumber duplicates
-#'
-#' Converts data with duplicates, for which all columns are numbered when reading from gdx,
-#' to a state where only the duplicates are numbered.
-#'
-#' @param df data frame for which the columns should be renamed
-#' @param offset numeric, number by which the renumbering is shifted
-#' @param suffix character that is added the renumbered column name before the number
-#'
-.removeColNumbering <- function(df, offset = 0, suffix = "") {
-
-  colnamesUnnmbd <- sub("\\_\\d{1-3}$", "", colnames(df))
-
-  duplicates <- which(duplicated(colnamesUnnmbd))
-  for (i in seq_along(duplicates)) {
-    colnamesUnnmbd[duplicates[i]] <- paste0(colnamesUnnmbd[duplicates[i]], suffix, offset + i)
-  }
-
-  colnames(df) <- colnamesUnnmbd
-
-  return(df)
 }

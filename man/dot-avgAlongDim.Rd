@@ -6,6 +6,13 @@
 \usage{
 .avgAlongDim(df, dimToAvg, ...)
 }
+\arguments{
+\item{df}{data frame with the data to be manipulated}
+
+\item{dimToAvg}{character column name of the column to average over}
+
+\item{...}{named character vector to with tuples to be renamed}
+}
 \description{
 Compute data average along given dimensions
 }

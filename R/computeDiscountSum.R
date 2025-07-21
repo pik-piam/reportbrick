@@ -10,8 +10,8 @@
 #' @param df data frame, should contain one time vector
 #' @param dfDt data frame, contains lengths of time periods
 #' @param dfDiscount data frame, contains discount rate
-#' @param ttot numeric, first time vector
-#' @param ttot2 numeric, second time vector
+#' @param ttotInNum numeric, first time vector
+#' @param ttotOutNum numeric, second time vector
 #'
 #' @importFrom dplyr %>% .data filter group_by left_join mutate rename select ungroup
 #' @importFrom tidyr crossing
@@ -19,29 +19,36 @@
 computeDiscountSum <- function(df, dfDt, dfDiscount, ttotInNum, ttotOutNum) {
 
   if (!"ttot" %in% colnames(df)) df <- tidyr::crossing(df, ttot = ttotInNum)
+  
+  ttotAll <- union(ttotInNum, ttotOutNum)
 
   df %>%
     select(-"bs") %>%
     filter(.data[["ttot"]] %in% ttotInNum) %>%
-    left_join(dfDt, by = "ttot") %>%
     left_join(dfDiscount %>%
                 rename(discountIn = "value"),
               by = c("ttot", "typ")) %>%
     rename(ttotIn = "ttot") %>%
     tidyr::crossing(ttotOut = ttotOutNum) %>%
     filter(.data[["ttotIn"]] <= .data[["ttotOut"]]) %>%
+    group_by(across(everything())) %>%
+    reframe(ttot = ttotAll[ttotAll >= .data$ttotIn & ttotAll <= .data$ttotOut]) %>%
+    left_join(dfDt, by = "ttot") %>%
     
-    # Compute discounting between ttotIn and ttotOut
+    # Compute discounting between ttotIn and ttot
     left_join(dfDiscount %>%
                 rename(discountOut = "value"),
-              by = c("ttotOut" = "ttot", "typ")) %>%
+              by = c("ttot", "typ")) %>%
     mutate(discount = .data[["discountOut"]] / .data[["discountIn"]]) %>%
     select(-"discountIn", -"discountOut") %>%
     
-    # Compute the cumulative discounted sum along ttotOut
-    group_by(across(-any_of(c("ttotOut", "discount", "dt", "value")))) %>%
-    mutate(value = cumsum(.data[["value"]] * .data[["discount"]] * .data[["dt"]])) %>%
-    ungroup() %>%
-    select(-"dt", -"discount")
+    # Compute the discounted sum along ttot
+    group_by(across(-any_of(c("ttot", "discount", "dt", "value")))) %>%
+    mutate(factor = ifelse(
+      .data$ttot == .data$ttotIn | .data$ttot == .data$ttotOut,
+      0.5,
+      1
+    )) %>%
+    summarise(value = sum(.data[["value"]] * .data[["discount"]] * .data[["dt"]] * .data[["factor"]]), .groups = "drop")
 
 }

@@ -4,10 +4,24 @@
 \alias{reportLCCShare}
 \title{Compute life cycle costs and logit share}
 \usage{
-reportLCCShare(gdx, pathLt = NULL)
+reportLCCShare(
+  path,
+  gdxName = "output.gdx",
+  filterFullRen = list(vin = "1980-1989", ttotIn = 2005)
+)
+}
+\arguments{
+\item{path}{character, path to the Brick model output folder}
+
+\item{gdxName}{character, file name of the gdx to read data from}
+
+\item{filterFullRen}{named list with name value pairs to filter full resolution
+renovation LCC/LCOH/Shares by. If \code{NULL}, no filtering is applied.}
 }
 \description{
-Compute life cycle costs and logit share
+Estimate heating system lifetimes and use this to compute lifecycle costs,
+levelized costs of heat and logit heating system shares.
+Extract brick model shares for comparison.
 }
 \author{
 Ricarda Rosemann

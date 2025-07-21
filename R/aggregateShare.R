@@ -12,7 +12,8 @@
 #' @author Ricarda Rosemann
 #'
 #' @importFrom dplyr %>% across all_of .data filter group_by left_join mutate rename
-#'   replace_na select summarise ungroup
+#'   select summarise ungroup
+#' @importFrom tidyr replace_na
 #'
 aggregateShare <- function(share, weight = NULL, energyLadder = NULL, energyLadderNo = NULL) {
 

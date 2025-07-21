@@ -2,7 +2,7 @@
 % Please edit documentation in R/computeLCCVaryDiscount.R
 \name{computeLCCVaryDiscount}
 \alias{computeLCCVaryDiscount}
-\title{Compute LCC for varying discount rate}
+\title{Compute LCC for varying discount rates}
 \usage{
 computeLCCVaryDiscount(dfLt, dfCostsOpe, dfCostsRen, dfDt, dfDiscount)
 }
@@ -18,7 +18,8 @@ computeLCCVaryDiscount(dfLt, dfCostsOpe, dfCostsRen, dfDt, dfDiscount)
 \item{dfDiscount}{data frame, discount factors}
 }
 \description{
-Compute LCC for varying discount rate
+This was a function to test the effect of a varying discount rate and perspectively
+can be removed
 }
 \author{
 Ricarda Rosemann

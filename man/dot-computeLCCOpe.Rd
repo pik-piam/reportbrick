@@ -11,7 +11,8 @@
 
 \item{dfCosts}{data frame, costs}
 
-\item{dfDiscount}{data frame, discount factor}
+\item{dfDiscount}{numeric or data frame, discount rate if numeric
+or data frame containing the discount factor}
 }
 \description{
 Compute lifecycle operational costs

@@ -4,21 +4,25 @@
 \alias{.computeUnattrOut}
 \title{Compute the unattributed outflow}
 \usage{
-.computeUnattrOut(dfLtMixed, dfTotVal, tOut, dims)
+.computeUnattrOut(dfLtMixed, dfBrickIn, tOut, dims, dimsBrick = dims)
 }
 \arguments{
 \item{dfLtMixed}{data frame, direct lifetime estimates of current time period and
-mixed lifetime estimates of previous time periods}
+mixed lifetime estimates of previous time periods.
+Required (value) columns: \code{directVal}, \code{addAttr}, \code{value}.}
 
-\item{dfTotVal}{data frame, inflows in brick results}
+\item{dfBrickIn}{data frame, inflows in brick results}
 
 \item{tOut}{numeric, time period of removal for which we are computing the
 unattributed outflows}
 
 \item{dims}{character, dimensions of the data without time periods}
+
+\item{dimsBrick}{character, dimensions of the brick object without time periods}
 }
 \description{
-Compute the amount of the brick outflow that has not been attributed to an
-inflow by the direct lifetime estimate when also reflecting what remains of
-the inflow at the current time period.
+Compute the remaining inflow that has not yet been attributed to any outflows
+in the time periods before \code{tOut}.
+If the direct estimate surpasses this amount, then the difference is the un-
+attributed outflow.
 }

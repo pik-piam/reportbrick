@@ -4,29 +4,14 @@
 \alias{computeLogitShare}
 \title{Compute heating system shares from logit model}
 \usage{
-computeLogitShare(
-  variable,
-  lcc,
-  dims,
-  lambda,
-  energyLadder = NULL,
-  energyLadderNo = NULL
-)
+computeLogitShare(variable, lcc, lambda)
 }
 \arguments{
 \item{variable}{character, flow variable for which the share is computed}
 
 \item{lcc}{data frame, lifecycle costs}
 
-\item{dims}{character, dimensions of the lcc data, without time peridos}
-
 \item{lambda}{numeric, price sensitivity}
-
-\item{energyLadder}{data frame, mapping between heating systems and energy ladder position
-(only required for renovation flows)}
-
-\item{energyLadderNo}{numeric, maximum energy ladder position to be included in the share
-(only required for renovation flows)}
 }
 \description{
 Based on the lifecycle costs, compute the shares we would expect for each heating system

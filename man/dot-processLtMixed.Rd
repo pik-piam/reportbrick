@@ -4,18 +4,18 @@
 \alias{.processLtMixed}
 \title{Compute the relative value of the lifetime estimates}
 \usage{
-.processLtMixed(dfLt, dfVal, dfAnte, dims, removeVin = FALSE)
+.processLtMixed(dfLt, dfBrickIn, dfAnte, dims, dimsBrick = dims)
 }
 \arguments{
 \item{dfLt}{data frame, mixed lifetime estimates}
 
-\item{dfVal}{data frame, total inflows as given by brick results}
+\item{dfBrickIn}{data frame, total inflows as given by brick results}
 
 \item{dfAnte}{data frame, ex-ante lifetime estimates}
 
 \item{dims}{character, dimensions of the data without time periods}
 
-\item{removeVin}{logical, whether to remove the vintage column from the dimensions}
+\item{dimsBrick}{character, dimensions of the brick results}
 }
 \description{
 By setting the mixed estimates in relation to the total inflows, compute the

@@ -20,7 +20,7 @@ computeLCOH(dfLcc, dfLt, dfUe, dfDt, dfDiscount, dims)
 \item{dims}{character, dimensions of all data, excluding time dimension}
 }
 \description{
-Compute LCOH from LCC
+Compute the levelized costs of heat (LCOH) by scaling the LCC with discounted UE demand
 }
 \author{
 Ricarda Rosemann
