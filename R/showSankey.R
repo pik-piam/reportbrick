@@ -476,7 +476,8 @@ showSankey <- function(path, # nolint: cyclocomp_linter.
                                 next_node = .data$next_node,
                                 value = .data$value,
                                 shift = .data$shift),
-                            data) %>%
+                            data,
+                            width = 0) %>%
       suppressWarnings()
   }
 
@@ -635,7 +636,7 @@ showSankey <- function(path, # nolint: cyclocomp_linter.
 
   # sum over vintages and stock subsets
   aggDim <- setdiff(
-    c("bs", "hs", "bsr", "hsr", "vin", "reg", "loc", "typ", "inc", "value"),
+    c("bs", "hs", "bsr", "hsr", "vin", "region", "loc", "typ", "inc", "value"),
     c(fill, paste0(fill, "r"))
   )
   data <- lapply(data, function(var) {
