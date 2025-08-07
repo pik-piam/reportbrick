@@ -5,6 +5,8 @@
 #' @param field character, field to read (only relevant for variables)
 #' @param asMagpie boolean, return Magpie object
 #' @param stringAsFactor logical, keep default factors from gams
+#' @param removeDescription logical, if TRUE, the description column of set
+#'   records (element_text) is removed
 #' @returns MagPIE object with data of symbol
 #'
 #' @author Robin Hasse
@@ -14,7 +16,7 @@
 #' @importFrom magclass as.magpie
 #'
 readGdxSymbol <- function(gdx, symbol, field = "level", asMagpie = TRUE,
-                          stringAsFactor = TRUE) {
+                          stringAsFactor = TRUE, removeDescription = TRUE) {
 
   allFields <- c("level", "marginal", "lower", "upper", "scale")
 
@@ -45,10 +47,9 @@ readGdxSymbol <- function(gdx, symbol, field = "level", asMagpie = TRUE,
   }
 
   # make temporal dimensions numeric
-  tDims <- intersect(colnames(data), c("ttot", "tall", "ttot2"))
-  for (tDim in tDims) {
-    data[[tDim]] <- as.numeric(as.character(data[[tDim]]))
-  }
+  data <- mutate(data, across(any_of(c("ttot", "tall", "ttot2", "t")),
+                              function(x) as.numeric(as.character(x))))
+
 
   # remove columns
   switch(class(obj)[1],
@@ -56,11 +57,13 @@ readGdxSymbol <- function(gdx, symbol, field = "level", asMagpie = TRUE,
       data <- data %>%
         select(-all_of(setdiff(allFields, field))) %>%
         rename(value = field) %>%
-        mutate(value = as.numeric(.data[["value"]]))
+        mutate(value = as.numeric(.data$value))
     },
     Set = {
-      data <- data %>%
-        select(-"element_text")
+      if (isTRUE(removeDescription)) {
+        data <- data %>%
+          select(-"element_text")
+      }
       if (isTRUE(asMagpie)) {
         warning("Sets are not reported as Magpie object.")
       }
