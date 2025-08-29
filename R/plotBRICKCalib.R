@@ -8,7 +8,6 @@
 #' @param outName character, string added to the pdf file name and names of additionally saved plots
 #' @param scenNames character vector, scenario names for different paths.
 #'  Needs to be specified if \code{path} is unnamed and contains more than one element.
-#' @param savePlots logical, whether all plots should additionally be saved as png
 #'
 #' @author Ricarda Rosemann
 #'
@@ -17,8 +16,7 @@
 #' @export
 
 plotBRICKCalib <- function(path = ".", cal = "BRICK_calibration_report.csv",
-                           outName = "", scenNames = NULL,
-                           savePlots = FALSE) {
+                           outName = "", scenNames = NULL) {
 
   # Extract the scenario name from the output directory
   scenario <- sub("_\\d{4}-\\d{2}-\\d{2}_\\d{2}\\.\\d{2}\\.\\d{2}", "", basename(path))
@@ -43,9 +41,7 @@ plotBRICKCalib <- function(path = ".", cal = "BRICK_calibration_report.csv",
     path = normalizePath(path),
     cal = cal,
     docTitle = paste("BRICK Calibration Report", paste(scenario, collapse = " - ")),
-    scenNames = scenNames,
-    name = outName,
-    savePlots = savePlots
+    scenNames = scenNames
   )
 
   # All output will be stored in the first directory passed

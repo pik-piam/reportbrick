@@ -42,152 +42,156 @@ reportCalibration <- function(gdx, flowTargets = TRUE) {
   aggVin <- identical(cfg[["switches"]][["AGGREGATEDIM"]], "vin")
   removeDims <- if (isTRUE(aggVin)) "vin" else NULL
 
+  # Determine relevant variables
+  if (isTRUE(cfg[["switches"]][["SEQUENTIALREN"]])) {
+    varAll <- c("stock", "construction", "renovationBS", "renovationHS")
+  } else {
+    varAll <- c("stock", "construction", "renovation")
+  }
+  varFlow <- setdiff(varAll, "stock")
+
+  # Exclude renovationHS for computations on building shell
+  varFlowBs <- setdiff(varFlow, "renovationHS")
+
+  # Exclude renovationBS for computations on heating system
+  varAllHs <- setdiff(varAll, "renovationBS")
+  varFlowHs <- setdiff(varFlow, "renovationBS")
+
+  # Exclude construction for computations on vintage
+  varAllVin <- setdiff(varAll, "construction")
+
+  # Naming suffixes for each variable
+  namingMap <- c(
+    stock = "stock",
+    construction = "con",
+    renovation = "ren",
+    renovationBS = "renBS",
+    renovationHS = "renHS"
+  )
+
 
   ## Diagnostic parameters ====
 
-  diagnosticsExist <- all(file.exists(file.path(path, c("stepSizeParamsIter.csv",
-                                                        "deviationConIter.csv",
-                                                        "deviationRenIter.csv",
-                                                        "outerObjectiveAllIter.csv"))))
+  diagDevFiles <- list(
+    construction = "deviationConIter.csv",
+    renovation = "deviationRenIter.csv",
+    renovationBS = "deviationRenBSIter.csv",
+    renovationHS = "deviationRenHSIter.csv"
+  )
+
+  diagFiles <- c(
+    list(
+      stepSize = "stepSizeParamsIter.csv",
+      outerObjective = "outerObjectiveAllIter.csv"
+    ),
+    diagDevFiles[varFlow]
+  )
+
+  diagValNames <- c(
+    list(
+      stepSize = "stepSize",
+      outerObjective = "f",
+      lapply(stats::setNames(nm = varFlow), function(nm) "d")
+    )
+  )
+
+  diagnosticsExist <- all(file.exists(file.path(path, diagFiles)))
   if (diagnosticsExist) {
-    stepSize <- read.csv(file.path(path, "stepSizeParamsIter.csv")) %>%
-      select(-any_of(c("delta", "phiDeriv", "minOuterObj", "minStepSize"))) %>%
-      rename(value = "stepSize")
-    descDirCon <- read.csv(file.path(path, "deviationConIter.csv")) %>%
-      rename(value = "d") %>%
-      .replaceVarName()
-    descDirRen <- read.csv(file.path(path, "deviationRenIter.csv")) %>%
-      rename(value = "d")
-    outerObjective <- read.csv(file.path(path, "outerObjectiveAllIter.csv")) %>%
-      filter(.data$iterA == 1) %>%
-      select(-any_of(c("fA", "iterA"))) %>%
-      rename(value = "f")
+    diagnostics <- lapply(stats::setNames(nm = names(diagFiles)), function(nm) {
+      read.csv(file.path(path, diagFiles[[nm]])) %>%
+        select(-any_of(c("delta", "phiDeriv", "minOuterObj", "minStepSize", "fA", "iterA"))) %>%
+        rename(value = diagValNames[[nm]])
+    })
+
+    diagnostics[["construction"]] <- .replaceVarName(diagnostics[["construction"]])
+    diagnostics[["outerObjective"]] <- unique(diagnostics[["outerObjective"]])
   }
 
 
   ## Stock and flow results ====
 
   # Potentially shift the time filter to a later stage if I want to save and plot pure stock/flow data
-  v_stock <- .readGdxIter(gdx,
-                          if (calibOptim) "p_stock" else "v_stock",
-                          maxIter, asMagpie = FALSE, ttotFilter = tCalib, replaceVar = TRUE)
+  brickRes <- lapply(stats::setNames(nm = varAll), function(var) {
+    .readGdxIter(gdx,
+                 paste(if (calibOptim) "p" else "v", var, sep = "_"),
+                 maxIter, asMagpie = FALSE, ttotFilter = tCalib,
+                 replaceVar = !grepl("renovation", var))
+  })
 
-  v_construction <- .readGdxIter(gdx,
-                                 if (calibOptim) "p_construction" else "v_construction",
-                                 maxIter,
-                                 asMagpie = FALSE, ttotFilter = tCalib, replaceVar = TRUE)
-
-  v_renovation <- .readGdxIter(gdx,
-                               if (calibOptim) "p_renovation" else "v_renovation", maxIter,
-                               asMagpie = FALSE, ttotFilter = tCalib)
-
-  dims <- .getDims(list(stock = v_stock, construction = v_construction, renovation = v_renovation),
-                   removeDims = removeDims)
+  dims <- .getDims(brickRes, removeDims = removeDims)
 
   # Apply potential removal of vintage dimension
-  v_stock <- .computeSum(v_stock, rprt = dims$stock)
-  v_construction <- .computeSum(v_construction, rprt = dims$construction) # Currently not necessary
-  v_renovation <- .computeSum(v_renovation, rprt = dims$renovation)
+  brickRes <- lapply(stats::setNames(nm = varAll), function(var) {
+    .computeSum(brickRes[[var]], dims[[var]])
+  })
+
+  # Aggregate brick results to assess deviations of aggregates
+  brickResTot <- lapply(stats::setNames(nm = varAll), function(var) {
+    thisBrickRes <- brickRes[[var]]
+    if (var %in% c("renovation", "renovationHS")) {
+      thisBrickRes <- filter(thisBrickRes, .data$hsr != 0)
+    }
+    .computeSum(thisBrickRes, rprt = c("iteration", "region", "typ", "loc", "inc", "ttot"))
+  })
+
+  brickResTotHs <- lapply(brickRes[varAllHs], function(res) {
+    .computeSum(res, rprt = c("iteration", "region", "typ", "loc", "inc", "hsr", "ttot"))
+  })
 
 
   ## Specific costs ====
 
-  p_intangCostCon <- .readGdxIter(gdx, "p_specCostCon",
-                                  maxIter, asMagpie = FALSE, ttotFilter = tCalib, replaceVar = TRUE) %>%
-    filter(.data$cost == "intangible")
-
-  p_intangCostRen <- .readGdxIter(gdx, "p_specCostRen",
-                                  maxIter, asMagpie = FALSE, ttotFilter = tCalib) %>%
-    filter(.data$cost == "intangible")
+  costSym <- list(
+    construction = "p_specCostCon",
+    renovation = "p_specCostRen",
+    renovationBS = "p_specCostRenBS",
+    renovationHS = "p_specCostRenHS"
+  )
+  p_intangCost <- lapply(stats::setNames(nm = varFlow), function(var) {
+    .readGdxIter(gdx, costSym[[var]],
+                 maxIter, asMagpie = FALSE, ttotFilter = tCalib,
+                 replaceVar = (identical(var, "construction"))) %>%
+      filter(.data$cost == "intangible")
+  })
 
 
   ## Calibration targets ====
 
-  p_stockCalibTarget <- readGdxSymbol(gdxInp, "p_stockCalibTarget", asMagpie = FALSE) %>%
-    .replaceVarName() %>%
-    .computeSum(rprt = dims$stock)
+  p_calibTarget <- lapply(stats::setNames(nm = varAll), function(var) {
+    thisCalibTarget <- readGdxSymbol(gdxInp, paste0("p_", var, "CalibTarget"), asMagpie = FALSE)
+    if (!grepl("renovation", var)) {
+      thisCalibTarget <- .replaceVarName(thisCalibTarget)
+    }
+    thisCalibTarget %>%
+      .computeSum(rprt = dims[[var]])
+  })
 
-  p_stockCalibTargetTot <- .computeSum(p_stockCalibTarget, rprt = c("iteration", "region", "typ", "loc", "inc", "ttot"))
-  p_stockCalibTargetTotHs <- .computeSum(
-    p_stockCalibTarget,
-    rprt = c("iteration", "region", "typ", "loc", "inc", "hsr", "ttot")
-  )
+  # Aggregate to assess deviation of aggregate quantities
+  p_calibTargetTot <- lapply(stats::setNames(nm = varAll), function(var) {
+    thisCalibTarget <- p_calibTarget[[var]]
+    if (var %in% c("renovation", "renovationHS")) {
+      thisCalibTarget <- filter(thisCalibTarget, .data$hsr != "0")
+    }
+    .computeSum(thisCalibTarget, rprt = c("iteration", "region", "typ", "loc", "inc", "ttot"))
+  })
 
-  if (isTRUE(flowTargets)) {
-    p_constructionCalibTarget <- readGdxSymbol(gdxInp, "p_constructionCalibTarget", asMagpie = FALSE) %>%
-      .replaceVarName() %>%
-      .computeSum(rprt = dims$construction)
-
-    p_constructionCalibTargetTot <- .computeSum(
-      p_constructionCalibTarget,
-      rprt = c("iteration", "region", "typ", "loc", "inc", "ttot")
-    )
-    p_constructionCalibTargetTotHs <- .computeSum(
-      p_constructionCalibTarget,
-      rprt = c("iteration", "region", "typ", "loc", "inc", "hsr", "ttot")
-    )
-
-    p_renovationCalibTarget <- readGdxSymbol(gdxInp, "p_renovationCalibTarget", asMagpie = FALSE) %>%
-      .computeSum(rprt = dims$renovation)
-
-    p_renovationCalibTargetTot <- .computeSum(
-      p_renovationCalibTarget %>%
-        filter(.data$hsr != "0"),
-      rprt = c("iteration", "region", "typ", "loc", "inc", "ttot")
-    )
-    p_renovationCalibTargetTotHs <- .computeSum(
-      p_renovationCalibTarget,
-      rprt = c("iteration", "region", "typ", "loc", "inc", "hsr", "ttot")
-    )
-  }
-
-
-
-  # Aggregate quantities -------------------------------------------------------
-
-  v_stockTot <- .computeSum(v_stock, rprt = c("iteration", "region", "typ", "loc", "inc", "ttot"))
-  v_stockTotHs <- .computeSum(v_stock, rprt = c("iteration", "region", "typ", "loc", "inc", "hsr", "ttot"))
-
-  if (isTRUE(flowTargets)) {
-    v_constructionTot <- .computeSum(v_construction, rprt = c("iteration", "region", "typ", "loc", "inc", "ttot"))
-    v_constructionTotHs <- .computeSum(
-      v_construction,
-      rprt = c("iteration", "region", "typ", "loc", "inc", "hsr", "ttot")
-    )
-
-    v_renovationTot <- .computeSum(
-      v_renovation %>%
-        filter(.data$hsr != 0),
-      rprt = c("iteration", "region", "typ", "loc", "inc", "ttot")
-    )
-    v_renovationTotHs <- .computeSum(v_renovation, rprt = c("iteration", "region", "typ", "loc", "inc", "hsr", "ttot"))
-  }
+  p_calibTargetTotHs <- lapply(p_calibTarget[varAllHs], function(target) {
+    .computeSum(target, rprt = c("iteration", "region", "typ", "loc", "inc", "hsr", "ttot"))
+  })
 
 
 
   # COMPUTE DEVIATIONS ---------------------------------------------------------
 
-  v_stockDev <- .computeDeviation(v_stock, p_stockCalibTarget)
-
-  v_stockTotDev <- .computeDeviation(v_stockTot, p_stockCalibTargetTot)
-  v_stockTotHsDev <- .computeDeviation(v_stockTotHs, p_stockCalibTargetTotHs)
-
-  if (isTRUE(flowTargets)) {
-    v_constructionDev <- .computeDeviation(v_construction, p_constructionCalibTarget)
-
-    v_constructionTotDev <- .computeDeviation(v_constructionTot, p_constructionCalibTargetTot)
-    v_constructionTotHsDev <- .computeDeviation(v_constructionTotHs, p_constructionCalibTargetTotHs)
-
-    v_renovationDev <- .computeDeviation(v_renovation, p_renovationCalibTarget)
-
-    v_renovationTotDev <- .computeDeviation(v_renovationTot, p_renovationCalibTargetTot)
-    v_renovationTotHsDev <- .computeDeviation(v_renovationTotHs, p_renovationCalibTargetTotHs)
-
-    p_renovationDevSepGabo <- v_renovationDev %>%
-      mutate(hsr = as.character(.data[["hsr"]]),
-             hsr = ifelse(.data[["hsr"]] == "gabo" & .data[["hs"]] == "gabo", "gabo_id", .data[["hsr"]]),
-             hsr = factor(.data[["hsr"]]))
-  }
+  deviation <- lapply(stats::setNames(nm = varAll), function(var) {
+    .computeDeviation(brickRes[[var]], p_calibTarget[[var]])
+  })
+  deviationTot <- lapply(stats::setNames(nm = varAll), function(var) {
+    .computeDeviation(brickResTot[[var]], p_calibTargetTot[[var]])
+  })
+  deviationTotHs <- lapply(stats::setNames(nm = varAllHs), function(var) {
+    .computeDeviation(brickResTotHs[[var]], p_calibTargetTotHs[[var]])
+  })
 
 
 
@@ -198,177 +202,172 @@ reportCalibration <- function(gdx, flowTargets = TRUE) {
 
   ## Aggregate total quantities ====
 
+  # Direction of steepest descent by heating system
   if (isTRUE(diagnosticsExist)) {
-    out[["stepSize"]] <- stepSize
 
-    out[["descDirCon"]] <- .computeAvg(descDirCon, rprt = c("iteration", "region", "typ", "loc", "inc", "hsr", "ttot"),
-                                       exclude = list(hsr = "h2bo"))
+    diagnostics <- c(
+      diagnostics[c("stepSize", "outerObjective")],
+      stats::setNames(
+        lapply(varFlowHs, function(var) {
+          .computeAvg(diagnostics[[var]], rprt = c("iteration", "region", "typ", "loc", "inc", "hsr", "ttot"),
+                      valueName = "d",
+                      exclude = list(hs = "h2bo", hsr = "h2bo"))
+        }), paste0(namingMap[varFlowHs], "DescDirHs")
+      )
+    )
 
-    out[["descDirRen"]] <- .computeAvg(descDirRen, rprt = c("iteration", "region", "typ", "loc", "inc", "hsr", "ttot"),
-                                       exclude = list(hs = "h2bo", hsr = "h2bo"))
+    # Direction of steepest descent by heating system for late iterations
+    diagnostics <- c(
+      diagnostics,
+      stats::setNames(
+        lapply(paste0(namingMap[varFlowHs], "DescDirHs"), function(var) {
+          diagnostics[[var]] %>%
+            filter(.data[["iteration"]] >= floor(0.4 * maxIter))
+        }), paste0(namingMap[varFlowHs], "DescDirHsLate")
+      )
+    )
 
-    # Aggregate d, i.e. the direction of steepest descent by heating system for late iterations
-    out[["descDirConLate"]] <- out[["descDirCon"]] %>%
-      filter(.data[["iteration"]] >= floor(0.4 * maxIter))
-
-    out[["descDirRenLate"]] <- out[["descDirRen"]] %>%
-      filter(.data[["iteration"]] >= floor(0.4 * maxIter))
-
-    out[["outerObjective"]] <- outerObjective
+    out <- c(out, diagnostics)
   }
 
-  # Aggregate specific costs
-  out[["specCostCon"]] <- .computeAvg(
-    p_intangCostCon,
-    rprt = c("iteration", "region", "typ", "loc", "inc", "hsr", "ttot"),
-    exclude = list(hsr = "h2bo")
+  # Specific costs
+  out <- c(
+    out,
+    stats::setNames(lapply(varFlowBs, function(var) {
+      .computeAvg(
+        p_intangCost[[var]],
+        rprt = c("iteration", "region", "typ", "loc", "inc", "bsr", "ttot"),
+        exclude = list(hs = "h2bo", hsr = "h2bo")
+      )
+    }), paste0(namingMap[varFlowBs], "SpecCostBs")),
+    stats::setNames(lapply(varFlowHs, function(var) {
+      .computeAvg(
+        p_intangCost[[var]],
+        rprt = c("iteration", "region", "typ", "loc", "inc", "hsr", "ttot"),
+        exclude = list(hs = "h2bo", hsr = "h2bo")
+      )
+    }), paste0(namingMap[varFlowHs], "SpecCostHs"))
   )
 
-  out[["specCostRen"]] <- .computeAvg(
-    p_intangCostRen,
-    rprt = c("iteration", "region", "typ", "loc", "inc", "hsr", "ttot"),
-    exclude = list(hs = "h2bo", hsr = "h2bo")
+  # Aggregated brick results by heating system (hs)
+  out <- c(
+    out,
+    stats::setNames(
+      brickResTotHs,
+      paste0(sub("HS", "", unlist(namingMap[varAllHs], use.names = FALSE)), "Hs")
+    ),
+    list(flowHs = .computeFlowSum(
+      list(
+        construction = brickResTotHs[["construction"]],
+        renovation = brickResTotHs[[grep("renovation($|HS$)", varFlow, value = TRUE)]]
+      )
+    ))
   )
 
-  # Aggregate by heating system (hs)
-  out[["stockHs"]] <- v_stockTotHs
-
-  out[["conHs"]] <- v_constructionTotHs
-
-  out[["renHs"]] <- v_renovationTotHs
-
-  out[["flowHs"]] <- .computeFlowSum(out[["conHs"]], out[["renHs"]])
-
-  # Aggregate by vintage (vin)
+  # Brick results by vintage (vin)
   if (isFALSE(aggVin)) {
-    out[["stockVin"]] <- .computeSum(v_stock, rprt = c("iteration", "region", "typ", "loc", "inc", "vin", "ttot"))
-
-    out[["renVin"]] <- .computeSum(v_renovation, rprt = c("iteration", "region", "typ", "loc", "inc", "vin", "ttot"))
+    out <- c(
+      out,
+      stats::setNames(lapply(varAllVin, function(var) {
+        .computeSum(brickRes[[var]], rprt = c("iteration", "region", "typ", "loc", "inc", "vin", "ttot"))
+      }), paste0(namingMap[varAllVin], "Vin"))
+    )
   }
 
 
   ## Aggregate deviations ====
 
-  # Aggregate across all dimensions
-  out[["stockDevAgg"]] <- .computeSumSq(v_stockDev, rprt = c("iteration", "region", "typ", "loc", "inc", "ttot"),
-                                        addSign = FALSE)
+  # Across all dimensions
+  devAgg <- lapply(deviation, function(dev) {
+    .computeSumSq(dev, rprt = c("iteration", "region", "typ", "loc", "inc", "ttot"),
+                  addSign = FALSE)
+  })
+  out <- c(
+    out,
+    stats::setNames(devAgg, paste0(namingMap[varAll], "DevAgg")),
+    list(flowDevAgg = .computeFlowSum(devAgg[varFlow]))
+  )
 
-  if (isTRUE(flowTargets)) {
-    out[["conDevAgg"]] <- .computeSumSq(v_constructionDev, rprt = c("iteration", "region", "typ", "loc", "inc", "ttot"),
-                                        addSign = FALSE)
-
-    out[["renDevAgg"]] <- .computeSumSq(v_renovationDev, rprt = c("iteration", "region", "typ", "loc", "inc", "ttot"),
-                                        addSign = FALSE)
-
-    out[["flowDevAgg"]] <- .computeFlowSum(out[["conDevAgg"]], out[["renDevAgg"]])
-  }
-
-  # Aggregate by heating system (hs)
-  out[["stockDevHs"]] <- .computeSumSq(v_stockDev, rprt = c("iteration", "region", "typ", "loc", "inc", "hsr", "ttot"))
-
-  if (isTRUE(flowTargets)) {
-    out[["conDevHs"]] <- .computeSumSq(
-      v_constructionDev,
+  # By heating system (hs)
+  devHs <- lapply(deviation[varAllHs], function(dev) {
+    .computeSumSq(
+      dev,
       rprt = c("iteration", "region", "typ", "loc", "inc", "hsr", "ttot")
     )
+  })
+  out <- c(
+    out,
+    stats::setNames(devHs, paste0(namingMap[varAllHs], "DevHs")),
+    list(flowDevHs = .computeFlowSum(devHs[varFlowHs]))
+  )
 
-    out[["renDevHs"]] <- .computeSumSq(
-      v_renovationDev,
-      rprt = c("iteration", "region", "typ", "loc", "inc", "hsr", "ttot")
-    )
-
-    out[["flowDevHs"]] <- .computeFlowSum(out[["conDevHs"]], out[["renDevHs"]])
-
-    out[["renDevSepGabo"]] <- .computeSumSq(
-      p_renovationDevSepGabo,
-      rprt = c("iteration", "region", "typ", "loc", "inc", "hsr", "ttot")
-    )
-  }
-
-  # Aggregate by vintage (vin)
+  # By vintage (vin)
   if (isFALSE(aggVin)) {
-    out[["stockDevVin"]] <- .computeSumSq(
-      v_stockDev,
-      rprt = c("iteration", "region", "typ", "loc", "inc", "vin", "ttot")
-    )
-
-    if (isTRUE(flowTargets)) {
-      out[["renDevVin"]] <- .computeSumSq(
-        v_renovationDev,
+    devVin <- lapply(deviation[varAllVin], function(dev) {
+      .computeSumSq(
+        dev,
         rprt = c("iteration", "region", "typ", "loc", "inc", "vin", "ttot")
       )
-    }
+    })
+    out <- c(
+      out,
+      stats::setNames(devVin, paste0(namingMap[varAllVin], "DevVin"))
+    )
   }
 
 
   ## Relative aggregate deviations ====
 
   # Across all dimensions
-  out[["stockDevRel"]] <- .computeRelDev(out[["stockDevAgg"]], p_stockCalibTarget, tCalib)
-
-  if (isTRUE(flowTargets)) {
-    out[["conDevRel"]] <- .computeRelDev(out[["conDevAgg"]], p_constructionCalibTarget, tCalib)
-
-    out[["renDevRel"]] <- .computeRelDev(out[["renDevAgg"]], p_renovationCalibTarget, tCalib)
-
-    out[["flowDevRel"]] <- .computeRelDev(out[["flowDevAgg"]], list(p_constructionCalibTarget, p_renovationCalibTarget),
-                                          tCalib)
-  }
+  out <- c(
+    out,
+    stats::setNames(lapply(varAll, function(var) {
+      .computeRelDev(devAgg[[var]], p_calibTarget[[var]], tCalib)
+    }), paste0(namingMap[varAll], "DevRel")),
+    list(flowDevRel = .computeRelDev(out[["flowDevAgg"]], p_calibTarget[varFlow],
+                                     tCalib))
+  )
 
   # Separately for all heating systems (hs)
-  out[["stockDevHsRel"]] <- .computeRelDev(out[["stockDevHs"]], p_stockCalibTarget, tCalib, notInTargetGrp = "hsr")
-
-  if (isTRUE(flowTargets)) {
-    out[["conDevHsRel"]] <- .computeRelDev(out[["conDevHs"]], p_constructionCalibTarget, tCalib, notInTargetGrp = "hsr")
-
-    out[["renDevHsRel"]] <- .computeRelDev(out[["renDevHs"]], p_renovationCalibTarget, tCalib, notInTargetGrp = "hsr")
-
-    out[["flowDevHsRel"]] <- .computeRelDev(
+  out <- c(
+    out,
+    stats::setNames(lapply(varAllHs, function(var) {
+      .computeRelDev(devHs[[var]], p_calibTarget[[var]], tCalib, notInTargetGrp = "hsr")
+    }), paste0(namingMap[varAllHs], "DevHsRel")),
+    list(flowDevHsRel = .computeRelDev(
       out[["flowDevHs"]],
-      list(p_constructionCalibTarget, p_renovationCalibTarget),
-      tCalib, notInTargetGrp = "hsr"
-    )
-
-    out[["renDevSepGaboRel"]] <- .computeRelDev(out[["renDevSepGabo"]], p_renovationCalibTarget,
-                                                tCalib, notInTargetGrp = "hsr")
-  }
+      p_calibTarget[varFlowHs],
+      tCalib,
+      notInTargetGrp = "hsr"
+    ))
+  )
 
   # Deviation share for all heating systems (hs)
-  out[["stockDevHsShare"]] <- .computeRatioSq(out[["stockDevHs"]], out[["stockDevAgg"]])
-
-  if (isTRUE(flowTargets)) {
-    out[["conDevHsShare"]] <- .computeRatioSq(out[["conDevHs"]], out[["conDevAgg"]])
-
-    out[["renDevHsShare"]] <- .computeRatioSq(out[["renDevHs"]], out[["renDevAgg"]])
-
-    out[["flowDevHsShare"]] <- .computeRatioSq(out[["flowDevHs"]], out[["flowDevAgg"]])
-  }
+  out <- c(
+    out,
+    stats::setNames(lapply(varAllHs, function(var) {
+      .computeRatioSq(devHs[[var]], devAgg[[var]])
+    }), paste0(namingMap[varAllHs], "DevHsShare")),
+    list(flowDevHsShare = .computeRatioSq(out[["flowDevHs"]], out[["flowDevAgg"]]))
+  )
 
   # Separately for all vintages (vin)
   if (isFALSE(aggVin)) {
-    out[["stockDevVinRel"]] <- .computeRelDev(out[["stockDevVin"]], p_stockCalibTarget, tCalib, notInTargetGrp = "vin")
-
-    if (isTRUE(flowTargets)) {
-      out[["renDevVinRel"]] <- .computeRelDev(out[["renDevVin"]], p_renovationCalibTarget,
-                                              tCalib, notInTargetGrp = "vin")
-    }
+    out <- c(
+      out,
+      stats::setNames(lapply(varAllVin, function(var) {
+        .computeRelDev(devVin[[var]], p_calibTarget[[var]], tCalib, notInTargetGrp = "vin")
+      }), paste0(namingMap[varAllVin], "DevVinRel"))
+    )
   }
 
-  ## Deviations of aggregates
+  ## Deviations of aggregated brick results
+  out <- c(
+    out,
+    stats::setNames(deviationTot, paste0(namingMap[varAll], "TotDev")),
+    stats::setNames(deviationTotHs, paste0(namingMap[varAllHs], "TotHsDev"))
+  )
 
-  out[["stockTotDev"]] <- v_stockTotDev
-
-  out[["stockTotHsDev"]] <- v_stockTotHsDev
-
-  if (isTRUE(flowTargets)) {
-    out[["conTotDev"]] <- v_constructionTotDev
-
-    out[["conTotHsDev"]] <- v_constructionTotHsDev
-
-    out[["renTotDev"]] <- v_renovationTotDev
-
-    out[["renTotHsDev"]] <- v_renovationTotHsDev
-  }
 
 
   # EXPAND DIMENSIONS AND COMBINE IN ONE DATA FRAME ----------------------------
@@ -517,7 +516,9 @@ reportCalibration <- function(gdx, flowTargets = TRUE) {
 #'
 .excludeRows <- function(data, exclude) {
   for (nm in names(exclude)) {
-    data <- filter(data, .data[[nm]] != exclude[[nm]])
+    if (nm %in% colnames(data)) {
+      data <- filter(data, .data[[nm]] != exclude[[nm]])
+    }
   }
   data
 }
@@ -526,6 +527,7 @@ reportCalibration <- function(gdx, flowTargets = TRUE) {
 #'
 #' @param df data frame, containing the data to be evaluated
 #' @param rprt character, column names for which the mean should be reported separately
+#' @param valueName character, name of the column containing the values to be manipulated
 #' @param exclude named list with entries to be excluded from the data.
 #'   The name gives the column name from which the entries given by the value should
 #'   be removed.
@@ -534,12 +536,12 @@ reportCalibration <- function(gdx, flowTargets = TRUE) {
 #'
 #' @importFrom dplyr %>% across any_of .data group_by summarise
 #'
-.computeAvg <- function(df, rprt = "", exclude = list()) {
+.computeAvg <- function(df, rprt = "", valueName = "value", exclude = list()) {
 
   df %>%
     .excludeRows(exclude) %>%
     group_by(across(any_of(rprt))) %>%
-    summarise(value = mean(.data[["value"]], na.rm = TRUE), .groups = "drop")
+    summarise(value = mean(.data[[valueName]], na.rm = TRUE), .groups = "drop")
 
 }
 
@@ -623,13 +625,8 @@ reportCalibration <- function(gdx, flowTargets = TRUE) {
 
     # If two data frames with target data have been passed:
     # Combine them by treating the first as construction flows and the second as renovation flows
-    dfTargetSum <- .computeFlowSum(dfTargetSumList[[1]], dfTargetSumList[[2]]) %>%
+    dfTargetSum <- .computeFlowSum(dfTargetSumList) %>%
       rename(target = "value")
-  }
-
-  if (length(dfTargetSumList) > 2) {
-    warning(paste("Only two data frames of historical data can be combined.",
-                  "The remaining data frames are ignored."))
   }
 
   # Compute the relative deviation as the square root of the deviation divided
@@ -642,38 +639,45 @@ reportCalibration <- function(gdx, flowTargets = TRUE) {
 
 #' Compute the sum of construction and renovation flow values
 #'
-#' @param con data frame, contains construction flow quantities
-#' @param ren data frame, contains renovation flow quantities
+#' @param flows named list of data frames, each containing flow quantities.
+#'   Entries need to include \code{construction}
+#'   and one entry with \code{renovation} as part of the name.
 #' @returns data frame with the sum in the value column
 #'
 #' @importFrom dplyr %>% across all_of .data full_join mutate rename select
 #'
-.computeFlowSum <- function(con, ren) {
+.computeFlowSum <- function(flows) {
 
   # If columns bsr and hsr are present in the data:
   # Convert the construction data to the factor levels of the renovation data
+  renFlows <- flows[grep("^renovation", names(flows))]
   for (var in c("hsr", "bsr")) {
-
-    if (var %in% colnames(ren)) {
-      if (var %in% colnames(con)) {
-        con <- con %>%
-          mutate(across(all_of(var), ~ factor(.data[[var]], levels(ren[[var]]))))
+    containsVar <- purrr::map_lgl(renFlows, ~ var %in% colnames(.x))
+    if (any(containsVar)) {
+      if (var %in% colnames(flows[["construction"]])) {
+        renWithVar <- renFlows[containsVar] # nolint: object_usage_linter
+        flows[["construction"]] <- flows[["construction"]] %>%
+          mutate(across(all_of(var), ~ factor(.x, levels(renWithVar[[which(containsVar)[1]]][[var]]))))
       } else {
-        stop("Construction and renovation flow data do not match.")
+        warning("Construction and renovation flow data do not match.")
+        return(NULL)
       }
     }
   }
 
   # Compute the combined flow data as the sum of construction and renovation;
   # NA values in the construction flows are replaced by zeros, thus for "0" flows only renovation is reflected.
-  full_join(con %>%
-              rename(con = "value"),
-            ren %>%
-              rename(ren = "value"),
-            by = setdiff(intersect(colnames(con), colnames(ren)), "value")) %>%
-    replace_na(list(con = 0)) %>%
-    mutate(value = sign(.data[["con"]] + .data[["ren"]]) * (abs(.data[["con"]]) + abs(.data[["ren"]]))) %>%
-    select(-"con", -"ren")
+  purrr::reduce(
+    lapply(names(flows), function(var) {
+      flows[[var]] %>%
+        rename_with(~ var, .cols = "value")
+    }),
+    ~ full_join(.x, .y, by = intersect(colnames(.x), colnames(.y)))
+  ) %>%
+    replace_na(list(construction = 0)) %>%
+    tidyr::pivot_longer(cols = names(flows), names_to = "flow") %>%
+    group_by(across(-all_of(c("flow", "value")))) %>%
+    summarise(value = sum(.data$value), .groups = "drop")
 }
 
 #' Compute the ratio of the squares for two data sets
