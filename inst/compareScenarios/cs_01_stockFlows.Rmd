@@ -50,7 +50,7 @@ walk(heatingRes, showLinePlots, data = data)
 
 ## Construction flow
 
-```{r cosntruction vars}
+```{r construction vars}
 tot <- "Construction|Buildings"
 subsec <- c("Construction|Residential",
             "Construction|Commercial")
@@ -106,7 +106,8 @@ showAreaAndBarPlots(data, vars = subsec, tot = tot, orderVars = "user", scales =
 
 ### Residential
 ```{r residential shell Renovation vars}
-tot <- paste("Renovation|Residential", "Shell", sep = "|")
+tot <- "Renovation|Residential|Shell"
+identReplRes <- paste(tot, c("Identical replacement", "Effective change"), sep = "|")
 ```
 
 #### by building type
@@ -123,12 +124,22 @@ showAreaAndBarPlots(data, vars = paste(tot, location, sep = "|"), tot = tot,
 walk(paste(tot, location, sep = "|"), showLinePlots, data = data)
 ```
 
+#### by building shell (initial state)
+```{r Renovation-Residential-(shellBefore)}
+showAreaAndBarPlots(data, vars = paste(tot, "Initial", shell, sep = "|"), orderVars = "user", scales = "fixed")
+walk(paste(tot, "Initial", shell, sep = "|"), showLinePlots, data = data)
+```
+
 #### by building shell (final state)
-```{r Renovation-Residential-(shell)}
+```{r Renovation-Residential-(shellAfter)}
 showAreaAndBarPlots(data, vars = paste(tot, "Final", shell, sep = "|"), orderVars = "user", scales = "fixed")
 walk(paste(tot, "Final", shell, sep = "|"), showLinePlots, data = data)
 ```
 
+#### by identical replacement or not
+```{r Renovation-Residential-Heating-(identicalReplacement)}
+showAreaAndBarPlots(data, vars = identReplRes, orderVars = "user", scales = "fixed")
+```
 
 ### Commercial
 
@@ -149,8 +160,8 @@ showAreaAndBarPlots(data, vars = subsec, tot = tot, orderVars = "user", scales =
 ### Residential
 ```{r residential Renovation vars}
 tot <- "Renovation|Residential|Heating"
-identReplRes <- paste(tot, c("Identical replacement", "Change of heating system"), sep = "|")
-identReplHsRes <- paste(tot, c("Identical replacement", "Change of heating system|Final"), sep = "|")
+identReplRes <- paste(tot, c("Identical replacement", "Effective change"), sep = "|")
+identReplHsRes <- paste(tot, c("Identical replacement", "Effective change|Final"), sep = "|")
 identReplHsRes <- lapply(heating, function(hsr) {
   paste(identReplHsRes, hsr, sep = "|")
 })
