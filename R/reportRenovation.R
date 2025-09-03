@@ -41,20 +41,22 @@ reportRenovation <- function(gdx, renovatedObj = c("bs", "hs"),
 
   # Replace the pattern if it is a separate vector entry
   .replaceInVec <- function(pattern, replacement, char) {
-    sub(paste0("^", pattern, "$"), replacement, char)
+    char[char == pattern] <- replacement
+    char
   }
 
   # Replace the pattern if it is surrounded by "{}"
   .replaceInVariableName <- function(pattern, replacement, char) {
-    sub(paste0("\\{", pattern, "\\}"), paste0("\\{", replacement, "\\}"), char)
+    sub(paste0("{", pattern, "}"), paste0("{", replacement, "}"), char, fixed = TRUE)
   }
 
   # Replace occurences of "ren" and "ren.renr" by the correct column names
   .replaceRenr <- function(char, replaceFunc) {
-    char <- replaceFunc("ren\\.renr", paste(initialCol, finalCol, sep = "."), char)
+    char <- replaceFunc("ren.renr", paste(initialCol, finalCol, sep = "."), char)
     char <- replaceFunc("ren", initialCol, char)
     char <- replaceFunc("renr", finalCol, char)
     char <- replaceFunc("nonRen", setdiff(c("bs", "hs"), initialCol), char)
+    char
   }
 
   # Perform column name replacements on column-set specifications
@@ -67,8 +69,7 @@ reportRenovation <- function(gdx, renovatedObj = c("bs", "hs"),
 
   # Insert "Heating" or "Shell" in variable name and replace placeholders for "bs(r)/hs(r)"
   .constructVariableName <- function(baseName) {
-    baseName <- sub("\\{renName\\}", "%s", .replaceRenr(baseName, .replaceInVariableName))
-    sprintf(baseName, renName)
+    sub("{renName}", renName, .replaceRenr(baseName, .replaceInVariableName), fixed = TRUE)
   }
 
   # Adjust agg and rprt and the variable name and call reportAgg
@@ -78,7 +79,6 @@ reportRenovation <- function(gdx, renovatedObj = c("bs", "hs"),
     rprt <- .replaceRenrCol(rprt)
 
     variableName <- .constructVariableName(baseName)
-    print(variableName)
     reportAgg(x, variableName,
               brickSets = brickSets,
               agg = agg, rprt = rprt, silent = silent)
