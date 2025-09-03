@@ -37,3 +37,19 @@
     unite("combinations", everything(), sep = ".") %>%
     getElement("combinations")
 }
+
+
+
+
+
+
+#' Escape tag in curly brackets
+#'
+#' @param tag character tag
+#' @returns character, tag in curly brackets
+#'
+#' @author Robin Hasse
+
+.embrace <- function(tag) {
+  paste0("{", tag, "}")
+}

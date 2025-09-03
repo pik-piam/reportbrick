@@ -9,7 +9,8 @@ readGdxSymbol(
   symbol,
   field = "level",
   asMagpie = TRUE,
-  stringAsFactor = TRUE
+  stringAsFactor = TRUE,
+  removeDescription = TRUE
 )
 }
 \arguments{
@@ -22,6 +23,9 @@ readGdxSymbol(
 \item{asMagpie}{boolean, return Magpie object}
 
 \item{stringAsFactor}{logical, keep default factors from gams}
+
+\item{removeDescription}{logical, if TRUE, the description column of set
+records (element_text) is removed}
 }
 \value{
 MagPIE object with data of symbol

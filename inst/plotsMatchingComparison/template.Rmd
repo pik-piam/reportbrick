@@ -1,0 +1,54 @@
+---
+title: Matching Comparison
+subtitle: {path}
+date: {date}
+output:
+  html_document:
+    toc: true
+    toc_float:
+      toc_collapsed: true
+    toc_depth: 2
+    theme: lumen
+---
+
+<style>
+/* Make content use more width even with floating TOC */
+.main-container {
+  max-width: 100% !important;
+}
+
+/* Give it some margin so it’s not glued to window edge */
+.main-container {
+  margin-left: 1em;
+  margin-right: 1em;
+}
+</style>
+
+
+```{r create plots, include=F}
+plots <- reportbrick::showMatchingComparison("{path}", showTitles = FALSE)
+```
+
+
+```{r plot loop, results='asis',fig.width=15, fig.height={figHeight}, echo=F, message=F, warning=F}
+for (ref in names(plots)) {
+  plotRef <- plots[[ref]]
+  if (is.null(plotRef)) {
+    next
+  }
+  cat(paste0("# ", ref))
+  if (inherits(plotRef, "ggplot")) {
+    cat("\n\n")
+    print(plotRef)
+  } else {
+    cat("{.tabset .tabset-pills}\n\n")
+    for (tab in names(plotRef)) {
+      plotTab <- plotRef[[tab]]
+      cat(paste0("## ", tab, "\n\n"))
+      print(plotTab)
+      cat("\n\n")
+    }
+  }
+  cat("\n\n")
+}
+```

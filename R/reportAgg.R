@@ -118,7 +118,7 @@ reportAgg <- function(x,
           }
           return(NULL)
         }
-        outName <- sub(.tag(r),
+        outName <- sub(.embrace(r),
                        label,
                        outName, fixed = TRUE)
       }
@@ -184,21 +184,6 @@ reportAgg <- function(x,
     names(mElements) <- names(m)
     return(mElements)
   })
-}
-
-
-
-
-
-#' Create tag
-#'
-#' Escape dimension name in curly brackets
-#'
-#' @param dim character dimension name
-#' @returns character, dimension tag
-
-.tag <- function(dim) {
-  paste0("{", dim, "}")
 }
 
 
