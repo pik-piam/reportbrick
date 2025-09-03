@@ -63,9 +63,13 @@ convGDX2MIF <- function(gdx,
   message("running reportConstruction ...")
   output <- mbind(output, extendPeriods(reportConstruction(gdx, brickSets, silent = silent), t))
 
-  ## Renovation ====
-  message("running reportRenovation ...")
-  output <- mbind(output, extendPeriods(reportRenovation(gdx, brickSets, silent = silent), t))
+  ## Renovation BS ====
+  message("running reportRenovation for building shell ...")
+  output <- mbind(output, extendPeriods(reportRenovation(gdx, "bs", brickSets, silent = silent), t))
+
+  ## Renovation HS ====
+  message("running reportRenovation for heating system ...")
+  output <- mbind(output, extendPeriods(reportRenovation(gdx, "hs", brickSets, silent = silent), t))
 
   ## Demolition ====
   message("running reportDemolition ...")

@@ -2,19 +2,27 @@
 % Please edit documentation in R/reportRenovation.R
 \name{reportRenovation}
 \alias{reportRenovation}
-\title{Report renovation}
+\title{Report renovation of heating systems}
 \usage{
-reportRenovation(gdx, brickSets = NULL, silent = TRUE)
+reportRenovation(
+  gdx,
+  renovatedObj = c("bs", "hs"),
+  brickSets = NULL,
+  silent = TRUE
+)
 }
 \arguments{
 \item{gdx}{gams transfer container of the BRICK GDX}
+
+\item{renovatedObj}{character, renovation measure considered,
+needs to be either \code{bs} (building shell) or \code{hs} (heating system).}
 
 \item{brickSets}{character, BRICK reporting template}
 
 \item{silent}{boolean, suppress warnings and printing of dimension mapping}
 }
 \description{
-Report quantities describing the renovation of new buildings
+Report quantities describing the renovation of heating systems
 }
 \author{
 Ricarda Rosemann
