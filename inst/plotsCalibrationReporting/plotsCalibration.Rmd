@@ -12,7 +12,6 @@ params:
     cal: "BRICK_calibration_report.csv"
     path: ""
     scenNames: NULL
-    savePlots: false
     name: ""
     figWidth: 15 
     figHeight: 10
@@ -37,7 +36,7 @@ knitr::opts_chunk$set(
 ```
 
 
-```{r set variables and functions, check existence of first file}
+```{r set variables and check existence of first file}
 
 # Assemble all file paths
 filePath <- file.path(params$path, params$cal)
@@ -54,18 +53,72 @@ if (!is.null(params$scenNames)) {
   names(filePath) <- params$scenNames
 }
 
-savePlots <- params$savePlots
-outName <- params$name
 outPath <- dirname(filePath[1])
 
 customPlots <- params$customPlots
 extendedPlots <- params$extendedPlots
+```
+
+
+```{r load data}
+
+if (length(filePath) == 1) {
+  data <- utils::read.csv(filePath)
+  color <- "ttot"
+  facets <- c("loc", "typ")
+} else if (length(filePath) > 1) {
+  # If more than one file path is given: Assemble all data in one data frame
+  data <- data.frame()
+  maxIter <- Inf
+  for (scen in names(filePath)) {
+    if (file.exists(filePath[[scen]])) {
+      tmp <- utils::read.csv(filePath[[scen]]) %>%
+        mutate(scenario = scen, .before = 1)
+      maxIter <- min(max(tmp[["iteration"]]), maxIter) # Find maximum common iteration
+      data <- rbind(data, tmp)
+    } else {
+      warning("The file", filePath[[scen]], "does not exist and was skipped.")
+    }
+  }
+  # Filter for common iterations (TODO: maybe add a switch to suppress this)
+  data <- filter(data, .data[["iteration"]] <= maxIter)
+  color <- "scenario"
+  facets <- "scenario"
+}
+
+# Determine whether this is sequential or hierarchical calibration
+varAll <- NULL
+if (all(c("renBSDevAgg", "renHSDevAgg") %in% data$variable)) {
+  varAll <- c("stock", "construction", "renovationBS", "renovationHS", "flow")
+} else {
+  varAll <- c("stock", "construction", "renovation", "flow")
+}
+
+namingMap <- c(
+  stock = "stock",
+  construction = "con",
+  renovation = "ren",
+  renovationBS = "renBS",
+  renovationHS = "renHS",
+  flow = "flow"
+)
+
+```
+
+
+```{r define functions}
+
+# Helper: generate varNames for calibration plots
+.getVarNames <- function(suffix, skipVars = NULL) {
+  vars <- setdiff(varAll, skipVars)
+  paste0(namingMap[vars], suffix)
+}
 
 # Standard procedure to write a calibration plot
-.createCalibrationPlot <- function(data, varName, outPath, outName = "",
+.createCalibrationPlot <- function(data, varName, outPath,
                                    color = NULL, facets = c("loc", "typ"),
-                                   yToZero = TRUE, savePlots = FALSE,
-                                   keepCol = NULL, addColor = NULL, newColors = NULL,
+                                   yToZero = TRUE, keepCol = NULL,
+                                   addColor = NULL, newColors = NULL,
                                    textSize = 20) {
   # Extract the data
   plData <- data %>%
@@ -108,43 +161,19 @@ extendedPlots <- params$extendedPlots
       pl <- pl + ggplot2::scale_colour_manual(values = c(mip::plotstyle(colorMap, unknown = newColors)))
     }
     pl <- pl + ggplot2::theme(text = ggplot2::element_text(size = textSize))
-    # Currently, this overwrites previous plots so that only the last one remains
-    if (isTRUE(savePlots)) {
-      ggplot2::ggsave(file.path(outPath, paste0(paste(varName, outName, sep = "_"), ".png")), pl)
-    }
     print(pl)
   })
 }
 
-
-```
-
-
-```{r load data}
-
-if (length(filePath) == 1) {
-  data <- utils::read.csv(filePath)
-  color <- "ttot"
-  facets <- c("loc", "typ")
-} else if (length(filePath) > 1) {
-  # If more than one file path is given: Assemble all data in one data frame
-  data <- data.frame()
-  maxIter <- Inf
-  for (scen in names(filePath)) {
-    if (file.exists(filePath[[scen]])) {
-      tmp <- utils::read.csv(filePath[[scen]]) %>%
-        mutate(scenario = scen, .before = 1)
-      maxIter <- min(max(tmp[["iteration"]]), maxIter) # Find maximum common iteration
-      data <- rbind(data, tmp)
-    } else {
-      warning("The file", filePath[[scen]], "does not exist and was skipped.")
-    }
+# Helper: run calibration plots for a given suffix
+.runCalibrationPlots <- function(suffix, color, facets = c("loc", "typ"), skipVars = NULL) {
+  varNames <- .getVarNames(suffix, skipVars)
+  for (var in varNames) {
+    .createCalibrationPlot(data, var, outPath,
+                           color = color, facets = facets)
   }
-  # Filter for common iterations (TODO: maybe add a switch to suppress this)
-  data <- filter(data, .data[["iteration"]] <= maxIter)
-  color <- "scenario"
-  facets <- "scenario"
 }
+
 
 ```
 
@@ -153,7 +182,8 @@ if (length(filePath) == 1) {
 
 ```{r}
 varReference <- read.csv(getSystemFile(file.path("plotsCalibrationReporting", "variableNames.csv"),
-                                       package = "reportbrick"))
+                                       package = "reportbrick")) %>%
+  filter(.data$variable %in% data$variable)
 
 varReference %>%
   kableExtra::kbl(
@@ -179,27 +209,27 @@ dataRelQuant <- data %>%
   filter(is.na(.data$ttot) | .data$ttot == ttotFirst) %>%
   mutate(ttot = NA)
 
+renHsVar <- grep("renovation$|HS$", varAll, value = TRUE)
+
+overviewAbsolute <- c("outerObjective", "stepSize", "stockDevHs", "conDevHs", "flowDevHs",
+                      paste0(namingMap[renHsVar], c("DescDirHs", "SpecCostHs", "DevAgg", "DevHs")))
+
+overviewRelative <- c("outerObjective", "stepSize", "stockDevHsRel", "conDevHsRel", "flowDevHsRel",
+                      paste0(namingMap[renHsVar], c("DescDirHs", "SpecCostHs", "DevRel", "DevHsRel")))
+
 .createCalibrationPlot(
   dataRelQuant,
-  c("descDirRen", "flowDevAgg", "flowDevHs", "conDevHs", "specCostRen", "outerObjective",
-    "renDevHs", "stepSize", "stockDevHs"),
+  overviewAbsolute,
   outPath,
-  outName = outName,
   color = "hsr",
-  facets = "variable",
-  addColor = c(gabo_id = "Gas identical replacement"),
-  newColor = data.frame(row.names = "Gas identical replacement", color = "#8B8378")
+  facets = "variable"
 )
 .createCalibrationPlot(
   dataRelQuant,
-  c("descDirRen", "flowDevRel", "flowDevHsRel", "conDevHsRel", "specCostRen", "renDevHsRel",
-    "renDevDiffGasRel", "stepSize", "stockDevAgg", "stockDevHsRel"),
+  overviewRelative,
   outPath,
-  outName = outName,
   color = "hsr",
-  facets = "variable",
-  addColor = c(gabo_id = "Gas identical replacement"),
-  newColor = data.frame(row.names = "Gas identical replacement", color = "#8B8378")
+  facets = "variable"
 )
 
 ```
@@ -211,17 +241,17 @@ dataRelQuant <- data %>%
 
 ```{r stock and flows by hs}
 
-.createCalibrationPlot(data, "stockHs", outPath, outName = outName,
-                       color = "hsr", facets = facets, savePlots = savePlots)
+.createCalibrationPlot(data, "stockHs", outPath,
+                       color = "hsr", facets = facets)
 
-.createCalibrationPlot(data, "conHs", outPath, outName = outName,
-                       color = "hsr", facets = facets, savePlots = savePlots)
+.createCalibrationPlot(data, "conHs", outPath,
+                       color = "hsr", facets = facets)
 
-.createCalibrationPlot(data, "renHs", outPath, outName = outName,
-                       color = "hsr", facets = facets, savePlots = savePlots)
+.createCalibrationPlot(data, "renHs", outPath,
+                       color = "hsr", facets = facets)
 
-.createCalibrationPlot(data, "flowHs", outPath, outName = outName,
-                       color = "hsr", facets = facets, savePlots = savePlots)
+.createCalibrationPlot(data, "flowHs", outPath,
+                       color = "hsr", facets = facets)
 
 ```
 
@@ -229,12 +259,7 @@ dataRelQuant <- data %>%
 
 ```{r stock and flows by vin}
 
-if (all(c("stockVin", "renVin") %in% data$variable)) {
-  .createCalibrationPlot(data, "stockVin", outPath, outName = outName,
-                         color = "vin", facets = facets, savePlots = savePlots)
-  .createCalibrationPlot(data, "renVin", outPath, outName = outName,
-                         color = "vin", facets = facets, savePlots = savePlots)
-}
+.runCalibrationPlots("Vin", color = "vin", facets = facets, skipVars = c("construction", "flow"))
 
 ```
 
@@ -245,17 +270,8 @@ if (all(c("stockVin", "renVin") %in% data$variable)) {
 
 ```{r Total absolute stock and flow deviations}
 
-.createCalibrationPlot(data, "stockDevAgg", outPath, outName = outName,
-                       color = color, savePlots = savePlots)
+.runCalibrationPlots("DevAgg", color)
 
-.createCalibrationPlot(data, "conDevAgg", outPath, outName = outName,
-                       color = color, savePlots = savePlots)
-
-.createCalibrationPlot(data, "renDevAgg", outPath, outName = outName,
-                       color = color, savePlots = savePlots)
-
-.createCalibrationPlot(data, "flowDevAgg", outPath, outName = outName,
-                       color = color, savePlots = savePlots)
 
 ```
 
@@ -263,34 +279,16 @@ if (all(c("stockVin", "renVin") %in% data$variable)) {
 
 ```{r absolute stock and flow deviations by hs}
 
-.createCalibrationPlot(data, "stockDevHs", outPath, outName = outName,
-                       color = "hsr", facets = facets, savePlots = savePlots)
-
-.createCalibrationPlot(data, "conDevHs", outPath, outName = outName,
-                       color = "hsr", facets = facets, savePlots = savePlots)
-
-.createCalibrationPlot(data, "renDevHs", outPath, outName = outName,
-                       color = "hsr", facets = facets, savePlots = savePlots)
-
-.createCalibrationPlot(data, "flowDevHs", outPath, outName = outName,
-                       color = "hsr", facets = facets, savePlots = savePlots)
-
-.createCalibrationPlot(data, "renDevSepGabo", outPath, outName = outName,
-                       color = "hsr", facets = facets, savePlots = savePlots,
-                       addColor = c(gabo_id = "Gas identical replacement"),
-                       newColor = data.frame(row.names = "Gas identical replacement", color = "#8B8378"))
+.runCalibrationPlots("DevHs", color = "hsr", facets = facets, skipVars = "renovationBS")
 
 ```
 
 ## Absolute deviations by vintage
 
 ```{r absolute stock and flow deviations by vin}
-if (all(c("stockDevVin", "renDevVin") %in% data$variable)) {
-  .createCalibrationPlot(data, "stockDevVin", outPath, outName = outName,
-                         color = "vin", facets = facets, savePlots = savePlots)
-  .createCalibrationPlot(data, "renDevVin", outPath, outName = outName,
-                         color = "vin", facets = facets, savePlots = savePlots)
-}
+
+.runCalibrationPlots("DevVin", color = "vin", facets = facets, skipVars = c("construction", "flow"))
+
 ```
 
 
@@ -300,17 +298,7 @@ if (all(c("stockDevVin", "renDevVin") %in% data$variable)) {
 
 ```{r total relative stock and flow deviations}
 
-.createCalibrationPlot(data, "stockDevRel", outPath, outName = outName,
-                       color = color, savePlots = savePlots)
-
-.createCalibrationPlot(data, "conDevRel", outPath, outName = outName,
-                       color = color, savePlots = savePlots)
-
-.createCalibrationPlot(data, "renDevRel", outPath, outName = outName,
-                       color = color, savePlots = savePlots)
-
-.createCalibrationPlot(data, "flowDevRel", outPath, outName = outName,
-                       color = color, savePlots = savePlots)
+.runCalibrationPlots("DevRel", color)
 
 ```
 
@@ -318,22 +306,7 @@ if (all(c("stockDevVin", "renDevVin") %in% data$variable)) {
 
 ```{r relative stock and flow deviation by hs}
 
-.createCalibrationPlot(data, "stockDevHsRel", outPath, outName = outName,
-                       color = "hsr", facets = facets, savePlots = savePlots)
-
-.createCalibrationPlot(data, "conDevHsRel", outPath, outName = outName,
-                       color = "hsr", facets = facets, savePlots = savePlots)
-
-.createCalibrationPlot(data, "renDevHsRel", outPath, outName = outName,
-                       color = "hsr", facets = facets, savePlots = savePlots)
-
-.createCalibrationPlot(data, "flowDevHsRel", outPath, outName = outName,
-                       color = "hsr", facets = facets, savePlots = savePlots)
-
-.createCalibrationPlot(data, "renDevSepGaboRel", outPath, outName = outName,
-                       color = "hsr", facets = facets, savePlots = savePlots,
-                       addColor = c(gabo_id = "Gas identical replacement"),
-                       newColor = data.frame(row.names = "Gas identical replacement", color = "#FAEBD7"))
+.runCalibrationPlots("DevHsRel", color = "hsr", facets = facets, skipVars = "renovationBS")
 
 ```
 
@@ -341,14 +314,7 @@ if (all(c("stockDevVin", "renDevVin") %in% data$variable)) {
 
 ```{r relative stock and flow deviation by hs, alternative 2}
 
-.createCalibrationPlot(data, "stockDevHsShare", outPath, outName = outName,
-                       color = "hsr", facets = facets, savePlots = savePlots)
-.createCalibrationPlot(data, "conDevHsShare", outPath, outName = outName,
-                       color = "hsr", facets = facets, savePlots = savePlots)
-.createCalibrationPlot(data, "renDevHsShare", outPath, outName = outName,
-                       color = "hsr", facets = facets, savePlots = savePlots)
-.createCalibrationPlot(data, "flowDevHsShare", outPath, outName = outName,
-                       color = "hsr", facets = facets, savePlots = savePlots)
+.runCalibrationPlots("DevHsShare", color = "hsr", facets = facets, skipVars = "renovationBS")
 
 ```
 
@@ -356,12 +322,7 @@ if (all(c("stockDevVin", "renDevVin") %in% data$variable)) {
 
 ```{r relative stock and flow deviation by vin}
 
-if (all(c("stockDevVinRel", "renDevVinRel") %in% data$variable)) {
-  .createCalibrationPlot(data, "stockDevVinRel", outPath, outName = outName,
-                         color = "vin", facets = facets, savePlots = savePlots)
-  .createCalibrationPlot(data, "renDevVinRel", outPath, outName = outName,
-                         color = "vin", facets = facets, savePlots = savePlots)
-}
+.runCalibrationPlots("DevVinRel", color = "vin", facets = facets, skipVars = c("construction", "flow"))
 
 ```
 
@@ -372,14 +333,7 @@ if (all(c("stockDevVinRel", "renDevVinRel") %in% data$variable)) {
 
 ```{r aggregate stock and flow deviations}
 
-.createCalibrationPlot(data, "stockTotDev", outPath, outName = outName,
-                       color = color, facets = facets, savePlots = savePlots)
-
-.createCalibrationPlot(data, "conTotDev", outPath, outName = outName,
-                       color = color, facets = facets, savePlots = savePlots)
-
-.createCalibrationPlot(data, "renTotDev", outPath, outName = outName,
-                       color = color, facets = facets, savePlots = savePlots)
+.runCalibrationPlots("TotDev", color = color, facets = facets, skipVars = "flow")
 
 ```
 
@@ -387,14 +341,7 @@ if (all(c("stockDevVinRel", "renDevVinRel") %in% data$variable)) {
 
 ```{r agg stock and flow deviations by hs}
 
-.createCalibrationPlot(data, "stockTotHsDev", outPath, outName = outName,
-                       color = "hsr", facets = facets, savePlots = savePlots)
-
-.createCalibrationPlot(data, "conTotHsDev", outPath, outName = outName,
-                       color = "hsr", facets = facets, savePlots = savePlots)
-
-.createCalibrationPlot(data, "renTotHsDev", outPath, outName = outName,
-                       color = "hsr", facets = facets, savePlots = savePlots)
+.runCalibrationPlots("TotHsDev", color = "hsr", facets = facets, skipVars = c("renovationBS", "flow"))
 
 ```
 
@@ -404,8 +351,7 @@ if (all(c("stockDevVinRel", "renDevVinRel") %in% data$variable)) {
 
 ```{r outer objective}
 
-.createCalibrationPlot(data, "outerObjective", outPath, outName = outName,
-                       color = color, savePlots = savePlots)
+.createCalibrationPlot(data, "outerObjective", outPath, color = color)
 
 ```
 
@@ -413,19 +359,24 @@ if (all(c("stockDevVinRel", "renDevVinRel") %in% data$variable)) {
 
 ```{r step size}
 
-.createCalibrationPlot(data, "stepSize", outPath, outName = outName,
-                       color = color, savePlots = savePlots)
+.createCalibrationPlot(data, "stepSize", outPath, color = color)
+```
+
+## Intangible costs by building shell
+
+```{r intangible costs by building shell}
+
+.runCalibrationPlots("SpecCostBs", color = "bsr", facets = facets,
+                     skipVars = c("stock", "renovationHS", "flow"))
+
 ```
 
 ## Intangible costs by heating system
 
 ```{r intangible costs by heating system}
 
-.createCalibrationPlot(data, "specCostCon", outPath, outName = outName,
-                       color = "hsr", savePlots = savePlots)
+.runCalibrationPlots("SpecCostHs", color = "hsr", facets = facets, skipVars = c("stock", "renovationBS", "flow"))
 
-.createCalibrationPlot(data, "specCostRen", outPath, outName = outName,
-                       color = "hsr", savePlots = savePlots)
 ```
 
 
@@ -433,15 +384,7 @@ if (all(c("stockDevVinRel", "renDevVinRel") %in% data$variable)) {
 
 ```{r descent direction by heating system}
 
-.createCalibrationPlot(data, "descDirCon", outPath, outName = outName,
-                       color = "hsr", savePlots = savePlots)
+.runCalibrationPlots("DescDirHs", color = "hsr", facets = facets, skipVars = c("stock", "renovationBS", "flow"))
 
-.createCalibrationPlot(data, "descDirRen", outPath, outName = outName,
-                       color = "hsr", savePlots = savePlots)
-
-.createCalibrationPlot(data, "descDirConLate", outPath, outName = outName,
-                       color = "hsr", savePlots = savePlots)
-
-.createCalibrationPlot(data, "descDirRenLate", outPath, outName = outName,
-                       color = "hsr", savePlots = savePlots)
+.runCalibrationPlots("DescDirHsLate", color = "hsr", facets = facets, skipVars = c("stock", "renovationBS", "flow"))
 ```

@@ -4,12 +4,12 @@
 \alias{.computeFlowSum}
 \title{Compute the sum of construction and renovation flow values}
 \usage{
-.computeFlowSum(con, ren)
+.computeFlowSum(flows)
 }
 \arguments{
-\item{con}{data frame, contains construction flow quantities}
-
-\item{ren}{data frame, contains renovation flow quantities}
+\item{flows}{named list of data frames, each containing flow quantities.
+Entries need to include \code{construction}
+and one entry with \code{renovation} as part of the name.}
 }
 \value{
 data frame with the sum in the value column
