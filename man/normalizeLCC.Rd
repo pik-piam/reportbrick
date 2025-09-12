@@ -4,7 +4,7 @@
 \alias{normalizeLCC}
 \title{Normalize LCC}
 \usage{
-normalizeLCC(dfLcc, dfLt, dfDt)
+normalizeLCC(dfLcc, dfLt, dfDt, flow)
 }
 \arguments{
 \item{dfLcc}{data frame, lifecycle costs}

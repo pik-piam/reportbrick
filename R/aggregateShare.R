@@ -17,7 +17,7 @@
 #'
 aggregateShare <- function(share, weight = NULL, energyLadder = NULL, energyLadderNo = NULL) {
 
-  baseDims <- setdiff(colnames(share), c("bs", "hs", "bsr", "hsr", "ttotIn", "value"))
+  baseDims <- setdiff(colnames(share), c("bs", "hs", "hsr", "ttotIn", "value"))
 
   # Filter for the desired energy ladder steps
   if (!is.null(energyLadder) && !is.null(energyLadderNo)) {
@@ -42,14 +42,13 @@ aggregateShare <- function(share, weight = NULL, energyLadder = NULL, energyLadd
   }
 
   share %>%
-    
+
     # Sum the shares over hs
-    group_by(across(all_of(c("bs", baseDims, "ttotIn", "bsr", "hsr")))) %>%
+    group_by(across(all_of(c("bs", baseDims, "ttotIn", "hsr")))) %>%
     summarise(value = sum(.data[["value"]]), .groups = "drop") %>%
-    select(-"bs") %>%
-    rename(bs = "bsr", hs = "hsr") %>%
-    
-    # Compute total as sum over (bsr, hsr) and recalculate the share
+    rename(hs = "hsr") %>%
+
+    # Compute total as sum over hs (was hsr) and recalculate the share
     group_by(across(all_of(c("bs", baseDims, "ttotIn")))) %>%
     mutate(totVal = sum(.data[["value"]]),
            shareVal = .data[["value"]] / .data[["totVal"]]) %>%

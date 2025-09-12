@@ -12,29 +12,38 @@
 #' @importFrom dplyr all_of left_join mutate rename rename_with
 #' @importFrom tidyr pivot_longer
 #'
-normalizeLCC <- function(dfLcc, dfLt, dfDt) {
-  
-  hsName <- if ("hsr" %in% colnames(dfLcc)) "hsr" else "hs"
-  bsName <- if ("bsr" %in% colnames(dfLcc)) "bsr" else "bs"
+normalizeLCC <- function(dfLcc, dfLt, dfDt, flow) {
+
+  if (flow == "construction") {
+    avgGroup <- c("hs", "bs", "expLt")
+    hsName <- "hs"
+    toRename <- c()
+  } else {
+    avgGroup <- c("hs", "expLt")
+    toRename <- c(hsr = "hs")
+    hsName <- "hsr"
+  }
 
   # Compute expected lifetime of each heating system and average lifetime across all heating systems
-  expLt <- rename_with(dfLt, ~ (if (all(c("bsr", "hsr") %in% colnames(dfLcc))) paste0(.x, "r") else .x),
-                      all_of(c("bs", "hs"))) %>%
+  expLt <- dfLt %>%
+    # rename_with(dfLt, ~ (if (all(c("bsr", "hsr") %in% colnames(dfLcc))) paste0(.x, "r") else .x),
+    #                   all_of(c("bs", "hs"))) %>%
     left_join(dfDt, by = c(ttotIn = "ttot")) %>%
     left_join(dfDt, by = c(ttotOut = "ttot"), suffix = c("In", "Out")) %>%
     mutate(lt = .data$ttotOut - .data$dtOut / 2 - (.data$ttotIn - .data$dtIn / 2)) %>%
-    group_by(across(any_of(c("qty", "bs", "hs", "bsr", "hsr", "vin", "region", "loc", "typ", "inc", "costType", "ttotIn")))) %>%
+    group_by(across(any_of(c("qty", "bs", "hs", "hsr", "vin", "region", "loc", "typ", "inc", "costType", "ttotIn")))) %>%
     summarise(expLt = sum(.data$lt * .data$relVal), .groups = "drop") %>%
-    group_by(across(-all_of(c(bsName, hsName, "expLt")))) %>%
+    group_by(across(-all_of(avgGroup))) %>%
     mutate(avgLt = mean(.data$expLt),
            scale = ifelse(.data$expLt == 0, 1, .data$avgLt / .data$expLt)) %>%
     ungroup() %>%
-    select(-"expLt", -"avgLt")
-  
+    select(-"expLt", -"avgLt") %>%
+    rename(toRename)
+
   # Scale LCC
   dfLcc %>%
     mutate(across(any_of("bsr"), ~ "low")) %>%
-    left_join(expLt, by = c("qty", bsName, hsName, "vin", "region", "loc", "typ", "inc", "ttotIn")) %>%
+    left_join(expLt, by = c("qty", "bs", hsName, "vin", "region", "loc", "typ", "inc", "ttotIn")) %>%
     mutate(value = .data$value * .data$scale) %>%
     select(-"scale")
 }

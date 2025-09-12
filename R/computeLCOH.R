@@ -1,5 +1,5 @@
 #' Compute LCOH from LCC
-#' 
+#'
 #' Compute the levelized costs of heat (LCOH) by scaling the LCC with discounted UE demand
 #'
 #' @author Ricarda Rosemann
@@ -27,10 +27,12 @@ computeLCOH <- function(dfLcc, dfLt, dfUe, dfDt, dfDiscount, dims) {
     group_by(across(all_of(c(dims, "ttotIn")))) %>%
     summarise(ue = sum(.data[["ltProb"]] * .data[["discountSum"]]), .groups = "drop")
 
+  joinDims <- if ("hsr" %in% colnames(dfLcc)) c(setdiff(dims, "hs"), hsr = "hs", "ttotIn") else c(dims, "ttotIn")
+
   # Scale LCC by expected UE demand to obtain LCOH
   dfLcc %>%
     rename(lcc = "value") %>%
-    left_join(expUe, by = c(dims, "ttotIn")) %>%
+    left_join(expUe, by = joinDims) %>%
     mutate(value = .data[["lcc"]] / .data[["ue"]],
            value = .data$value * 100) %>% # Convert USD to US cents
     select(-"ue", -"lcc")
