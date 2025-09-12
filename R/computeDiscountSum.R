@@ -13,13 +13,13 @@
 #' @param ttotInNum numeric, first time vector
 #' @param ttotOutNum numeric, second time vector
 #'
-#' @importFrom dplyr %>% .data filter group_by left_join mutate rename select ungroup
+#' @importFrom dplyr %>% .data filter group_by left_join mutate reframe rename select ungroup
 #' @importFrom tidyr crossing
 #'
 computeDiscountSum <- function(df, dfDt, dfDiscount, ttotInNum, ttotOutNum) {
 
   if (!"ttot" %in% colnames(df)) df <- tidyr::crossing(df, ttot = ttotInNum)
-  
+
   ttotAll <- union(ttotInNum, ttotOutNum)
 
   df %>%
@@ -34,14 +34,14 @@ computeDiscountSum <- function(df, dfDt, dfDiscount, ttotInNum, ttotOutNum) {
     group_by(across(everything())) %>%
     reframe(ttot = ttotAll[ttotAll >= .data$ttotIn & ttotAll <= .data$ttotOut]) %>%
     left_join(dfDt, by = "ttot") %>%
-    
+
     # Compute discounting between ttotIn and ttot
     left_join(dfDiscount %>%
                 rename(discountOut = "value"),
               by = c("ttot", "typ")) %>%
     mutate(discount = .data[["discountOut"]] / .data[["discountIn"]]) %>%
     select(-"discountIn", -"discountOut") %>%
-    
+
     # Compute the discounted sum along ttot
     group_by(across(-any_of(c("ttot", "discount", "dt", "value")))) %>%
     mutate(factor = ifelse(

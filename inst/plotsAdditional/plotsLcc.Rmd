@@ -9,7 +9,7 @@ output:
 params:
     docTitle: "BRICK Analysis report"
     file: "BRICK_analysis_report.csv"
-    path: "C:/Users/ricardar/Documents/PIAM/brick/output/noShellEUR-lowGran_2025-07-22_09.58.50/"
+    path: "C:/Users/ricardar/Documents/Results/BRICK/calibration-tests/regionEU9/calibration-DEU_2025-09-11_11.15.36/"
     scenNames: NULL
     savePlots: TRUE
     name: ""
@@ -84,6 +84,7 @@ showAnalysisPlot("twoBar", data, c("stockInitLtMixed", "stockInitLtAnte"), yname
 
 showAnalysisPlot("line", data, c("stockInitLtMixedRemain", "stockWbRemain"),
                  yname = "relVal", color = "hs", linetype = "variable", rprt = "vin",
+                 suppressLateTtot = FALSE,
                  xlabName = "Time", ylabName = "Share of remaining floorspace", tmpl = tmpl)
 
 ```
@@ -186,28 +187,33 @@ showAnalysisPlot("bar", data, "conLccMixedScaled",
 showAnalysisPlot("bar", data, "renLccMixed",
                  xname = "hs", yname = "value", color = "costType", rprt = c("ttotIn", "typ", "loc"),
                  facets = "vin", xlabName = "Heating System", ylabName = "Costs in USD/m2", tmpl = tmpl,
-                 addPoints = list(variable = "renBrickAll", yname = "value", y2labName = "Brick Share"))
+                 addPoints = list(variable = "renBrickAll", yname = "value", y2labName = "Brick Share"),
+                 valueCap = 1000)
 ```
 
 ```{r Plot LCC of renovation with mixed lifetimes, full}
 showAnalysisPlot("bar", data, "renLccMixedFull",
                  xname = "hsr", yname = "value", color = "costType", rprt = c("vin", "ttotIn", "typ", "loc"),
                  facets = "hs", xlabName = "Heating System", ylabName = "Costs in USD/m2", tmpl = tmpl,
-                 addPoints = list(variable = "renBrickFull", yname = "value", y2labName = "Brick Share"))
+                 addPoints = list(variable = "renBrickFull", yname = "value", y2labName = "Brick Share"),
+                 valueCap = 1000)
 ```
 
 ## LCC of renovation with mixed lifetimes, matrix charts
 
 ```{r Plot renovation LCC, mixed lt as pie matrix}
 showAnalysisPlot("pieChart", data, "renLccMixedFull",
-                 xname = "hs", yname = "hsr", color = "costType", rprt = c("vin", "ttotIn", "typ", "loc"),
-                 facets = NULL, xlabName = "Original Heating System", ylabName = "Final heating system", tmpl = tmpl)
+                 xname = "hs", yname = "hsr", valueName = "value", color = "costType",
+                 rprt = c("vin", "ttotIn", "typ", "loc"),
+                 facets = NULL, xlabName = "Original Heating System", ylabName = "Final heating system", tmpl = tmpl,
+                 valueCap = 1000)
 ```
 
 ```{r Plot renovation LCC, mixed lt as heat map matrix}
 showAnalysisPlot("heatMap", data, "renLccMixedFull",
-                 xname = "hs", yname = "hsr", rprt = c("vin", "ttotIn", "typ", "loc"),
-                 facets = NULL, xlabName = "Original Heating System", ylabName = "Final heating system", tmpl = tmpl)
+                 xname = "hs", yname = "hsr", valueName = "value", rprt = c("vin", "ttotIn", "typ", "loc"),
+                 facets = NULL, xlabName = "Original Heating System", ylabName = "Final heating system", tmpl = tmpl,
+                 valueCap = 1000)
 ```
 
 # Levelized costs of heat (LCOH)
@@ -226,27 +232,34 @@ showAnalysisPlot("bar", data, "conLcohMixed",
 showAnalysisPlot("bar", data, "renLcohMixed",
                  xname = "hs", yname = "value", color = "costType", rprt = c("ttotIn", "typ", "loc"),
                  facets = "vin", xlabName = "Heating System", ylabName = "Costs in US Cents/kWh", tmpl = tmpl,
-                 addPoints = list(variable = "renBrickAll", yname = "value", y2labName = "Brick Share"))
+                 addPoints = list(variable = "renBrickAll", yname = "value", y2labName = "Brick Share"),
+                 valueCap = 200)
 ```
 
 ```{r Plot LCOH of renovation with mixed lifetimes by hs x hsr}
 showAnalysisPlot("bar", data, "renLcohMixedFull",
                  xname = "hsr", yname = "value", color = "costType", rprt = c("vin", "ttotIn", "typ", "loc"),
                  facets = "hs", xlabName = "Heating System", ylabName = "Costs in US Cents/kWh", tmpl = tmpl,
-                 addPoints = list(variable = "renBrickFull", yname = "value", y2labName = "Brick Share"))
+                 addPoints = list(variable = "renBrickFull", yname = "value", y2labName = "Brick Share"),
+                 valueCap = 200)
 ```
 
 ## LCOH of renovation with mixed lifetimes, matrix charts
 
 ```{r Plot renovation LCOH, mixed lt as pie matrix}
 showAnalysisPlot("pieChart", data, "renLcohMixedFull",
-                 xname = "hs", yname = "hsr", color = "costType", rprt = c("vin", "ttotIn", "typ", "loc"),
-                 facets = NULL, xlabName = "Original Heating System", ylabName = "Final heating system", tmpl = tmpl)
+                 xname = "hs", yname = "hsr", color = "costType", valueName = "value",
+                 rprt = c("vin", "ttotIn", "typ", "loc"),
+                 facets = NULL, xlabName = "Original Heating System", ylabName = "Final heating system", tmpl = tmpl,
+                 valueCap = 200)
 ```
+
 ```{r Plot renovation LCOH, mixed lt as heat map}
 showAnalysisPlot("heatMap", data, "renLcohMixedFull",
-                 xname = "hs", yname = "hsr", rprt = c("vin", "ttotIn", "typ", "loc"),
-                 facets = NULL, xlabName = "Original Heating System", ylabName = "Final heating system", tmpl = tmpl)
+                 xname = "hs", yname = "hsr", valueName = "value",
+                 rprt = c("vin", "ttotIn", "typ", "loc"),
+                 facets = NULL, xlabName = "Original Heating System", ylabName = "Final heating system", tmpl = tmpl,
+                 valueCap = 200)
 ```
 
 # Logit shares compared to Brick shares

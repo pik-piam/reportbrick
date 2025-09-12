@@ -9,22 +9,26 @@ showAnalysisPlot(
   data,
   varName,
   yname,
-  color,
+  color = NULL,
   linetype = NULL,
   facets = c("loc", "typ"),
   rprt = NULL,
   avg = NULL,
   remCols = NULL,
   xname = "ttotOut",
+  valueName = yname,
   suppressLateTtot = TRUE,
   xlabName = NULL,
   ylabName = NULL,
-  tmpl = NULL
+  tmpl = NULL,
+  addPoints = NULL,
+  filterRows = list(hs = "h2bo", hsr = "h2bo"),
+  valueCap = Inf
 )
 }
 \arguments{
 \item{plotType}{character, desired plot type.
-Needs to be one of \code{}, \code{} or \code{}.}
+Needs to be one of \code{line}, \code{bar} or \code{twoBar}.}
 
 \item{data}{data frame containing the data to be plotted}
 

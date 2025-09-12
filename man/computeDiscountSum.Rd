@@ -13,9 +13,9 @@ computeDiscountSum(df, dfDt, dfDiscount, ttotInNum, ttotOutNum)
 
 \item{dfDiscount}{data frame, contains discount rate}
 
-\item{ttot}{numeric, first time vector}
+\item{ttotInNum}{numeric, first time vector}
 
-\item{ttot2}{numeric, second time vector}
+\item{ttotOutNum}{numeric, second time vector}
 }
 \description{
 Compute the discount rate between two time periods
