@@ -87,13 +87,11 @@ reportCalibration <- function(gdx, flowTargets = TRUE) {
     diagDevFiles[varFlow]
   )
 
-  diagValNames <- c(
-    list(
-      stepSize = "stepSize",
-      outerObjective = "f",
-      lapply(stats::setNames(nm = varFlow), function(nm) "d")
-    )
+  diagValNames <- list(
+    stepSize = "stepSize",
+    outerObjective = "f"
   )
+  diagValNames[varFlow] <- "d"
 
   diagnosticsExist <- all(file.exists(file.path(path, diagFiles)))
   if (diagnosticsExist) {
@@ -207,23 +205,22 @@ reportCalibration <- function(gdx, flowTargets = TRUE) {
 
     diagnostics <- c(
       diagnostics[c("stepSize", "outerObjective")],
-      stats::setNames(
-        lapply(varFlowHs, function(var) {
-          .computeAvg(diagnostics[[var]], rprt = c("iteration", "region", "typ", "loc", "inc", "hsr", "ttot"),
-                      valueName = "d",
-                      exclude = list(hs = "h2bo", hsr = "h2bo"))
-        }), paste0(namingMap[varFlowHs], "DescDirHs")
-      )
+      lapply(stats::setNames(varFlowHs, paste0(namingMap[varFlowHs], "DescDirHs")), function(var) {
+        .computeAvg(diagnostics[[var]],
+                    rprt = c("iteration", "region", "typ", "loc", "inc", "hsr", "ttot"),
+                    exclude = list(hs = "h2bo", hsr = "h2bo"))
+      })
     )
 
     # Direction of steepest descent by heating system for late iterations
     diagnostics <- c(
       diagnostics,
-      stats::setNames(
-        lapply(paste0(namingMap[varFlowHs], "DescDirHs"), function(var) {
+      lapply(
+        stats::setNames(paste0(namingMap[varFlowHs], "DescDirHs"), paste0(namingMap[varFlowHs], "DescDirHsLate")),
+        function(var) {
           diagnostics[[var]] %>%
             filter(.data[["iteration"]] >= floor(0.4 * maxIter))
-        }), paste0(namingMap[varFlowHs], "DescDirHsLate")
+        }
       )
     )
 
@@ -233,20 +230,20 @@ reportCalibration <- function(gdx, flowTargets = TRUE) {
   # Specific costs
   out <- c(
     out,
-    stats::setNames(lapply(varFlowBs, function(var) {
+    lapply(stats::setNames(varFlowBs, paste0(namingMap[varFlowBs], "SpecCostBs")), function(var) {
       .computeAvg(
         p_intangCost[[var]],
         rprt = c("iteration", "region", "typ", "loc", "inc", "bsr", "ttot"),
         exclude = list(hs = "h2bo", hsr = "h2bo")
       )
-    }), paste0(namingMap[varFlowBs], "SpecCostBs")),
-    stats::setNames(lapply(varFlowHs, function(var) {
+    }),
+    lapply(stats::setNames(varFlowHs, paste0(namingMap[varFlowHs], "SpecCostHs")), function(var) {
       .computeAvg(
         p_intangCost[[var]],
         rprt = c("iteration", "region", "typ", "loc", "inc", "hsr", "ttot"),
         exclude = list(hs = "h2bo", hsr = "h2bo")
       )
-    }), paste0(namingMap[varFlowHs], "SpecCostHs"))
+    })
   )
 
   # Aggregated brick results by heating system (hs)
@@ -268,9 +265,9 @@ reportCalibration <- function(gdx, flowTargets = TRUE) {
   if (isFALSE(aggVin)) {
     out <- c(
       out,
-      stats::setNames(lapply(varAllVin, function(var) {
+      lapply(stats::setNames(varAllVin, paste0(namingMap[varAllVin], "Vin")), function(var) {
         .computeSum(brickRes[[var]], rprt = c("iteration", "region", "typ", "loc", "inc", "vin", "ttot"))
-      }), paste0(namingMap[varAllVin], "Vin"))
+      })
     )
   }
 
@@ -321,9 +318,9 @@ reportCalibration <- function(gdx, flowTargets = TRUE) {
   # Across all dimensions
   out <- c(
     out,
-    stats::setNames(lapply(varAll, function(var) {
+    lapply(stats::setNames(varAll, paste0(namingMap[varAll], "DevRel")), function(var) {
       .computeRelDev(devAgg[[var]], p_calibTarget[[var]], tCalib)
-    }), paste0(namingMap[varAll], "DevRel")),
+    }),
     list(flowDevRel = .computeRelDev(out[["flowDevAgg"]], p_calibTarget[varFlow],
                                      tCalib))
   )
@@ -331,9 +328,9 @@ reportCalibration <- function(gdx, flowTargets = TRUE) {
   # Separately for all heating systems (hs)
   out <- c(
     out,
-    stats::setNames(lapply(varAllHs, function(var) {
+    lapply(stats::setNames(varAllHs, paste0(namingMap[varAllHs], "DevHsRel")), function(var) {
       .computeRelDev(devHs[[var]], p_calibTarget[[var]], tCalib, notInTargetGrp = "hsr")
-    }), paste0(namingMap[varAllHs], "DevHsRel")),
+    }),
     list(flowDevHsRel = .computeRelDev(
       out[["flowDevHs"]],
       p_calibTarget[varFlowHs],
@@ -345,9 +342,9 @@ reportCalibration <- function(gdx, flowTargets = TRUE) {
   # Deviation share for all heating systems (hs)
   out <- c(
     out,
-    stats::setNames(lapply(varAllHs, function(var) {
+    lapply(stats::setNames(varAllHs, paste0(namingMap[varAllHs], "DevHsShare")), function(var) {
       .computeRatioSq(devHs[[var]], devAgg[[var]])
-    }), paste0(namingMap[varAllHs], "DevHsShare")),
+    }),
     list(flowDevHsShare = .computeRatioSq(out[["flowDevHs"]], out[["flowDevAgg"]]))
   )
 
@@ -355,9 +352,9 @@ reportCalibration <- function(gdx, flowTargets = TRUE) {
   if (isFALSE(aggVin)) {
     out <- c(
       out,
-      stats::setNames(lapply(varAllVin, function(var) {
+      lapply(stats::setNames(varAllVin, paste0(namingMap[varAllVin], "DevVinRel")), function(var) {
         .computeRelDev(devVin[[var]], p_calibTarget[[var]], tCalib, notInTargetGrp = "vin")
-      }), paste0(namingMap[varAllVin], "DevVinRel"))
+      })
     )
   }
 
@@ -386,6 +383,7 @@ reportCalibration <- function(gdx, flowTargets = TRUE) {
   write.csv(out, file.path(path, outName), row.names = FALSE)
 
 }
+
 
 
 #' Get dimension names from stock and flow objects
