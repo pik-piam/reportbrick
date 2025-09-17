@@ -8,8 +8,7 @@ plotBRICKCalib(
   path = ".",
   cal = "BRICK_calibration_report.csv",
   outName = "",
-  scenNames = NULL,
-  savePlots = FALSE
+  scenNames = NULL
 )
 }
 \arguments{
@@ -22,8 +21,6 @@ If several paths are given, the names can be used to pass short scenario names.}
 
 \item{scenNames}{character vector, scenario names for different paths.
 Needs to be specified if \code{path} is unnamed and contains more than one element.}
-
-\item{savePlots}{logical, whether all plots should additionally be saved as png}
 }
 \description{
 Renders the file plotCalibration.Rmd to create the plots for the BRICK calibration
