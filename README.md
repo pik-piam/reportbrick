@@ -46,7 +46,7 @@ A BibTeX entry for LaTeX users is
 @Misc{,
   title = {reportbrick: Reporting package for BRICK - Version 0.12.1},
   author = {Robin Hasse and Ricarda Rosemann},
-  date = {2025-09-17},
+  date = {2025-09-22},
   year = {2025},
 }
 ```

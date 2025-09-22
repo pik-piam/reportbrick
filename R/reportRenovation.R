@@ -193,12 +193,10 @@ reportRenovation <- function(gdx, renovatedObj = c("bs", "hs"),
         " (bn m2/yr)"
       )
       if (all(c(renFinal, renIdentRepl) %in% getItems(out, dim = 3))) {
-        outChangeFinal <- setNames(out[, , renFinal, drop = TRUE] - out[, , renIdentRepl, drop = TRUE],
-                                   renChangeFinal)
+        setNames(out[, , renFinal, drop = TRUE] - out[, , renIdentRepl, drop = TRUE], renChangeFinal)
       } else {
-        outChangeFinal <- NULL
+        NULL
       }
-      outChangeFinal
     }))
   )
 
