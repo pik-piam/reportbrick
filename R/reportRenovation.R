@@ -153,18 +153,28 @@ reportRenovation <- function(gdx, renovatedObj = c("bs", "hs"),
 
   )
 
+  renTotal <- .constructVariableName("Renovation|Residential|{renName} (bn m2/yr)")
+  renIdentRepl <- .constructVariableName("Renovation|Residential|{renName}|Identical replacement (bn m2/yr)")
+
+  if (all(c(renTotal, renIdentRepl) %in% getItems(out, dim = 3))) {
+
+    out <- mbind(
+
+      out,
+
+
+      ## only changes of heating systems ====
+      setNames(
+        out[, , renTotal, drop = TRUE] - out[, , renIdentRepl, drop = TRUE],
+        .constructVariableName("Renovation|Residential|{renName}|Effective change (bn m2/yr)")
+      )
+    )
+
+  }
+
   out <- mbind(
 
     out,
-
-
-    ## only changes of heating systems ====
-    setNames(
-      out[, , .constructVariableName("Renovation|Residential|{renName} (bn m2/yr)"), drop = TRUE]
-      - out[, , .constructVariableName("Renovation|Residential|{renName}|Identical replacement (bn m2/yr)"),
-            drop = TRUE],
-      .constructVariableName("Renovation|Residential|{renName}|Effective change (bn m2/yr)")
-    ),
 
 
     ## only changes of heating systems by heating system ====
@@ -182,8 +192,11 @@ reportRenovation <- function(gdx, renovatedObj = c("bs", "hs"),
         elem,
         " (bn m2/yr)"
       )
-      setNames(out[, , renFinal, drop = TRUE] - out[, , renIdentRepl, drop = TRUE],
-               renChangeFinal)
+      if (all(c(renFinal, renIdentRepl) %in% getItems(out, dim = 3))) {
+        setNames(out[, , renFinal, drop = TRUE] - out[, , renIdentRepl, drop = TRUE], renChangeFinal)
+      } else {
+        NULL
+      }
     }))
   )
 
