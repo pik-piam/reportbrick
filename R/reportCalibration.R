@@ -276,13 +276,13 @@ reportCalibration <- function(gdx, flowTargets = TRUE) {
 
   # Across all dimensions
   devAgg <- lapply(deviation, function(dev) {
-    .computeSumSq(dev, rprt = c("iteration", "region", "typ", "loc", "inc", "ttot"),
+    .computeSumSq(dev, rprt = c("iteration", "region", "typ", "loc", "inc"),
                   addSign = FALSE)
   })
   out <- c(
     out,
     stats::setNames(devAgg, paste0(namingMap[varAll], "DevAgg")),
-    list(flowDevAgg = .computeFlowSum(devAgg[varFlow]))
+    list(flowDevAgg = .computeFlowSum(devAgg[varFlow], squareAndRoot = TRUE))
   )
 
   # By heating system (hs)
@@ -295,7 +295,7 @@ reportCalibration <- function(gdx, flowTargets = TRUE) {
   out <- c(
     out,
     stats::setNames(devHs, paste0(namingMap[varAllHs], "DevHs")),
-    list(flowDevHs = .computeFlowSum(devHs[varFlowHs]))
+    list(flowDevHs = .computeFlowSum(devHs[varFlowHs], squareAndRoot = TRUE))
   )
 
   # By vintage (vin)
@@ -394,6 +394,8 @@ reportCalibration <- function(gdx, flowTargets = TRUE) {
 #' @param calibObj list, calibration targets
 #' @param removeDims character, additional dimensions to be removed from the output
 #'
+#' @returns character with dimension names
+#'
 .getDims <- function(calibObj, removeDims = NULL) {
   lapply(calibObj, function(obj) {
     dims <- colnames(obj)
@@ -467,6 +469,7 @@ reportCalibration <- function(gdx, flowTargets = TRUE) {
 #' Replace column names \code{bs} and \code{hs} by \code{bsr} and \code{hsr}
 #'
 #' @param df data frame
+#'
 #' @returns data frame where column names have been replaced
 #'
 .replaceVarName <- function(df) {
@@ -479,6 +482,7 @@ reportCalibration <- function(gdx, flowTargets = TRUE) {
 #'
 #' @param df data frame, containing data from calibration run
 #' @param dfTarget data frame, containing historical data as calibration target
+#'
 #' @returns data frame where the value column contains the deviation from target data
 #'
 #' @importFrom dplyr %>% .data filter full_join mutate rename select
@@ -508,6 +512,7 @@ reportCalibration <- function(gdx, flowTargets = TRUE) {
 #' @param exclude named list with entries to be excluded from the data.
 #'   The name gives the column name from which the entries given by the value should
 #'   be removed.
+#'
 #' @returns the given data set without the rows identified by the filter criteria
 #'
 #' @importFrom dplyr .data filter
@@ -552,6 +557,7 @@ reportCalibration <- function(gdx, flowTargets = TRUE) {
 #'   be removed.
 #'
 #' @returns data frame with summed values
+#'
 #' @importFrom dplyr %>% .data across any_of group_by summarise
 #'
 .computeSum <- function(df, rprt = "", exclude = list()) {
@@ -563,13 +569,13 @@ reportCalibration <- function(gdx, flowTargets = TRUE) {
 
 }
 
-#' Compute the sum of the squares in a data frame
+#' Compute the square root of the sum of the squares in a data frame
 #'
 #' @param df data frame, containing the data to be evaluated
 #' @param rprt character, column names for which the sum of the squares should be reported separately
 #' @param addSign logical indicating whether the heuristic sign of the square should be computed
 #'
-#' @returns data frame sum of squares as value column
+#' @returns data frame with the square root of the sum of squares as value column
 #'
 #' @importFrom dplyr %>% across all_of any_of .data group_by rename_with summarise ungroup
 #'
@@ -582,8 +588,7 @@ reportCalibration <- function(gdx, flowTargets = TRUE) {
               valueSgn = sum(.data[["sgn"]] * .data[["value"]] ^ 2, na.rm = TRUE),
               .groups = "drop") %>%
     mutate(sgn = if (isTRUE(addSign)) sign(.data[["valueSgn"]]) else 1,
-           value = .data[["sgn"]] * sqrt(abs(.data[["valuePos"]])),
-           valuePos = sqrt(.data[["valuePos"]])) %>%
+           value = .data[["sgn"]] * sqrt(abs(.data[["valuePos"]]))) %>%
     select(-"sgn", -"valueSgn", -"valuePos")
 
 }
@@ -597,6 +602,7 @@ reportCalibration <- function(gdx, flowTargets = TRUE) {
 #' @param tCalib numerical/factor, calibration time periods to filter calibration target data
 #' @param notInTargetGrp character vector, pass columns that target data should not be grouped by
 #'  when computing the sum of the squares, although they exist in the data
+#'
 #' @returns data frame with relative deviation in value column
 #'
 #' @importFrom dplyr %>% .data filter left_join mutate rename select
@@ -623,15 +629,15 @@ reportCalibration <- function(gdx, flowTargets = TRUE) {
 
     # If two data frames with target data have been passed:
     # Combine them by treating the first as construction flows and the second as renovation flows
-    dfTargetSum <- .computeFlowSum(dfTargetSumList) %>%
+    dfTargetSum <- .computeFlowSum(dfTargetSumList, squareAndRoot = TRUE) %>%
       rename(target = "value")
   }
 
   # Compute the relative deviation as the square root of the deviation divided
   # by the square root of the historical data
-  dfDev <- dfDev %>%
+  dfDev %>%
     left_join(dfTargetSum, by = rprt) %>%
-    mutate(value = sign(.data[["value"]]) * sqrt(abs(.data[["value"]])) / sqrt(.data[["target"]])) %>%
+    mutate(value = .data[["value"]] / .data[["target"]]) %>%
     select(-"target")
 }
 
@@ -639,12 +645,16 @@ reportCalibration <- function(gdx, flowTargets = TRUE) {
 #'
 #' @param flows named list of data frames, each containing flow quantities.
 #'   Entries need to include \code{construction}
-#'   and one entry with \code{renovation} as part of the name.
+#'   and at least one entry with \code{renovation} as part of the name.
+#' @param squareAndRoot logical, whether the square should be taken before summing
+#'   and the root afterwards.
+#'   This option should be active if we're summing up roots of summed squares.
+#'
 #' @returns data frame with the sum in the value column
 #'
 #' @importFrom dplyr %>% across all_of .data full_join mutate rename select
 #'
-.computeFlowSum <- function(flows) {
+.computeFlowSum <- function(flows, squareAndRoot = FALSE) {
 
   # If columns bsr and hsr are present in the data:
   # Convert the construction data to the factor levels of the renovation data
@@ -663,6 +673,15 @@ reportCalibration <- function(gdx, flowTargets = TRUE) {
     }
   }
 
+  # Pick correct summing function
+  sumFunc <- if (isTRUE(squareAndRoot)) {
+    function(x) {
+      sqrt(sum(x^2))
+    }
+  } else {
+    sum
+  }
+
   # Compute the combined flow data as the sum of construction and renovation;
   # NA values in the construction flows are replaced by zeros, thus for "0" flows only renovation is reflected.
   purrr::reduce(
@@ -675,7 +694,7 @@ reportCalibration <- function(gdx, flowTargets = TRUE) {
     replace_na(list(construction = 0)) %>%
     tidyr::pivot_longer(cols = names(flows), names_to = "flow") %>%
     group_by(across(-all_of(c("flow", "value")))) %>%
-    summarise(value = sum(.data$value), .groups = "drop")
+    summarise(value = sumFunc(.data$value), .groups = "drop")
 }
 
 #' Compute the ratio of the squares for two data sets
