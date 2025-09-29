@@ -31,7 +31,7 @@ convGDX2MIF <- function(gdx,
 
   # common time steps
   if (is.null(t)) {
-    t <- as.numeric(as.character(readGdxSymbol(gdx, "ttot", asMagpie = FALSE)[[1]]))
+    t <- as.numeric(as.character(readGdxSymbol(gdx, "ttot")[[1]]))
   }
 
   brickSets <- readBrickSets(tmpl)
@@ -42,7 +42,7 @@ convGDX2MIF <- function(gdx,
   }
 
   # Filter Brick sets for vintages existing in any time period
-  vintages <- unique(readGdxSymbol(gdx, "vinExists", asMagpie = FALSE)$vin)
+  vintages <- unique(readGdxSymbol(gdx, "vinExists")$vin)
   brickSets$vin$elements <- brickSets$vin$elements[vintages]
   brickSets$vin$subsets <- lapply(brickSets$vin$subsets, function(subset) {
     subset[subset %in% vintages]

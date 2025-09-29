@@ -21,8 +21,7 @@ reportEnergy <- function(gdx, brickSets = NULL, silent = TRUE) {
     collapseDim(dim = "qty")
 
   # carrier dimension needed to report carriers
-  hsCarrier <- readGdxSymbol(gdx, "hsCarrier",
-                             asMagpie = FALSE, stringAsFactor = FALSE)
+  hsCarrier <- readGdxSymbol(gdx, "hsCarrier", stringAsFactor = FALSE)
   stock <- .addCarrierDimension(v_stock, hsCarrier)
   stock <- complete_magpie(stock, fill = 0)
 

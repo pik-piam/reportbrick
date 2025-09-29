@@ -3,7 +3,8 @@
 #' @param gdx character, file path to GDX file
 #' @param symbol character, name of gams object
 #' @param field character, field to read (only relevant for variables)
-#' @param asMagpie boolean, return Magpie object
+#' @param asMagpie boolean, return Magpie object. By default (\code{NULL}),
+#'   variables are reported as mapgie and sets as data frames
 #' @param stringAsFactor logical, keep default factors from gams
 #' @param removeDescription logical, if TRUE, the description column of set
 #'   records (element_text) is removed
@@ -15,7 +16,7 @@
 #' @importFrom dplyr select rename %>% all_of
 #' @importFrom magclass as.magpie
 #'
-readGdxSymbol <- function(gdx, symbol, field = "level", asMagpie = TRUE,
+readGdxSymbol <- function(gdx, symbol, field = "level", asMagpie = NULL,
                           stringAsFactor = TRUE, removeDescription = TRUE) {
 
   allFields <- c("level", "marginal", "lower", "upper", "scale")
@@ -54,6 +55,9 @@ readGdxSymbol <- function(gdx, symbol, field = "level", asMagpie = TRUE,
   # remove columns
   switch(class(obj)[1],
     Variable = {
+      if (is.null(asMagpie)) {
+        asMagpie <- TRUE
+      }
       data <- data %>%
         select(-all_of(setdiff(allFields, field))) %>%
         rename(value = field) %>%
@@ -68,6 +72,11 @@ readGdxSymbol <- function(gdx, symbol, field = "level", asMagpie = TRUE,
         warning("Sets are not reported as Magpie object.")
       }
       asMagpie <- FALSE
+    },
+    {
+      if (is.null(asMagpie)) {
+        asMagpie <- TRUE
+      }
     }
   )
 

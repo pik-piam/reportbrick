@@ -105,10 +105,10 @@ showMatchingComparison <- function(path, showTitles = TRUE) {
   v_refValsBasic <- readGdxSymbol(gdx, "v_refValsBasic", asMagpie = FALSE)
   p_refWeight <- readGdxSymbol(gdx, "p_refWeight", asMagpie = FALSE)
 
-  refs <- readGdxSymbol(gdx, "ref", asMagpie = FALSE, stringAsFactor = FALSE, removeDescription = FALSE)
-  refsRel <- readGdxSymbol(gdx, "refRel", asMagpie = FALSE, stringAsFactor = FALSE)[[1]]
-  refVarBasic <- readGdxSymbol(gdx, "refVarBasic", asMagpie = FALSE)
-  refVarConsidered <- readGdxSymbol(gdx, "refVarConsidered", asMagpie = FALSE)
+  refs <- readGdxSymbol(gdx, "ref", stringAsFactor = FALSE, removeDescription = FALSE)
+  refsRel <- readGdxSymbol(gdx, "refRel", stringAsFactor = FALSE)[[1]]
+  refVarBasic <- readGdxSymbol(gdx, "refVarBasic")
+  refVarConsidered <- readGdxSymbol(gdx, "refVarConsidered")
 
 
 

@@ -8,7 +8,7 @@ readGdxSymbol(
   gdx,
   symbol,
   field = "level",
-  asMagpie = TRUE,
+  asMagpie = NULL,
   stringAsFactor = TRUE,
   removeDescription = TRUE
 )
@@ -20,7 +20,8 @@ readGdxSymbol(
 
 \item{field}{character, field to read (only relevant for variables)}
 
-\item{asMagpie}{boolean, return Magpie object}
+\item{asMagpie}{boolean, return Magpie object. By default (\code{NULL}),
+variables are reported as mapgie and sets as data frames}
 
 \item{stringAsFactor}{logical, keep default factors from gams}
 
