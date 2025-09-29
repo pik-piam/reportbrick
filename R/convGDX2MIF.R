@@ -64,8 +64,12 @@ convGDX2MIF <- function(gdx,
   output <- mbind(output, extendPeriods(reportConstruction(gdx, brickSets, silent = silent), t))
 
   ## Renovation BS ====
-  message("running reportRenovation for building shell ...")
-  output <- mbind(output, extendPeriods(reportRenovation(gdx, "bs", brickSets, silent = silent), t))
+  if (all(readGdxSymbol(gdx, "renAllowedBS")$bsr == "0")) {
+    message("skip reportRenovation for building shell ...")
+  } else {
+    message("running reportRenovation for building shell ...")
+    output <- mbind(output, extendPeriods(reportRenovation(gdx, "bs", brickSets, silent = silent), t))
+  }
 
   ## Renovation HS ====
   message("running reportRenovation for heating system ...")
