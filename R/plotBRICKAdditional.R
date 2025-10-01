@@ -18,6 +18,14 @@
 #' @param outName character, string added to the pdf file name and names of additionally saved plots
 #' @param scenNames character vector, scenario names for different paths.
 #'  Needs to be specified if \code{path} is unnamed and contains more than one element.
+#' @param regionHandling character, indication of how to handle the region dimensions. Available options:
+#'   - \code{"all"}: Take into account all regions for the report. With more than one region, this is
+#'     only available for \code{plotsCalibration.Rmd}. If this option is chosen for \code{plotsLcc.Rmd}
+#'     with more than one region, this parameter is reset to \code{"separate"}.
+#'   - \code{"separate"}: Produce a separate report for each region. This is the recommended setting
+#'     to analyse all regions with \code{plotsLcc.Rmd}.
+#'   - \code{"<character vector of regions>}: Only include the given regions in the report.
+#'     For \code{plotsLcc.Rmd}, a separate report is generated for each region.
 #'
 #' @author Ricarda Rosemann
 #'
@@ -27,7 +35,7 @@
 
 plotBRICKAdditional <- function(path = ".", file = NULL,
                                 plottingRoutine = "plotsCalibration.Rmd",
-                                outName = "", scenNames = NULL) {
+                                outName = "", scenNames = NULL, regionHandling = "all") {
 
   docTitles <- c(plotsCalibration.Rmd = "BRICK Calibration Report",
                  plotsLcc.Rmd = "BRICK Analysis report",
@@ -57,29 +65,58 @@ plotBRICKAdditional <- function(path = ".", file = NULL,
 
   if (is.null(file)) file <- paste0(allFiles[plottingRoutine], ".csv")
 
-  # Assemble the parameters to be passed to the markdown file
-  yamlParams <- list(
-    path = normalizePath(path),
-    file = file,
-    docTitle = paste(docTitles[plottingRoutine], paste(scenario, collapse = " - ")),
-    scenNames = scenNames
-  )
-
   # All output will be stored in the first directory passed
   finalOutputDir <- unname(path[1])
 
   # Copy markdown file to the final output directory
-  file.copy(
-            getSystemFile("plotsAdditional", plottingRoutine,
+  file.copy(getSystemFile("plotsAdditional", plottingRoutine,
                           package = "reportbrick"),
             finalOutputDir, overwrite = TRUE)
 
-  # Call the Rmd file
-  render(
-    file.path(finalOutputDir, plottingRoutine),
-    output_dir = finalOutputDir,
-    output_file = paste0(allFiles[[plottingRoutine]], outName, ".pdf"),
-    output_format = "pdf_document",
-    params = yamlParams
-  )
+  # Read available regions from config
+  configRegions <- yaml::read_yaml(file.path(path, "config", "config_COMPILED.yaml"))[["regions"]]
+
+  # Apply region handling
+  if (grepl("plotsLcc", plottingRoutine) && identical(regionHandling, "all") && length(configRegions) > 1) {
+    message("Region handling was set to 'all' for 'plotsLcc', but the data in ", path,
+            " contains more than one region. Using the 'separate' region handling instead.")
+    regionHandling <- "separate"
+  }
+
+  addRegionToName <- FALSE
+  if (identical(regionHandling, "separate")) {
+    regionSeq <- configRegions
+    addRegionToName <- TRUE
+  } else if (length(regionHandling) > 1 && identical(plottingRoutine, "plotsCalibration.Rmd")) {
+    regionSeq <- list(regionHandling)
+  } else {
+    if (length(regionHandling) > 1) {
+      message("Region handling contains more than one region. 'plotsLcc' can only handle one region. ",
+              "A separate report is generated for each region.")
+    }
+    regionSeq <- regionHandling
+    addRegionToName <- !identical(regionHandling, "all")
+  }
+
+  for (reg in regionSeq) {
+    # Assemble the parameters to be passed to the markdown file
+    yamlParams <- list(
+      path = normalizePath(path),
+      file = file,
+      docTitle = paste(docTitles[plottingRoutine], paste(scenario, collapse = " - ")),
+      scenNames = scenNames,
+      region = reg
+    )
+
+    name <- if (isTRUE(addRegionToName)) paste(outName, "reg", reg, sep = "_") else outName
+
+    # Call the Rmd file
+    render(
+      file.path(finalOutputDir, plottingRoutine),
+      output_dir = finalOutputDir,
+      output_file = paste0(allFiles[[plottingRoutine]], name, ".pdf"),
+      output_format = "pdf_document",
+      params = yamlParams
+    )
+  }
 }

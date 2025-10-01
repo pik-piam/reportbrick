@@ -10,7 +10,6 @@ showAnalysisPlot(
   varName,
   yname,
   color = NULL,
-  linetype = NULL,
   facets = c("loc", "typ"),
   rprt = NULL,
   avg = NULL,
@@ -21,9 +20,9 @@ showAnalysisPlot(
   xlabName = NULL,
   ylabName = NULL,
   tmpl = NULL,
-  addPoints = NULL,
   filterRows = list(hs = "h2bo", hsr = "h2bo"),
-  valueCap = Inf
+  valueCap = Inf,
+  ...
 )
 }
 \arguments{
@@ -37,8 +36,6 @@ Needs to be one of \code{line}, \code{bar} or \code{twoBar}.}
 \item{yname}{character, column to be used as y-aesthetic}
 
 \item{color}{character, column to be used as color aesthetic}
-
-\item{linetype}{character, column to be used as linetype aesthetic}
 
 \item{facets}{character, columns to be used as facets.
 Can either be one or two columns.}
@@ -60,6 +57,8 @@ from the plots shown}
 \item{ylabName}{character, y-axis label}
 
 \item{tmpl}{character, name or path to reportbrick reporting template.}
+
+\item{linetype}{character, column to be used as linetype aesthetic}
 }
 \description{
 Framework to create various plots required for the LCC analysis.

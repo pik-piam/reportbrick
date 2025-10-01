@@ -18,9 +18,6 @@
 #' @importFrom tidyr crossing pivot_wider replace_na
 #' @importFrom utils read.csv write.csv
 #'
-
-#TODO: Proper handling of building shell!!! (Ignored for the time being)
-
 reportLCCShare <- function(path, gdxName = "output.gdx", filterFullRen = list(vin = "1980-1989", ttotIn = 2005)) {
 
   gdx <- file.path(path, gdxName)
@@ -395,6 +392,51 @@ reportLCCShare <- function(path, gdxName = "output.gdx", filterFullRen = list(vi
   out[["renBrickAll"]] <- aggregateShare(renBrickFull, weight = v_renovationIn)
 
 
+  # LINEARIZED LOGISTIC MODEL --------------------------------------------------
+
+  # Ratio of all renovation inflows w.r.t to the gabo inflow
+  hsNames <- unique(v_renovationIn$hs)
+  out[["renInRatioGabo"]] <- v_renovationIn %>%
+    pivot_wider(names_from = "hs") %>%
+    mutate(across(setdiff(hsNames, "gabo"), ~ log(.x / .data$gabo))) %>%
+    pivot_longer(cols = setdiff(hsNames, "gabo"), names_to = "hs") %>%
+    select(-"gabo")
+
+  # Difference in LCC w.r.t to the gabo value
+  out[["renLccDiffGabo"]] <- out[["renLccMixed"]] %>%
+    group_by(across(-all_of(c("costType", "value")))) %>%
+    summarise(value = sum(.data$value), .groups = "drop") %>%
+    pivot_wider(names_from = "hs") %>%
+    mutate(across(setdiff(hsNames, "gabo"), ~ .x - .data$gabo)) %>%
+    pivot_longer(cols = setdiff(hsNames, "gabo"), names_to = "hs") %>%
+    select(-"gabo")
+
+  out[["renInRatioGaboFull"]] <- v_renovation %>%
+    rename(ttotIn = "ttot") %>%
+    filter(.data$hsr != "0") %>%
+    pivot_wider(names_from = "hsr") %>%
+    mutate(across(
+      setdiff(hsNames, "gabo"),
+      ~ ifelse(.x == 0 | .data$gabo == 0, NA, log(.x / .data$gabo)))
+    ) %>%
+    pivot_longer(cols = setdiff(hsNames, "gabo"), names_to = "hsr") %>%
+    select(-"gabo")
+
+  # Difference in LCC w.r.t to the gabo value
+  out[["renLccDiffGaboFull"]] <- renLccMixedFull %>%
+    group_by(across(-all_of(c("costType", "value")))) %>%
+    summarise(value = sum(.data$value), .groups = "drop") %>%
+    pivot_wider(names_from = "hsr") %>%
+    mutate(across(setdiff(hsNames, "gabo"), ~ .x - .data$gabo)) %>%
+    pivot_longer(cols = setdiff(hsNames, "gabo"), names_to = "hsr") %>%
+    select(-"gabo")
+
+  # Price sensitivity
+  out <- c(
+    out,
+    lapply(stats::setNames(priceSensBs, c("conPriceSensBS", "renPriceSensBS")), function(x) data.frame(value = x)),
+    lapply(stats::setNames(priceSensHs, c("conPriceSensHS", "renPriceSensHS")), function(x) data.frame(value = x))
+  )
 
   # NORMALIZE PRICE SENSITIVITY ------------------------------------------------
 
@@ -531,24 +573,4 @@ reportLCCShare <- function(path, gdxName = "output.gdx", filterFullRen = list(vi
       rbind(dfFiltered)
   }
   if (is.null(filterVals)) df else unique(dfFiltered)
-}
-
-#' Extend dimensions of a data frame by adding NA entries, add variable name
-#' Code duplicate from reportCalibration.R
-#'
-#' @param df data frame to be extended
-#' @param varName character, variable name to be added
-#' @param allSets character, sets that need to be included as column names
-#' @returns data frame
-#'
-#' @importFrom dplyr %>% mutate last_col relocate
-
-.expandDims <- function(df, varName, allSets) {
-
-  # Add missing columns with NA entries
-  df[setdiff(allSets, colnames(df))] <- NA
-
-  # Add variable name as first column
-  df <- df %>%
-    mutate(variable = varName, .before = 1)
 }

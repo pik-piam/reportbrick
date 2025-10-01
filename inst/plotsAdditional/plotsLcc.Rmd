@@ -9,10 +9,11 @@ output:
 params:
     docTitle: "BRICK Analysis report"
     file: "BRICK_analysis_report.csv"
-    path: "C:/Users/ricardar/Documents/Results/BRICK/calibration-tests/regionEU9/calibration-DEU_2025-09-11_11.15.36/"
+    path: "C:/Users/ricardar/Documents/Results/BRICK/ECEMP-runs/WithConstruction/calibration_2025-10-14_17.22.25/"
     scenNames: NULL
     savePlots: TRUE
     name: ""
+    region: "all"
 ---
 
 ```{r setup, include=FALSE}
@@ -53,8 +54,11 @@ outPath <- dirname(filePath[1])
 ```
 
 ```{r Read in data}
-data <- utils::read.csv(filePath) %>%
-  filter(typ == "Res") # Temporary
+dataTmp <- utils::read.csv(filePath)
+data <- dataTmp %>%
+  filter(typ == "Res" | is.na(typ)) # Temporary
+
+if (!identical(params$region, "all")) data <- filter(data, .data$region %in% c(params$region, NA))
 ```
 
 # Lifetime distribution estimates
@@ -83,9 +87,10 @@ showAnalysisPlot("twoBar", data, c("stockInitLtMixed", "stockInitLtAnte"), yname
 ```{r Plot mixed leave time of initial stock, remaining share}
 
 showAnalysisPlot("line", data, c("stockInitLtMixedRemain", "stockWbRemain"),
-                 yname = "relVal", color = "hs", linetype = "variable", rprt = "vin",
+                 yname = "relVal", color = "hs", rprt = "vin",
                  suppressLateTtot = FALSE,
-                 xlabName = "Time", ylabName = "Share of remaining floorspace", tmpl = tmpl)
+                 xlabName = "Time", ylabName = "Share of remaining floorspace", tmpl = tmpl,
+                 linetype = "variable")
 
 ```
 
@@ -113,8 +118,9 @@ showAnalysisPlot("twoBar", data, c("conLtMixed", "conLtAnte"), yname = "absVal",
 ```{r Plot mixed leave time of construction, remaining share}
 
 showAnalysisPlot("line", data, c("conLtMixedRemain", "wbRemain"), yname = "relVal",
-                 color = "hs", linetype = "variable", rprt = "ttotIn",
-                 xlabName = "Time", ylabName = "Share of remaining floorspace", tmpl = tmpl)
+                 color = "hs", rprt = "ttotIn",
+                 xlabName = "Time", ylabName = "Share of remaining floorspace", tmpl = tmpl,
+                 linetype = "variable")
 
 ```
 
@@ -127,7 +133,7 @@ showAnalysisPlot("line", data, c("conLtMixedRemain", "wbRemain"), yname = "relVa
 showAnalysisPlot("bar", data, "renLtMixed", yname = "absVal", color = "hs", rprt = "ttotIn",
                  xlabName = "Time of removal", ylabName = "Quantity in million m2", tmpl = tmpl)
 
-showAnalysisPlot("bar", data %>% filter(vin == "1970-1979"), "renLtMixed", yname = "absVal", color = "hs", rprt = "ttotIn",
+showAnalysisPlot("bar", data %>% filter(vin == "1980-1989"), "renLtMixed", yname = "absVal", color = "hs", rprt = "ttotIn",
                  xlabName = "Time of removal", ylabName = "Quantity in million m2", tmpl = tmpl)
 
 showAnalysisPlot("bar", data %>% filter(ttotIn == 2005), "renLtMixed", yname = "absVal", color = "hs", rprt = "vin",
@@ -150,8 +156,9 @@ showAnalysisPlot("twoBar", data, c("renLtMixed", "renLtAnte"), yname = "absVal",
 ```{r Plot mixed leave time of renovations, relative values}
 
 showAnalysisPlot("line", data, c("renLtMixedRemain", "wbRemain"), yname = "relVal",
-                 color = "hs", linetype = "variable", rprt = c("vin", "ttotIn"),
-                 xlabName = "Time", ylabName = "Share of remaining floorspace", tmpl = tmpl)
+                 color = "hs", rprt = c("vin", "ttotIn"),
+                 xlabName = "Time", ylabName = "Share of remaining floorspace", tmpl = tmpl,
+                 linetype = "variable")
 
 ```
 
@@ -183,20 +190,40 @@ showAnalysisPlot("bar", data, "conLccMixedScaled",
 
 ## LCC of renovation with mixed lifetimes
 
+### Averaged across initial heating systems
+
 ```{r Plot LCC of renovation with mixed lifetimes}
-showAnalysisPlot("bar", data, "renLccMixed",
+showAnalysisPlot("bar", data, c("renLccMixed", "renBrickAll"),
                  xname = "hs", yname = "value", color = "costType", rprt = c("ttotIn", "typ", "loc"),
                  facets = "vin", xlabName = "Heating System", ylabName = "Costs in USD/m2", tmpl = tmpl,
-                 addPoints = list(variable = "renBrickAll", yname = "value", y2labName = "Brick Share"),
-                 valueCap = 1000)
+                 valueCap = 1500,
+                 addPoints = list(variable = "renBrickAll", yname = "value", y2labName = "Brick Share"))
 ```
 
+```{r Plot LCC of renovation with mixed lifetimes, no facets}
+showAnalysisPlot("bar", data %>% filter(.data$ttotIn == 2005 | vin == "1980-1989"), c("renLccMixed", "renBrickAll"),
+                 xname = "hs", yname = "value", color = "costType", rprt = c("vin", "ttotIn", "typ", "loc"),
+                 facets = NULL, xlabName = "Heating System", ylabName = "Costs in USD/m2", tmpl = tmpl,
+                 valueCap = 1500,
+                 addPoints = list(variable = "renBrickAll", yname = "value", y2labName = "Brick Share"))
+```
+
+### At full resolution
+
 ```{r Plot LCC of renovation with mixed lifetimes, full}
-showAnalysisPlot("bar", data, "renLccMixedFull",
+showAnalysisPlot("bar", data, c("renLccMixedFull", "renBrickFull"),
                  xname = "hsr", yname = "value", color = "costType", rprt = c("vin", "ttotIn", "typ", "loc"),
                  facets = "hs", xlabName = "Heating System", ylabName = "Costs in USD/m2", tmpl = tmpl,
-                 addPoints = list(variable = "renBrickFull", yname = "value", y2labName = "Brick Share"),
-                 valueCap = 1000)
+                 valueCap = 1500,
+                 addPoints = list(variable = "renBrickFull", yname = "value", y2labName = "Brick Share"))
+```
+
+```{r Plot LCC of renovation with mixed lifetimes, full, only hs gabo}
+showAnalysisPlot("bar", data %>% filter(.data$hs == "gabo"), c("renLccMixedFull", "renBrickFull"),
+                 xname = "hsr", yname = "value", color = "costType", rprt = c("vin", "ttotIn", "typ", "loc"),
+                 facets = NULL, xlabName = "Heating System", ylabName = "Costs in USD/m2", tmpl = tmpl,
+                 valueCap = 1500,
+                 addPoints = list(variable = "renBrickFull", yname = "value", y2labName = "Brick Share"))
 ```
 
 ## LCC of renovation with mixed lifetimes, matrix charts
@@ -206,14 +233,14 @@ showAnalysisPlot("pieChart", data, "renLccMixedFull",
                  xname = "hs", yname = "hsr", valueName = "value", color = "costType",
                  rprt = c("vin", "ttotIn", "typ", "loc"),
                  facets = NULL, xlabName = "Original Heating System", ylabName = "Final heating system", tmpl = tmpl,
-                 valueCap = 1000)
+                 valueCap = 1500)
 ```
 
 ```{r Plot renovation LCC, mixed lt as heat map matrix}
 showAnalysisPlot("heatMap", data, "renLccMixedFull",
                  xname = "hs", yname = "hsr", valueName = "value", rprt = c("vin", "ttotIn", "typ", "loc"),
                  facets = NULL, xlabName = "Original Heating System", ylabName = "Final heating system", tmpl = tmpl,
-                 valueCap = 1000)
+                 valueCap = 1500)
 ```
 
 # Levelized costs of heat (LCOH)
@@ -228,20 +255,40 @@ showAnalysisPlot("bar", data, "conLcohMixed",
 
 ## LCOH of renovation with mixed lifetimes
 
+### Averaged across initial heating systems
+
 ```{r Plot LCOH of renovation with mixed lifetimes}
-showAnalysisPlot("bar", data, "renLcohMixed",
+showAnalysisPlot("bar", data, c("renLcohMixed", "renBrickAll"),
                  xname = "hs", yname = "value", color = "costType", rprt = c("ttotIn", "typ", "loc"),
                  facets = "vin", xlabName = "Heating System", ylabName = "Costs in US Cents/kWh", tmpl = tmpl,
-                 addPoints = list(variable = "renBrickAll", yname = "value", y2labName = "Brick Share"),
-                 valueCap = 200)
+                 valueCap = 300,
+                 addPoints = list(variable = "renBrickAll", yname = "value", y2labName = "Brick Share"))
 ```
 
+```{r Plot LCOH of renovation with mixed lifetimes, no facets}
+showAnalysisPlot("bar", data %>% filter(.data$ttotIn == 2005 | vin == "1980-1989"), c("renLcohMixed", "renBrickAll"),
+                 xname = "hs", yname = "value", color = "costType", rprt = c("vin", "ttotIn", "typ", "loc"),
+                 facets = NULL, xlabName = "Heating System", ylabName = "Costs in US Cents/kWh", tmpl = tmpl,
+                 valueCap = 300,
+                 addPoints = list(variable = "renBrickAll", yname = "value", y2labName = "Brick Share"))
+```
+
+### At full resolution
+
 ```{r Plot LCOH of renovation with mixed lifetimes by hs x hsr}
-showAnalysisPlot("bar", data, "renLcohMixedFull",
+showAnalysisPlot("bar", data, c("renLcohMixedFull", "renBrickFull"),
                  xname = "hsr", yname = "value", color = "costType", rprt = c("vin", "ttotIn", "typ", "loc"),
                  facets = "hs", xlabName = "Heating System", ylabName = "Costs in US Cents/kWh", tmpl = tmpl,
-                 addPoints = list(variable = "renBrickFull", yname = "value", y2labName = "Brick Share"),
-                 valueCap = 200)
+                 valueCap = 300,
+                 addPoints = list(variable = "renBrickFull", yname = "value", y2labName = "Brick Share"))
+```
+
+```{r Plot LCOH of renovation with mixed lifetimes by hsr, filter gabo}
+showAnalysisPlot("bar", data %>% filter(.data$hs == "gabo"), c("renLcohMixedFull", "renBrickFull"),
+                 xname = "hsr", yname = "value", color = "costType", rprt = c("vin", "ttotIn", "typ", "loc"),
+                 facets = NULL, xlabName = "Heating System", ylabName = "Costs in US Cents/kWh", tmpl = tmpl,
+                 valueCap = 300,
+                 addPoints = list(variable = "renBrickFull", yname = "value", y2labName = "Brick Share"))
 ```
 
 ## LCOH of renovation with mixed lifetimes, matrix charts
@@ -251,7 +298,7 @@ showAnalysisPlot("pieChart", data, "renLcohMixedFull",
                  xname = "hs", yname = "hsr", color = "costType", valueName = "value",
                  rprt = c("vin", "ttotIn", "typ", "loc"),
                  facets = NULL, xlabName = "Original Heating System", ylabName = "Final heating system", tmpl = tmpl,
-                 valueCap = 200)
+                 valueCap = 300)
 ```
 
 ```{r Plot renovation LCOH, mixed lt as heat map}
@@ -259,7 +306,7 @@ showAnalysisPlot("heatMap", data, "renLcohMixedFull",
                  xname = "hs", yname = "hsr", valueName = "value",
                  rprt = c("vin", "ttotIn", "typ", "loc"),
                  facets = NULL, xlabName = "Original Heating System", ylabName = "Final heating system", tmpl = tmpl,
-                 valueCap = 200)
+                 valueCap = 300)
 ```
 
 # Logit shares compared to Brick shares
@@ -288,4 +335,24 @@ showAnalysisPlot("twoBar", data, c("renLogitEl1Mixed", "renBrickEl1"),
 showAnalysisPlot("twoBar", data, c("renLogitMixedFull", "renBrickFull"),
                  yname = "value", xname = "hs", color = "hsr", rprt = c("vin", "ttotIn"),
                  xlabName = "Previous heating system", ylabName = "Shares", tmpl = tmpl)
+```
+
+# Heating system ratio by LCC differences
+
+```{r Plot hs ratio by lcc difference}
+slopeRenHS <- - data$value[data$variable == "renPriceSensHS"]
+showAnalysisPlot("scatter", data, c("renInRatioGabo", "renLccDiffGabo"),
+                 yname = "renInRatioGabo", xname = "renLccDiffGabo", valueName = "value",
+                 color = "hs", rprt = c("vin"),
+                 xlabName = "Difference of LCC with gas heater",
+                 ylabName = "Log ratio of renovated floorspace w.r.t to gas heaters",
+                 tmpl = tmpl, shape = "ttotIn", slope = slopeRenHS, fitLinear = TRUE)
+```
+
+```{r Plot hs ratio by lcc difference, full resolution}
+showAnalysisPlot("scatter", data, c("renInRatioGaboFull", "renLccDiffGaboFull"),
+                 yname = "renInRatioGaboFull", xname = "renLccDiffGaboFull", valueName = "value",
+                 xlabName = "Difference of LCC with gas heater",
+                 ylabName = "Log ratio of renovated floorspace w.r.t to gas heaters",
+                 color = "hsr", rprt = c("vin"), tmpl = tmpl, shape = "ttotIn", slope = slopeRenHS, fitLinear = TRUE)
 ```
