@@ -29,41 +29,70 @@
 #' @param tmpl character, name or path to reportbrick reporting template.
 #'
 #' @importFrom dplyr %>% .data across all_of any_of cur_column filter group_by lag mutate
-#'   pull rename_with select summarise ungroup
+#'   pull rename_with select slice_max slice_min summarise ungroup
 #' @importFrom ggplot2 aes coord_fixed facet_grid element_text facet_wrap geom_col geom_line ggplot
 #'   ggtitle scale_alpha_manual scale_color_manual scale_fill_manual sym theme vars xlab ylab
 #' @importFrom tidyr crossing pivot_longer
 #'
-showAnalysisPlot <- function(plotType, data, varName, yname, color = NULL,
-                             linetype = NULL, facets = c("loc", "typ"),
+showAnalysisPlot <- function(plotType, data, varName, yname, color = NULL, facets = c("loc", "typ"),
                              rprt = NULL, avg = NULL, remCols = NULL,
                              xname = "ttotOut", valueName = yname, suppressLateTtot = TRUE,
                              xlabName = NULL, ylabName = NULL, tmpl = NULL,
-                             addPoints = NULL, filterRows = list(hs = "h2bo", hsr = "h2bo"),
-                             valueCap = Inf) {
+                             filterRows = list(hs = "h2bo", hsr = "h2bo"),
+                             valueCap = Inf, ...) {
 
 
 
   # Functions ------------------------------------------------------------------
 
   # Remove columns without data
-  .removeEmptyCols <- function(plData) {
+  .removeEmptyCols <- function(plData, keepCols = NULL) {
     plData %>%
-      select(where(~ !all(is.na(.))))
+      select(keepCols, where(~ !all(is.na(.))))
+  }
+
+  # Additional scatter plot
+  .addLtPoint <- function(pl, plDataMain, plDataAdd, xname, yname, y2labName) {
+
+    scaleFactor <- max(plDataMain[[yname]]) / max(plDataAdd[[yname]])
+
+    pl + geom_point(
+      data = plDataAdd,
+      mapping = aes(x = .data[[xname]], y = .data[[yname]] * scaleFactor),
+      color = "black",
+      show.legend = FALSE,
+      inherit.aes = FALSE
+    ) +
+      scale_y_continuous(
+        sec.axis = sec_axis(~ . / scaleFactor, name = y2labName)
+      ) +
+      theme(
+        axis.title.y.right = element_text(angle = 90)
+      )
   }
 
   # Bar plot
-  .createLtBar <- function(plData, xname, yname, color) {
+  .createLtBar <- function(plData, xname, yname, color, addPoints = NULL) {
+    if (!is.null(addPoints)) {
+      plDataMain <- plData %>%
+        filter(.data$variable != addPoints$variable)
+      plDataAdd <- plData %>%
+        filter(.data$variable == addPoints$variable) %>%
+        .removeEmptyCols()
+    } else {
+      plDataMain <- plData
+    }
+
     alphaMap <- c(`FALSE` = 1, `TRUE` = 0.3)
 
-    maxYlim <- plData %>%
+    maxYlim <- plDataMain %>%
       filter(!.data$exceedCap) %>%
       group_by(across(-all_of(c(color, "exceedCap", yname)))) %>%
       summarise(value = sum(.data[[yname]])) %>%
       pull("value") %>%
       max()
 
-    plData <- plData %>%
+    plDataMain <- plDataMain %>%
       group_by(across(-all_of(c(color, "exceedCap", yname)))) %>%
       mutate(value = ifelse(
         .data$exceedCap,
@@ -71,11 +100,17 @@ showAnalysisPlot <- function(plotType, data, varName, yname, color = NULL,
         .data[[yname]]
       ))
 
-    plData %>%
+    pl <- plDataMain %>%
       .removeEmptyCols() %>%
       ggplot(mapping = aes(x = !!sym(xname), y = .data$value, fill = !!sym(color), alpha = .data[["exceedCap"]])) +
       geom_col() +
       scale_alpha_manual(values = alphaMap, guide = "none")
+
+    if (!is.null(addPoints) && nrow(plDataAdd) > 0) {
+      pl <- .addLtPoint(pl, plDataMain, plDataAdd, xname, yname, addPoints$y2labName)
+    }
+
+    pl
   }
 
   .computeResolution <- function(v, default = 10) {
@@ -151,6 +186,77 @@ showAnalysisPlot <- function(plotType, data, varName, yname, color = NULL,
         linetype = .data[[linetype]]),
         linewidth = 1
       )
+  }
+
+  .addLinearReg <- function(pl, plData, xname, yname) {
+    modelData <- plData %>%
+      mutate(x = .data[[xname]], y = .data[[yname]], .keep = "none")
+    linearModel <- lm(y ~ x, modelData)
+
+    lineData <- data.frame(
+      x = seq(min(plData[[xname]]), max(plData[[xname]])),
+      slopeX = summary(linearModel)$coefficients["x", "Estimate"],
+      rSquared = summary(linearModel)$r.squared
+    )
+    lineData <- lineData %>%
+      mutate(y = predict(linearModel, lineData))
+
+    labelPoint <- lineData %>%
+      slice_max(order_by = x, n = 1)
+
+    lab <- paste0(
+      "atop(lambda == ", -signif(labelPoint$slopeX, 2),
+      ", R^2 == ", signif(labelPoint$rSquared, 2), ")"
+    )
+
+    pl +
+      geom_line(mapping = aes(x = .data$x, y = .data$y), data = lineData) +
+      geom_text(mapping = aes(x = .data$x, y = .data$y),
+                data = labelPoint,
+                label = lab,
+                parse = TRUE, size = 3, hjust = 1.1, vjust = 1.1)
+
+  }
+
+  # Scatter plot
+  .createScatter <- function(plData, xname, yname, color, shape, slope = NULL, fitLinear = FALSE) {
+    plData <- plData %>%
+      .removeEmptyCols(keepCols = c(xname, yname)) %>%
+      filter(is.finite(.data[[xname]]), is.finite(.data[[yname]])) %>%
+      mutate(across(shape, as.factor))
+
+    pl <- plData %>%
+      ggplot() +
+      geom_point(mapping = aes(
+        x = .data[[xname]],
+        y = .data[[yname]],
+        color = .data[[color]],
+        shape = .data[[shape]]
+      )) +
+      scale_shape_manual(values = 0:(length(levels(plData[[shape]])) - 1))
+
+    if (!is.null(slope)) {
+      lineData <- data.frame(
+        x = seq(min(plData[[xname]]), max(plData[[xname]]))
+      ) %>%
+        mutate(y = slope * .data$x)
+
+      labelPoint <- lineData %>%
+        slice_min(order_by = x, n = 1)
+
+      lab <- paste0("lambda == ", -slope)
+
+      pl <- pl +
+        geom_line(data = lineData, mapping = aes(x = .data$x, y = .data$y), colour = "#3366FF") +
+        geom_text(mapping = aes(x = .data$x, y = .data$y),
+                  data = labelPoint,
+                  label = lab,
+                  parse = TRUE, size = 3, hjust = 0, vjust = 1.5, colour = "#3366FF")
+    }
+
+    if (isTRUE(fitLinear)) pl <- .addLinearReg(pl, plData, xname, yname)
+
+    pl
   }
 
   # Matrix pie chart
@@ -314,42 +420,24 @@ showAnalysisPlot <- function(plotType, data, varName, yname, color = NULL,
 
   }
 
-  # Additional scatter plot
-  .addLtPoint <- function(pl, plData, mainVar, addVar, xname, yname, y2labName) {
-
-    plDataMain <- filter(plData, .data$variable %in% mainVar, !.data$exceedCap)
-    plDataAdd <- filter(plData, .data$variable == addVar) %>%
-      .removeEmptyCols()
-
-    if (nrow(plDataAdd) == 0) return(NULL)
-
-    scaleFactor <- max(plDataMain[[yname]]) / max(plDataAdd[[yname]])
-
-    pl + geom_point(
-      data = plDataAdd,
-      mapping = aes(x = .data[[xname]], y = .data[[yname]] * scaleFactor),
-      color = "black",
-      show.legend = FALSE,
-      inherit.aes = FALSE
-    ) +
-      scale_y_continuous(
-        sec.axis = sec_axis(~ . / scaleFactor, name = y2labName)
-      ) +
-      theme(
-        axis.title.y.right = element_text(angle = 90)
-      )
-  }
-
 
 
   # Prepare the data -----------------------------------------------------------
 
   plData <- data %>%
-    filter(.data[["variable"]] %in% c(varName, addPoints$variable), !is.na(.data[[yname]])) %>%
+    filter(.data[["variable"]] %in% varName, !is.na(.data[[valueName]])) %>%
     select(-any_of(remCols))
 
   for (nm in names(filterRows)) {
     plData <- filter(plData, !.data[[nm]] %in% filterRows[[nm]])
+  }
+
+  if (all(!c(xname, yname) %in% colnames(plData)) && all(c(xname, yname) %in% plData$variable)) {
+    plData <- plData %>%
+      pivot_wider(names_from = "variable") %>%
+      mutate(variable = yname) %>%
+      rename(value = yname)
+    yname <- "value"
   }
 
   # If any faceting columns are NA for a given variable:
@@ -485,7 +573,8 @@ showAnalysisPlot <- function(plotType, data, varName, yname, color = NULL,
       complete <- TRUE
     }
 
-    if (nrow(plDataFiltered) == 0) next
+    if (nrow(plDataFiltered) == 0
+        || (plotType == "scatter" && length(plDataFiltered[[yname]][!is.na(plDataFiltered[[yname]])]) == 0)) next
 
 
     ## Create the plot according to the plot type ====
@@ -495,9 +584,10 @@ showAnalysisPlot <- function(plotType, data, varName, yname, color = NULL,
 
     pl <- switch(
       plotType,
-      bar = .createLtBar(plDataMain, xname, yname, color),
+      bar = .createLtBar(plDataMain, xname, yname, color, ...),
       twoBar = .createLtTwoBar(plDataMain, varName, xname, yname, color),
-      line = .createLtLine(plDataMain, xname, yname, color, linetype),
+      line = .createLtLine(plDataMain, xname, yname, color, ...),
+      scatter = .createScatter(plDataMain, xname, yname, color, ...),
       pieChart = .createLtPieChart(plDataMain, varName, xname, yname, color,
                                     valueName = valueName),
       barMatrix = .createLtBarChart(plDataMain, varName, xname, yname, color, valueName = valueName),
@@ -508,14 +598,11 @@ showAnalysisPlot <- function(plotType, data, varName, yname, color = NULL,
 
     ## Adjust the plot according to options ====
 
-    if (!is.null(addPoints)) {
-      pl <- .addLtPoint(pl, plDataFiltered, varName, addPoints$variable, xname, yname, addPoints$y2labName)
-    }
     if (is.null(pl)) next
     if (!grepl("ttot", xname)) pl <- pl + theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
     if (length(facets) == 1) pl <- pl + facet_wrap(facets = vars(.data[[facets[1]]]))
     if (length(facets) == 2) pl <- pl + facet_grid(rows = vars(.data[[facets[1]]]), cols = vars(.data[[facets[2]]]))
-    if (!is.null(colorMap) && plotType == "line") {
+    if (!is.null(colorMap) && plotType %in% c("line", "scatter")) {
       pl <- pl + ggplot2::scale_color_manual(values = mip::plotstyle(colorMap))
     } else if (!is.null(colorMap)) {
       pl <- pl + ggplot2::scale_fill_manual(values = mip::plotstyle(colorMap))
