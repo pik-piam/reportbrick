@@ -2,8 +2,8 @@ cff-version: 1.2.0
 message: If you use this software, please cite it using the metadata from this file.
 type: software
 title: 'reportbrick: Reporting package for BRICK'
-version: 0.12.2
-date-released: '2025-09-29'
+version: 0.12.3
+date-released: '2025-10-02'
 abstract: This package contains BRICK-specific routines to report model results. The
   main functionality is to generate a mif-file from a given BRICK model run folder.
 authors:

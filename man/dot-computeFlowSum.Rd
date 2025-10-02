@@ -4,12 +4,16 @@
 \alias{.computeFlowSum}
 \title{Compute the sum of construction and renovation flow values}
 \usage{
-.computeFlowSum(flows)
+.computeFlowSum(flows, squareAndRoot = FALSE)
 }
 \arguments{
 \item{flows}{named list of data frames, each containing flow quantities.
 Entries need to include \code{construction}
-and one entry with \code{renovation} as part of the name.}
+and at least one entry with \code{renovation} as part of the name.}
+
+\item{squareAndRoot}{logical, whether the square should be taken before summing
+and the root afterwards.
+This option should be active if we're summing up roots of summed squares.}
 }
 \value{
 data frame with the sum in the value column

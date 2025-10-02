@@ -11,6 +11,9 @@
 
 \item{removeDims}{character, additional dimensions to be removed from the output}
 }
+\value{
+character with dimension names
+}
 \description{
 Gives the column names of a list of data frames except the first and the last
 one, i.e. \code{qty} and \code{value}.

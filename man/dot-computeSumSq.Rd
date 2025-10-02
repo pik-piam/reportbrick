@@ -2,7 +2,7 @@
 % Please edit documentation in R/reportCalibration.R
 \name{.computeSumSq}
 \alias{.computeSumSq}
-\title{Compute the sum of the squares in a data frame}
+\title{Compute the square root of the sum of the squares in a data frame}
 \usage{
 .computeSumSq(df, rprt = "", addSign = TRUE)
 }
@@ -14,8 +14,8 @@
 \item{addSign}{logical indicating whether the heuristic sign of the square should be computed}
 }
 \value{
-data frame sum of squares as value column
+data frame with the square root of the sum of squares as value column
 }
 \description{
-Compute the sum of the squares in a data frame
+Compute the square root of the sum of the squares in a data frame
 }
