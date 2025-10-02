@@ -676,7 +676,9 @@ reportCalibration <- function(gdx, flowTargets = TRUE) {
   # Pick correct summing function
   sumFunc <- if (isTRUE(squareAndRoot)) {
     function(x) {
-      sqrt(sum(x^2))
+      resPos <- sqrt(sum(x^2))
+      resSign <- sign(sum(sign(x) * x^2))
+      resPos * resSign
     }
   } else {
     sum

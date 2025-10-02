@@ -2,7 +2,7 @@ Type: Package
 Package: reportbrick
 Title: Reporting package for BRICK
 Version: 0.12.3
-Date: 2025-09-30
+Date: 2025-10-02
 Authors@R: c(
     person("Robin", "Hasse", , "robin.hasse@pik-potsdam.de",
            role = c("aut", "cre"),
