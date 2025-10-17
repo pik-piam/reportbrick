@@ -35,7 +35,9 @@ reportCalibration <- function(gdx, flowTargets = TRUE) {
   cfg <- read_yaml(file = file.path(path, "config", "config_COMPILED.yaml"))
 
   # Read relevant time periods
-  tCalib <- cfg[["calibperiods"]]
+  startyear <- cfg[["startyear"]]
+  tCalibAll <- cfg[["calibperiods"]]
+  tCalib <- tCalibAll[tCalibAll >= startyear]
 
   # Read calibration type and whether vintages are aggregated
   calibOptim <- identical(cfg[["switches"]][["RUNTYPE"]], "optimization")
@@ -44,18 +46,18 @@ reportCalibration <- function(gdx, flowTargets = TRUE) {
 
   # Determine relevant variables
   if (isTRUE(cfg[["switches"]][["SEQUENTIALREN"]])) {
-    varAll <- c("stock", "construction", "renovationBS", "renovationHS")
+    varAll <- c("stock", "construction", "demolition", "renovationBS", "renovationHS")
   } else {
-    varAll <- c("stock", "construction", "renovation")
+    varAll <- c("stock", "construction", "demolition", "renovation")
   }
-  varFlow <- setdiff(varAll, "stock")
+  varIntang <- setdiff(varAll, c("stock", "demolition"))
 
   # Exclude renovationHS for computations on building shell
-  varFlowBs <- setdiff(varFlow, "renovationHS")
+  varIntangBs <- setdiff(varIntang, "renovationHS")
 
   # Exclude renovationBS for computations on heating system
   varAllHs <- setdiff(varAll, "renovationBS")
-  varFlowHs <- setdiff(varFlow, "renovationBS")
+  varIntangHs <- setdiff(varIntang, "renovationBS")
 
   # Exclude construction for computations on vintage
   varAllVin <- setdiff(varAll, "construction")
@@ -64,6 +66,7 @@ reportCalibration <- function(gdx, flowTargets = TRUE) {
   namingMap <- c(
     stock = "stock",
     construction = "con",
+    demolition = "dem",
     renovation = "ren",
     renovationBS = "renBS",
     renovationHS = "renHS"
@@ -84,14 +87,14 @@ reportCalibration <- function(gdx, flowTargets = TRUE) {
       stepSize = "stepSizeParamsIter.csv",
       outerObjective = "outerObjectiveAllIter.csv"
     ),
-    diagDevFiles[varFlow]
+    diagDevFiles[varIntang]
   )
 
   diagValNames <- list(
     stepSize = "stepSize",
     outerObjective = "f"
   )
-  diagValNames[varFlow] <- "d"
+  diagValNames[varIntang] <- "d"
 
   diagnosticsExist <- all(file.exists(file.path(path, diagFiles)))
   if (diagnosticsExist) {
@@ -145,7 +148,7 @@ reportCalibration <- function(gdx, flowTargets = TRUE) {
     renovationBS = "p_specCostRenBS",
     renovationHS = "p_specCostRenHS"
   )
-  p_intangCost <- lapply(stats::setNames(nm = varFlow), function(var) {
+  p_intangCost <- lapply(stats::setNames(nm = varIntang), function(var) {
     .readGdxIter(gdx, costSym[[var]],
                  maxIter, asMagpie = FALSE, ttotFilter = tCalib,
                  replaceVar = (identical(var, "construction"))) %>%
@@ -205,7 +208,7 @@ reportCalibration <- function(gdx, flowTargets = TRUE) {
 
     diagnostics <- c(
       diagnostics[c("stepSize", "outerObjective")],
-      lapply(stats::setNames(varFlowHs, paste0(namingMap[varFlowHs], "DescDirHs")), function(var) {
+      lapply(stats::setNames(varIntangHs, paste0(namingMap[varIntangHs], "DescDirHs")), function(var) {
         .computeAvg(diagnostics[[var]],
                     rprt = c("iteration", "region", "typ", "loc", "inc", "hsr", "ttot"),
                     exclude = list(hs = "h2bo", hsr = "h2bo"))
@@ -216,7 +219,7 @@ reportCalibration <- function(gdx, flowTargets = TRUE) {
     diagnostics <- c(
       diagnostics,
       lapply(
-        stats::setNames(paste0(namingMap[varFlowHs], "DescDirHs"), paste0(namingMap[varFlowHs], "DescDirHsLate")),
+        stats::setNames(paste0(namingMap[varIntangHs], "DescDirHs"), paste0(namingMap[varIntangHs], "DescDirHsLate")),
         function(var) {
           diagnostics[[var]] %>%
             filter(.data[["iteration"]] >= floor(0.4 * maxIter))
@@ -230,14 +233,14 @@ reportCalibration <- function(gdx, flowTargets = TRUE) {
   # Specific costs
   out <- c(
     out,
-    lapply(stats::setNames(varFlowBs, paste0(namingMap[varFlowBs], "SpecCostBs")), function(var) {
+    lapply(stats::setNames(varIntangBs, paste0(namingMap[varIntangBs], "SpecCostBs")), function(var) {
       .computeAvg(
         p_intangCost[[var]],
         rprt = c("iteration", "region", "typ", "loc", "inc", "bsr", "ttot"),
         exclude = list(hs = "h2bo", hsr = "h2bo")
       )
     }),
-    lapply(stats::setNames(varFlowHs, paste0(namingMap[varFlowHs], "SpecCostHs")), function(var) {
+    lapply(stats::setNames(varIntangHs, paste0(namingMap[varIntangHs], "SpecCostHs")), function(var) {
       .computeAvg(
         p_intangCost[[var]],
         rprt = c("iteration", "region", "typ", "loc", "inc", "hsr", "ttot"),
@@ -256,7 +259,7 @@ reportCalibration <- function(gdx, flowTargets = TRUE) {
     list(flowHs = .computeFlowSum(
       list(
         construction = brickResTotHs[["construction"]],
-        renovation = brickResTotHs[[grep("renovation($|HS$)", varFlow, value = TRUE)]]
+        renovation = brickResTotHs[[grep("renovation($|HS$)", varIntang, value = TRUE)]]
       )
     ))
   )
@@ -276,26 +279,27 @@ reportCalibration <- function(gdx, flowTargets = TRUE) {
 
   # Across all dimensions
   devAgg <- lapply(deviation, function(dev) {
-    .computeSumSq(dev, rprt = c("iteration", "region", "typ", "loc", "inc"),
+    .computeSumSq(dev, tCalib, rprt = c("iteration", "region", "typ", "loc", "inc"),
                   addSign = FALSE)
   })
   out <- c(
     out,
     stats::setNames(devAgg, paste0(namingMap[varAll], "DevAgg")),
-    list(flowDevAgg = .computeFlowSum(devAgg[varFlow], squareAndRoot = TRUE))
+    list(flowDevAgg = .computeFlowSum(devAgg[varIntang], squareAndRoot = TRUE))
   )
 
   # By heating system (hs)
   devHs <- lapply(deviation[varAllHs], function(dev) {
     .computeSumSq(
       dev,
+      tCalib,
       rprt = c("iteration", "region", "typ", "loc", "inc", "hsr", "ttot")
     )
   })
   out <- c(
     out,
     stats::setNames(devHs, paste0(namingMap[varAllHs], "DevHs")),
-    list(flowDevHs = .computeFlowSum(devHs[varFlowHs], squareAndRoot = TRUE))
+    list(flowDevHs = .computeFlowSum(devHs[varIntangHs], squareAndRoot = TRUE))
   )
 
   # By vintage (vin)
@@ -303,6 +307,7 @@ reportCalibration <- function(gdx, flowTargets = TRUE) {
     devVin <- lapply(deviation[varAllVin], function(dev) {
       .computeSumSq(
         dev,
+        tCalib,
         rprt = c("iteration", "region", "typ", "loc", "inc", "vin", "ttot")
       )
     })
@@ -321,7 +326,7 @@ reportCalibration <- function(gdx, flowTargets = TRUE) {
     lapply(stats::setNames(varAll, paste0(namingMap[varAll], "DevRel")), function(var) {
       .computeRelDev(devAgg[[var]], p_calibTarget[[var]], tCalib)
     }),
-    list(flowDevRel = .computeRelDev(out[["flowDevAgg"]], p_calibTarget[varFlow],
+    list(flowDevRel = .computeRelDev(out[["flowDevAgg"]], p_calibTarget[varIntang],
                                      tCalib))
   )
 
@@ -333,7 +338,7 @@ reportCalibration <- function(gdx, flowTargets = TRUE) {
     }),
     list(flowDevHsRel = .computeRelDev(
       out[["flowDevHs"]],
-      p_calibTarget[varFlowHs],
+      p_calibTarget[varIntangHs],
       tCalib,
       notInTargetGrp = "hsr"
     ))
@@ -572,6 +577,7 @@ reportCalibration <- function(gdx, flowTargets = TRUE) {
 #' Compute the square root of the sum of the squares in a data frame
 #'
 #' @param df data frame, containing the data to be evaluated
+#' @param tCalib numeric, time periods the model was calibrated on
 #' @param rprt character, column names for which the sum of the squares should be reported separately
 #' @param addSign logical indicating whether the heuristic sign of the square should be computed
 #'
@@ -579,9 +585,10 @@ reportCalibration <- function(gdx, flowTargets = TRUE) {
 #'
 #' @importFrom dplyr %>% across all_of any_of .data group_by rename_with summarise ungroup
 #'
-.computeSumSq <- function(df, rprt = "", addSign = TRUE) {
+.computeSumSq <- function(df, tCalib, rprt = "", addSign = TRUE) {
 
   df %>%
+    filter(.data$ttot %in% tCalib) %>%
     mutate(sgn = if (isTRUE(addSign)) sign(.data[["value"]]) else 1) %>%
     group_by(across(any_of(rprt))) %>%
     summarise(valuePos = sum(.data[["value"]] ^ 2, na.rm = TRUE),
@@ -616,11 +623,7 @@ reportCalibration <- function(gdx, flowTargets = TRUE) {
   if (is.data.frame(dfTarget)) dfTarget <- list(dfTarget)
 
   # Compute the sum of the squares for target data
-  dfTargetSumList <- lapply(dfTarget, function(df) {
-    df %>%
-      filter(.data[["ttot"]] %in% tCalib) %>%
-      .computeSumSq(rprt = rprt, addSign = FALSE)
-  })
+  dfTargetSumList <- lapply(dfTarget, .computeSumSq, tCalib = tCalib, rprt = rprt, addSign = FALSE)
 
   if (length(dfTargetSumList) == 1) {
     dfTargetSum <- dfTargetSumList[[1]] %>%

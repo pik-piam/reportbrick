@@ -10,7 +10,7 @@ geometry: "a4paper,left=1cm,right=1cm,top=1cm,bottom=1cm,footnotesep=0.0cm,foots
 params:
     docTitle: "BRICK calibration report"
     cal: "BRICK_calibration_report.csv"
-    path: ""
+    path: "C:/Users/ricardar/Documents/Results/BRICK/ECEMP-runs/WithConstruction/calibration_2025-10-14_17.22.25/"
     scenNames: NULL
     name: ""
     figWidth: 15 
@@ -89,14 +89,15 @@ if (length(filePath) == 1) {
 # Determine whether this is sequential or hierarchical calibration
 varAll <- NULL
 if (all(c("renBSDevAgg", "renHSDevAgg") %in% data$variable)) {
-  varAll <- c("stock", "construction", "renovationBS", "renovationHS", "flow")
+  varAll <- c("stock", "construction", "demolition", "renovationBS", "renovationHS", "flow")
 } else {
-  varAll <- c("stock", "construction", "renovation", "flow")
+  varAll <- c("stock", "construction", "demolition", "renovation", "flow")
 }
 
 namingMap <- c(
   stock = "stock",
   construction = "con",
+  demolition = "dem",
   renovation = "ren",
   renovationBS = "renBS",
   renovationHS = "renHS",
@@ -253,6 +254,9 @@ overviewRelative <- c("outerObjective", "stepSize", "stockDevHsRel", "conDevHsRe
 .createCalibrationPlot(data, "flowHs", outPath,
                        color = "hsr", facets = facets)
 
+.createCalibrationPlot(data, "demHs", outPath,
+                       color = "hsr", facets = facets)
+
 ```
 
 ## Stock and flows by vintage
@@ -271,7 +275,6 @@ overviewRelative <- c("outerObjective", "stepSize", "stockDevHsRel", "conDevHsRe
 ```{r Total absolute stock and flow deviations}
 
 .runCalibrationPlots("DevAgg", color)
-
 
 ```
 
@@ -367,7 +370,7 @@ overviewRelative <- c("outerObjective", "stepSize", "stockDevHsRel", "conDevHsRe
 ```{r intangible costs by building shell}
 
 .runCalibrationPlots("SpecCostBs", color = "bsr", facets = facets,
-                     skipVars = c("stock", "renovationHS", "flow"))
+                     skipVars = c("stock", "demolition", "renovationHS", "flow"))
 
 ```
 
@@ -375,7 +378,8 @@ overviewRelative <- c("outerObjective", "stepSize", "stockDevHsRel", "conDevHsRe
 
 ```{r intangible costs by heating system}
 
-.runCalibrationPlots("SpecCostHs", color = "hsr", facets = facets, skipVars = c("stock", "renovationBS", "flow"))
+.runCalibrationPlots("SpecCostHs", color = "hsr", facets = facets,
+                     skipVars = c("stock", "demolition", "renovationBS", "flow"))
 
 ```
 
@@ -384,7 +388,9 @@ overviewRelative <- c("outerObjective", "stepSize", "stockDevHsRel", "conDevHsRe
 
 ```{r descent direction by heating system}
 
-.runCalibrationPlots("DescDirHs", color = "hsr", facets = facets, skipVars = c("stock", "renovationBS", "flow"))
+.runCalibrationPlots("DescDirHs", color = "hsr", facets = facets,
+                     skipVars = c("stock", "demolition", "renovationBS", "flow"))
 
-.runCalibrationPlots("DescDirHsLate", color = "hsr", facets = facets, skipVars = c("stock", "renovationBS", "flow"))
+.runCalibrationPlots("DescDirHsLate", color = "hsr", facets = facets,
+                     skipVars = c("stock", "demolition", "renovationBS", "flow"))
 ```
