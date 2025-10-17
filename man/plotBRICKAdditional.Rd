@@ -9,7 +9,8 @@ plotBRICKAdditional(
   file = NULL,
   plottingRoutine = "plotsCalibration.Rmd",
   outName = "",
-  scenNames = NULL
+  scenNames = NULL,
+  regionHandling = "all"
 )
 }
 \arguments{
@@ -24,18 +25,27 @@ If several paths are given, the names can be used to pass short scenario names.}
 - \code{plotsCalibration.Rmd} generates plots of calibration results
 - \code{plotsLcc.Rmd} generates analysis plots including life time assessments and LCC results}
 
-\item{outName}{character, string added to the pdf file name and names of additionally saved plots}
+\item{outName}{character, string added to the pdf file name}
 
 \item{scenNames}{character vector, scenario names for different paths.
 Needs to be specified if \code{path} is unnamed and contains more than one element.}
+
+\item{regionHandling}{character, indication of how to handle the region dimensions. Available options:
+- \code{all}: Take into account all regions for the report. With more than one region, this is
+  only available for \code{plotsCalibration.Rmd}. If this option is chosen for \code{plotsLcc.Rmd}
+  with more than one region, this parameter is reset to \code{"separate"}.
+- \code{separate}: Produce a separate report for each region. This is the recommended setting
+  to analyse all regions with \code{plotsLcc.Rmd}.
+- \code{<character vector of regions>}: Only include the given regions in the report.
+  For \code{plotsLcc.Rmd}, a separate report is generated for each region.}
 }
 \description{
 Renders specified Rmd file to create a pdf of additional Brick plots.
-The Rmd file needs to be present in \code{inst/plotsAdditional}. plotCalibration.Rmd to create the plots for the BRICK calibration
+The Rmd file needs to be present in \code{inst/plotsAdditional}.
 Currently available files are:
   - plotsCalibration.Rmd
   - plotsLcc.Rmd
-Mutiple scenarios are only supported for \code{plotsCalibration.Rmd}.
+Mutiple scenarios and more than one region in one report are only supported for \code{plotsCalibration.Rmd}.
 }
 \author{
 Ricarda Rosemann

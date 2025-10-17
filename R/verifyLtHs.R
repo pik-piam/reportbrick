@@ -2,10 +2,11 @@
 #'
 #' @author Ricarda Rosemann
 #'
-#' @param gdx character, path to input gdx file
 #' @param inflow data frame, all inflows
 #' @param v_stockInit data frame, brick results on initial stock
 #' @param outflow data frame, all outflows
+#' @param p_shareRenHSinit data frame with shares to be renovated for the initial stock
+#' @param p_shareRenHS data frame with shares to be renovated for the inflow
 #' @param dims character, dimensions of the data without time periods
 #'
 #' @importFrom dplyr %>% across all_of .data filter group_by left_join mutate
@@ -22,7 +23,7 @@ verifyLtHs <- function(inflow, v_stockInit, outflow, p_shareRenHSinit, p_shareRe
               by = c("hs", "region", "typ", "ttotIn")) %>%
     mutate(initVal = .data[["stockVal"]] * .data[["shareVal"]]) %>%
     select(-"ttotIn", -"shareVal", -"stockVal")
-  
+
 
   # Compute the left-hand side of the inequality as the sum over ttot of the outflows
   # Compute the sum of over ttot of the inflows weighted by the shares
@@ -61,7 +62,7 @@ verifyLtHs <- function(inflow, v_stockInit, outflow, p_shareRenHSinit, p_shareRe
     pivot_longer(cols = all_of(c("lhsLtIneq", "rhsLtIneq")),
                  names_to = "variable", values_to = "value")
 
-  out <- stats::setNames(
+  stats::setNames(
     lapply(c("lhsLtIneq", "rhsLtIneq"), function(v) {
       ltIneq %>%
         filter(.data[["variable"]] == v) %>%

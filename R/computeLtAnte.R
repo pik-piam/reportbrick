@@ -5,24 +5,17 @@
 #'
 #' @author Ricarda Rosemann
 #'
-#' @param variable character, variable for which the lifetime is computed
 #' @param data data frame, dimensions of desired lifetimes,
 #'   usually also contains values to compute the absolute removed quantities
-#' @param ttotNum numeric, all time periods to be considered
-#' @param lifeTimeHs data frame, Weibull parameters
-#' @param dims character, dimensions of the data without time dimensions
-#' @param runSimple logical, whether to use the simplified formula
-#' @param dataValue data frame, optionally provide the values to compute the
-#'   absolute removed quantities separately
-#' @param p_dt data frame, lengths of the time periods
-#'   (only required for simple formula)
-#' @param returnDistr logical, whether to return the distribution rather than the density function
+#' @param shareRen data frame with the data on which share of inflows has to be replaced when
+#' @param t0 numeric, initial time period (time period before the model starts)
+#' @param isFlow logical, is \code{data} flow data?
 #'
 #' @importFrom dplyr %>% across all_of .data filter group_by left_join mutate
-#'   rename select summarise ungroup
+#'   rename select ungroup
 #'
 computeLtAnte <- function(data, shareRen, t0, isFlow = TRUE) {
-  
+
   shareRen <- shareRen %>%
     group_by(across(-all_of(c("ttotOut", "value")))) %>%
     mutate(value = c(.data$value[1], diff(.data$value))) %>%

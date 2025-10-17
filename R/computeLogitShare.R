@@ -19,11 +19,11 @@ computeLogitShare <- function(variable, lcc, lambda) {
 
   # Compute logit shares from LCC and the price sensitivity lambda
   lcc  %>%
-    
+
     # Sum over all cost types to obtain total LCC
     group_by(across(-all_of(c("costType", "value")))) %>%
     summarise(value = sum(.data[["value"]]), .groups = "drop") %>%
-    
+
     # Compute the logit share
     mutate(expoVal = exp(-lambda * .data[["value"]])) %>%
     group_by(across(-all_of(c(hsName, "expoVal", "value")))) %>%

@@ -10,6 +10,8 @@ computeRemainingShare(dfLt, asDensity = TRUE, valueName = "relVal")
 \item{dfLt}{data frame with life time data}
 
 \item{asDensity}{logical, whether the data is given as a density}
+
+\item{valueName}{character, name of the column from which the renovation share is read}
 }
 \description{
 Compute the remaining share of an inflow

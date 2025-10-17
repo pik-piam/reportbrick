@@ -81,7 +81,7 @@ readGdxSymbol <- function(gdx, symbol, field = "level", asMagpie = NULL,
       }
     }
   )
-  
+
   # make temporal dimensions numeric
   tDims <- intersect(
     colnames(data),

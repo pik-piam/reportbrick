@@ -49,6 +49,8 @@ each entry}
 
 \item{xname}{character, column to be used as x-aesthetic}
 
+\item{valueName}{character, column to be used as the value column}
+
 \item{suppressLateTtot}{logical, whether to remove the last three time steps
 from the plots shown}
 
@@ -58,7 +60,11 @@ from the plots shown}
 
 \item{tmpl}{character, name or path to reportbrick reporting template.}
 
-\item{linetype}{character, column to be used as linetype aesthetic}
+\item{filterRows}{named list, key-value pairs to filter the data by}
+
+\item{valueCap}{numeric, maximum value for value data to be included in the plot}
+
+\item{...}{additional parameters to be passed to the plotting functions}
 }
 \description{
 Framework to create various plots required for the LCC analysis.

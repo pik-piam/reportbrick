@@ -4,7 +4,7 @@
 \alias{rescaleRemainingShare}
 \title{Rescale the remaining share to a given Weibull inflow}
 \usage{
-rescaleRemainingShare(remainingShare, wbRescale, ttotRescale, dims)
+rescaleRemainingShare(remainingShare, wbRescale, ttotRescale)
 }
 \arguments{
 \item{remainingShare}{data frame with share of remaining installations}

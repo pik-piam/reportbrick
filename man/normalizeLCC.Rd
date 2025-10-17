@@ -12,6 +12,8 @@ normalizeLCC(dfLcc, dfLt, dfDt, flow)
 \item{dfLt}{data frame, lifetime estimate}
 
 \item{dfDt}{data frame, lengths of time periods}
+
+\item{flow}{character, which flow data is contained in \code{dfLcc} and \code{dfLt}?}
 }
 \description{
 Normalize the life cycle costs by rescaling to the average lifetime across

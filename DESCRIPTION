@@ -15,8 +15,10 @@ Description: This package contains BRICK-specific routines to report model resul
 License: LGPL-3
 URL: https://github.com/pik-piam/reportbrick
 Imports:
+  colorspace,
   dplyr,
   gamstransfer (>= 3.0.1),
+  ggforce,
   ggplot2,
   ggpubr,
   ggsankey,

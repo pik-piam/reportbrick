@@ -19,6 +19,8 @@
 \item{dfLtMixed}{data frame, mixed lifetime estimates of previous time steps,
 direct estimates and remaining inflows of the current time step}
 
+\item{unattrOut}{data frame with outflow that has not been attributed to any inflow}
+
 \item{unattrTot}{data frame, total unattributed outflow}
 
 \item{tIn}{numeric, current time period of installation / inflow}

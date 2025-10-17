@@ -11,6 +11,8 @@
 
 \item{dfCosts}{data frame, costs}
 
+\item{dfDt}{data frame with time period lengths}
+
 \item{dfDiscount}{numeric or data frame, discount rate if numeric
 or data frame containing the discount factor}
 }

@@ -4,11 +4,12 @@
 #'
 #' @param dfLt data frame with life time data
 #' @param asDensity logical, whether the data is given as a density
+#' @param valueName character, name of the column from which the renovation share is read
 #'
 #' @importFrom dplyr %>% across all_of .data group_by mutate select
 #'
 computeRemainingShare <- function(dfLt, asDensity = TRUE, valueName = "relVal") {
-  
+
   dfLt %>%
     rename(relVal = valueName) %>%
     select(-any_of("absVal")) %>%
