@@ -6,19 +6,19 @@
 #' @param wbRescale data frame with rescaling factor from weibull distribution
 #' @param ttotRescale numeric, time period to rescale on
 #'
-#' @importFrom dplyr %>% .data filter left_join mutate rename select
+#' @importFrom dplyr %>% .data filter left_join mutate rename select syms
 #' @importFrom tidyr complete nesting
 #'
-rescaleRemainingShare <- function(remainingShare, wbRescale, ttotRescale, dims) {
+rescaleRemainingShare <- function(remainingShare, wbRescale, ttotRescale) {
 
   wbRescale <- wbRescale %>%
     filter(.data$ttotOut == ttotRescale) %>%
     select(-"ttotIn", -"ttotOut") %>%
     rename(scale = "relVal")
-  
+
   remainingShare %>%
     complete(
-      nesting(qty, bs, hs, vin, region, loc, typ, inc, ttotIn),
+      nesting(!!!syms(c("qty", "bs", "hs", "vin", "region", "loc", "typ", "inc", "ttotIn"))),
       ttotOut = c(ttotRescale, .data$ttotOut),
       fill = list(relVal = 1)
     ) %>%

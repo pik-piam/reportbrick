@@ -7,7 +7,7 @@
 #' @param share data frame with heating system shares
 #' @param weight data frame with weights to scale
 #' @param energyLadder data frame containing the map between heating system and energy ladder
-#' @param ernegyLadderNo numeric, energy ladder step to filter for
+#' @param energyLadderNo numeric, energy ladder step to filter for
 #'
 #' @author Ricarda Rosemann
 #'

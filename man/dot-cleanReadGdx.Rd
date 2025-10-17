@@ -13,11 +13,15 @@
 )
 }
 \arguments{
+\item{gdx}{path to the gdx}
+
+\item{symbol}{character, symbol to read from gdx}
+
 \item{vinExists}{data frame with existing vintage and time period combinations}
 
 \item{renAllowed}{data frame with all possible renovation transitions}
 
-\item{df}{data frame with data as read from a gdx}
+\item{asMagpie}{logical, whether to convert the data to a magpie opject}
 }
 \description{
 Read data from gdx and clean

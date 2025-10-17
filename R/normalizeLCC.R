@@ -8,6 +8,7 @@
 #' @param dfLcc data frame, lifecycle costs
 #' @param dfLt data frame, lifetime estimate
 #' @param dfDt data frame, lengths of time periods
+#' @param flow character, which flow data is contained in \code{dfLcc} and \code{dfLt}?
 #'
 #' @importFrom dplyr all_of left_join mutate rename rename_with
 #' @importFrom tidyr pivot_longer
@@ -26,12 +27,11 @@ normalizeLCC <- function(dfLcc, dfLt, dfDt, flow) {
 
   # Compute expected lifetime of each heating system and average lifetime across all heating systems
   expLt <- dfLt %>%
-    # rename_with(dfLt, ~ (if (all(c("bsr", "hsr") %in% colnames(dfLcc))) paste0(.x, "r") else .x),
-    #                   all_of(c("bs", "hs"))) %>%
     left_join(dfDt, by = c(ttotIn = "ttot")) %>%
     left_join(dfDt, by = c(ttotOut = "ttot"), suffix = c("In", "Out")) %>%
     mutate(lt = .data$ttotOut - .data$dtOut / 2 - (.data$ttotIn - .data$dtIn / 2)) %>%
-    group_by(across(any_of(c("qty", "bs", "hs", "hsr", "vin", "region", "loc", "typ", "inc", "costType", "ttotIn")))) %>%
+    group_by(across(any_of(c("qty", "bs", "hs", "hsr", "vin", "region", "loc", "typ",
+                             "inc", "costType", "ttotIn")))) %>%
     summarise(expLt = sum(.data$lt * .data$relVal), .groups = "drop") %>%
     group_by(across(-all_of(avgGroup))) %>%
     mutate(avgLt = mean(.data$expLt),

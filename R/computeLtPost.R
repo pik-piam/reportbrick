@@ -95,7 +95,7 @@ computeLtPost <- function(inflow, outflow, data, conShare, p_ttotVin, ttotNum, d
   dfStock <- dfStock %>%
     filter(.data[["ttotOut"]] < tOut) %>%
     group_by(across(any_of(dims))) %>%
-    summarise(valueCumSum = sum(value), .groups = "drop") %>%
+    summarise(valueCumSum = sum(.data$value), .groups = "drop") %>%
     left_join(dfOut %>%
                 rename(valueOut = "value") %>%
                 filter(.data[["ttotOut"]] == tOut),

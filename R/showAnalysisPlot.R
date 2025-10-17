@@ -14,7 +14,6 @@
 #' @param varName character, variables to be plotted
 #' @param yname character, column to be used as y-aesthetic
 #' @param color character, column to be used as color aesthetic
-#' @param linetype character, column to be used as linetype aesthetic
 #' @param facets character, columns to be used as facets.
 #'   Can either be one or two columns.
 #' @param rprt character, columns for which a separate plot should be created for
@@ -22,20 +21,26 @@
 #' @param avg character, columns over which the average should be computed
 #' @param remCols character, columns to be removed before creating the plot
 #' @param xname character, column to be used as x-aesthetic
+#' @param valueName character, column to be used as the value column
 #' @param suppressLateTtot logical, whether to remove the last three time steps
 #'   from the plots shown
 #' @param xlabName character, x-axis label
 #' @param ylabName character, y-axis label
 #' @param tmpl character, name or path to reportbrick reporting template.
+#' @param filterRows named list, key-value pairs to filter the data by
+#' @param valueCap numeric, maximum value for value data to be included in the plot
+#' @param ... additional parameters to be passed to the plotting functions
 #'
 #' @importFrom dplyr %>% .data across all_of any_of cur_column filter group_by lag mutate
-#'   pull rename_with select slice_max slice_min summarise ungroup
-#' @importFrom ggplot2 aes coord_fixed facet_grid element_text facet_wrap geom_col geom_line ggplot
-#'   ggtitle scale_alpha_manual scale_color_manual scale_fill_manual sym theme vars xlab ylab
+#'   pull rename_with select slice_max slice_min summarise ungroup where
+#' @importFrom ggplot2 aes coord_fixed facet_grid element_text expansion facet_wrap
+#'   geom_bar geom_col geom_line geom_point geom_text geom_tile ggplot ggtitle
+#'   scale_alpha_manual scale_color_identity scale_color_manual scale_fill_manual scale_shape_manual
+#'   sec_axis sym theme theme_minimal vars xlab ylab
 #' @importFrom tidyr crossing pivot_longer
 #'
-showAnalysisPlot <- function(plotType, data, varName, yname, color = NULL, facets = c("loc", "typ"),
-                             rprt = NULL, avg = NULL, remCols = NULL,
+showAnalysisPlot <- function(plotType, data, varName, yname, color = NULL, #nolint: cyclocomp_linter.
+                             facets = c("loc", "typ"), rprt = NULL, avg = NULL, remCols = NULL,
                              xname = "ttotOut", valueName = yname, suppressLateTtot = TRUE,
                              xlabName = NULL, ylabName = NULL, tmpl = NULL,
                              filterRows = list(hs = "h2bo", hsr = "h2bo"),
@@ -146,8 +151,8 @@ showAnalysisPlot <- function(plotType, data, varName, yname, color = NULL, facet
           width = 0.4 * .data[["width"]]
         )
 
-      p <- ggplot(plData, aes(x = .data$xShifted, y = .data[[yName]],
-                                       fill = .data[[color]], width = .data$width, alpha = .data$variable)) +
+      pl <- ggplot(plData, aes(x = .data$xShifted, y = .data[[yName]],
+                               fill = .data[[color]], width = .data$width, alpha = .data$variable)) +
         geom_col() +
         scale_alpha_manual(values = alphaMap)
 
@@ -162,8 +167,8 @@ showAnalysisPlot <- function(plotType, data, varName, yname, color = NULL, facet
                             .data$xPos + 0.225)
         )
 
-      p <- ggplot(plData, aes(x = .data$xShifted, y = .data[[yName]],
-                                       fill = .data[[color]], alpha = .data$variable)) +
+      pl <- ggplot(plData, aes(x = .data$xShifted, y = .data[[yName]],
+                               fill = .data[[color]], alpha = .data$variable)) +
         geom_col(width = 0.4) +
         scale_alpha_manual(values = alphaMap) +
         scale_x_continuous(
@@ -172,6 +177,7 @@ showAnalysisPlot <- function(plotType, data, varName, yname, color = NULL, facet
           name = xName
         )
     }
+    pl
 
   }
 
@@ -180,10 +186,12 @@ showAnalysisPlot <- function(plotType, data, varName, yname, color = NULL, facet
     plData %>%
       .removeEmptyCols() %>%
       ggplot() +
-      geom_line(mapping = aes(
-        x = .data[[xname]], y = .data[[yname]],
-        color = .data[[color]],
-        linetype = .data[[linetype]]),
+      geom_line(
+        mapping = aes(
+          x = .data[[xname]], y = .data[[yname]],
+          color = .data[[color]],
+          linetype = .data[[linetype]]
+        ),
         linewidth = 1
       )
   }
@@ -191,7 +199,7 @@ showAnalysisPlot <- function(plotType, data, varName, yname, color = NULL, facet
   .addLinearReg <- function(pl, plData, xname, yname) {
     modelData <- plData %>%
       mutate(x = .data[[xname]], y = .data[[yname]], .keep = "none")
-    linearModel <- lm(y ~ x, modelData)
+    linearModel <- stats::lm(y ~ x, modelData)
 
     lineData <- data.frame(
       x = seq(min(plData[[xname]]), max(plData[[xname]])),
@@ -199,10 +207,10 @@ showAnalysisPlot <- function(plotType, data, varName, yname, color = NULL, facet
       rSquared = summary(linearModel)$r.squared
     )
     lineData <- lineData %>%
-      mutate(y = predict(linearModel, lineData))
+      mutate(y = stats::predict(linearModel, lineData))
 
     labelPoint <- lineData %>%
-      slice_max(order_by = x, n = 1)
+      slice_max(order_by = .data$x, n = 1)
 
     lab <- paste0(
       "atop(lambda == ", -signif(labelPoint$slopeX, 2),
@@ -242,7 +250,7 @@ showAnalysisPlot <- function(plotType, data, varName, yname, color = NULL, facet
         mutate(y = slope * .data$x)
 
       labelPoint <- lineData %>%
-        slice_min(order_by = x, n = 1)
+        slice_min(order_by = .data$x, n = 1)
 
       lab <- paste0("lambda == ", -slope)
 
@@ -275,7 +283,7 @@ showAnalysisPlot <- function(plotType, data, varName, yname, color = NULL, facet
       mutate(
         total = sum(.data[[valueName]]),
         exceedCapTot = any(.data$exceedCap),
-        fraction = ifelse(total == 0, 0, .data[[valueName]] / .data$total),
+        fraction = ifelse(.data$total == 0, 0, .data[[valueName]] / .data$total),
         end = 2 * pi * cumsum(.data$fraction),
         start = lag(.data$end, default = 0),
         r0 = 0
@@ -296,20 +304,20 @@ showAnalysisPlot <- function(plotType, data, varName, yname, color = NULL, facet
       select("x", "y", "xNum", "yNum", "total", "r") %>%
       unique() %>%
       mutate(total = signif(.data$total, 3)) %>%
-      group_by(y) %>%
+      group_by(across(all_of("y"))) %>%
       mutate(yLabel = max(.data$yNum + .data$r + 0.2, na.rm = TRUE)) %>%  # row-aligned above pies
       ungroup()
 
     # Final plot
     ggplot(plData) +
       ggforce::geom_arc_bar(
-        aes(x0 = xNum, y0 = yNum, r0 = r0, r = r,
-            start = start, end = end, fill = .data[[color]], alpha = .data$exceedCap),
+        aes(x0 = .data$xNum, y0 = .data$yNum, r0 = .data$r0, r = .data$r,
+            start = .data$start, end = .data$end, fill = .data[[color]], alpha = .data$exceedCap),
         color = "black", size = 0.3
       ) +
       geom_text(
         data = dfLabel,
-        aes(x = xNum, y = yLabel, label = total),
+        aes(x = .data$xNum, y = .data$yLabel, label = .data$total),
         size = 3.5, fontface = "bold"
       ) +
       coord_fixed() +
@@ -350,20 +358,21 @@ showAnalysisPlot <- function(plotType, data, varName, yname, color = NULL, facet
       summarise(
         total = signif(sum(.data[[valueName]]), 3),
         yLabel = sum(pmax((.data[[valueName]]), 0)),
-        .groups = "drop")
+        .groups = "drop"
+      )
 
     # Plot
     ggplot(plData, aes(x = 1, y = .data[[valueName]], fill = .data[[color]])) +
       geom_bar(stat = "identity", width = 0.7) +
       geom_text(
         data = dfTotals,
-        aes(x = 1, y = yLabel, label = .data$total),
+        aes(x = 1, y = .data$yLabel, label = .data$total),
         position = "stack",
         inherit.aes = FALSE,
         size = 3.5,
         vjust = -0.5
       ) +
-      facet_grid(rows = vars(y), cols = vars(x)) +
+      facet_grid(rows = vars(.data$y), cols = vars(.data$x)) +
       scale_y_continuous(expand = expansion(mult = c(0, 0.3))) +  # Top padding
       scale_fill_brewer(palette = "Set2") +
       theme_minimal() +
@@ -379,14 +388,8 @@ showAnalysisPlot <- function(plotType, data, varName, yname, color = NULL, facet
 
   .createLtHeatMap <- function(plData, varName, xname, yname, valueName = "value") {
 
-    plData <- filter(plData, .data$costType == "intangible")
-
-    maxVal <- plData %>%
-      filter(!.data$exceedCap) %>%
-      pull(valueName) %>%
-      max()
-
     plData <- plData %>%
+      filter(.data$costType == "intangible") %>%
       mutate(fillValue = ifelse(
         .data$exceedCap,
         max(.data[[valueName]][!.data$exceedCap]),
@@ -394,7 +397,7 @@ showAnalysisPlot <- function(plotType, data, varName, yname, color = NULL, facet
       ))
 
     # Compute dynamic threshold (median of value column)
-    valueThreshold <- median(plData$fillValue, na.rm = TRUE)
+    valueThreshold <- stats::median(plData$fillValue, na.rm = TRUE)
 
     # Assign adaptive text color
     plData <- plData %>%
@@ -488,7 +491,10 @@ showAnalysisPlot <- function(plotType, data, varName, yname, color = NULL, facet
     if (!is.null(colorMap)) {
       plData <- mutate(plData, across(any_of(color), ~ factor(colorMap[.x], levels = colorMap)))
     } else if (color == "costType") {
-      plData <- mutate(plData, across(any_of(color), ~ factor(.x, levels = c("statusQuoPref", "intangible", "tangible", "lccOpe"))))
+      plData <- mutate(plData, across(
+        any_of(color),
+        ~ factor(.x, levels = c("statusQuoPref", "intangible", "tangible", "lccOpe"))
+      ))
     }
   } else {
     colorMap <- NULL
@@ -589,7 +595,7 @@ showAnalysisPlot <- function(plotType, data, varName, yname, color = NULL, facet
       line = .createLtLine(plDataMain, xname, yname, color, ...),
       scatter = .createScatter(plDataMain, xname, yname, color, ...),
       pieChart = .createLtPieChart(plDataMain, varName, xname, yname, color,
-                                    valueName = valueName),
+                                   valueName = valueName),
       barMatrix = .createLtBarChart(plDataMain, varName, xname, yname, color, valueName = valueName),
       heatMap = .createLtHeatMap(plDataMain, varName, xname, yname, valueName = valueName)
     ) +

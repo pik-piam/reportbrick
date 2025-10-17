@@ -9,9 +9,8 @@ output:
 params:
     docTitle: "BRICK Analysis report"
     file: "BRICK_analysis_report.csv"
-    path: "C:/Users/ricardar/Documents/Results/BRICK/ECEMP-runs/WithConstruction/calibration_2025-10-14_17.22.25/"
+    path: ""
     scenNames: NULL
-    savePlots: TRUE
     name: ""
     region: "all"
 ---
@@ -70,7 +69,7 @@ if (!identical(params$region, "all")) data <- filter(data, .data$region %in% c(p
 ```{r Plot mixture outflow of standing stock}
 
 showAnalysisPlot("bar", data, "stockInitLtMixed", yname = "absVal", color = "hs", rprt = "vin",
-            xlabName = "Time of removal", ylabName = "Quantity in million m2", tmpl = tmpl)
+                 xlabName = "Time of removal", ylabName = "Quantity in million m2", tmpl = tmpl)
 
 ```
 
@@ -133,10 +132,12 @@ showAnalysisPlot("line", data, c("conLtMixedRemain", "wbRemain"), yname = "relVa
 showAnalysisPlot("bar", data, "renLtMixed", yname = "absVal", color = "hs", rprt = "ttotIn",
                  xlabName = "Time of removal", ylabName = "Quantity in million m2", tmpl = tmpl)
 
-showAnalysisPlot("bar", data %>% filter(vin == "1980-1989"), "renLtMixed", yname = "absVal", color = "hs", rprt = "ttotIn",
+showAnalysisPlot("bar", data %>% filter(vin == "1980-1989"), "renLtMixed", yname = "absVal",
+                 color = "hs", rprt = "ttotIn",
                  xlabName = "Time of removal", ylabName = "Quantity in million m2", tmpl = tmpl)
 
-showAnalysisPlot("bar", data %>% filter(ttotIn == 2005), "renLtMixed", yname = "absVal", color = "hs", rprt = "vin",
+showAnalysisPlot("bar", data %>% filter(ttotIn == 2005), "renLtMixed", yname = "absVal",
+                 color = "hs", rprt = "vin",
                  xlabName = "Time of removal", ylabName = "Quantity in million m2", tmpl = tmpl)
 
 ```

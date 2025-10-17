@@ -10,23 +10,11 @@ computeLtAnte(data, shareRen, t0, isFlow = TRUE)
 \item{data}{data frame, dimensions of desired lifetimes,
 usually also contains values to compute the absolute removed quantities}
 
-\item{variable}{character, variable for which the lifetime is computed}
+\item{shareRen}{data frame with the data on which share of inflows has to be replaced when}
 
-\item{ttotNum}{numeric, all time periods to be considered}
+\item{t0}{numeric, initial time period (time period before the model starts)}
 
-\item{lifeTimeHs}{data frame, Weibull parameters}
-
-\item{dims}{character, dimensions of the data without time dimensions}
-
-\item{runSimple}{logical, whether to use the simplified formula}
-
-\item{dataValue}{data frame, optionally provide the values to compute the
-absolute removed quantities separately}
-
-\item{p_dt}{data frame, lengths of the time periods
-(only required for simple formula)}
-
-\item{returnDistr}{logical, whether to return the distribution rather than the density function}
+\item{isFlow}{logical, is \code{data} flow data?}
 }
 \description{
 Determine the lifetime of the heating system according to the respective Weibull distribution.

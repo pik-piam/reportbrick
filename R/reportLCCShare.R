@@ -11,7 +11,7 @@
 #' @param filterFullRen named list with name value pairs to filter full resolution
 #'   renovation LCC/LCOH/Shares by. If \code{NULL}, no filtering is applied.
 #'
-#' @importFrom dplyr %>% .data cur_column filter full_join group_by inner_join last
+#' @importFrom dplyr %>% .data contains cur_column filter full_join group_by inner_join last
 #'   left_join mutate rename right_join select summarise
 #' @importFrom piamutils getSystemFile
 #' @importFrom stats pweibull
@@ -40,7 +40,6 @@ reportLCCShare <- function(path, gdxName = "output.gdx", filterFullRen = list(vi
 
   ttot <- readGdxSymbol(gdx, "ttot", asMagpie = FALSE)[["tall"]]
   t0 <- min(ttot)
-  tRun <- setdiff(ttot, t0)
   ttotNum <- ttot
 
 
@@ -73,7 +72,6 @@ reportLCCShare <- function(path, gdxName = "output.gdx", filterFullRen = list(vi
 
   p_specCostOpe <- readGdxSymbol(gdx, "p_specCostOpe", asMagpie = FALSE)
   p_specCostCon <- readGdxSymbol(gdx, "p_specCostCon", asMagpie = FALSE)
-  p_specCostDem <- readGdxSymbol(gdx, "p_specCostDem", asMagpie = FALSE)
 
   if (isTRUE(config[["switches"]][["SEQUENTIALREN"]])) {
     p_specCostRen <- readGdxSymbol(gdx, "p_specCostRenHS", asMagpie = FALSE)
@@ -128,23 +126,19 @@ reportLCCShare <- function(path, gdxName = "output.gdx", filterFullRen = list(vi
 
   ## Renovation in- and outflow ====
 
-  v_renovationInDim <- v_renovation %>%
-    select(-"value") %>%
-    rename(ttotIn = "ttot")
-
   v_renovationOut <- v_renovation %>%
-    filter(hsr != "0") %>%
+    filter(.data$hsr != "0") %>%
     group_by(across(-all_of(c("hsr", "value")))) %>%
-    summarise(value = sum(value), .groups = "drop") %>%
+    summarise(value = sum(.data$value), .groups = "drop") %>%
     left_join(p_dt, by = "ttot") %>%
     mutate(value = .data[["value"]] * .data[["dt"]]) %>%
     select(-"dt") %>%
     rename(ttotOut = "ttot")
 
   v_renovationIn <- v_renovation %>%
-    filter(hsr != "0") %>%
+    filter(.data$hsr != "0") %>%
     group_by(across(-all_of(c("hs", "value")))) %>%
-    summarise(value = sum(value), .groups = "drop") %>%
+    summarise(value = sum(.data$value), .groups = "drop") %>%
     rename(hs = "hsr") %>%
     left_join(p_dt, by = "ttot") %>%
     mutate(value = .data[["value"]] * .data[["dt"]]) %>%
@@ -168,7 +162,7 @@ reportLCCShare <- function(path, gdxName = "output.gdx", filterFullRen = list(vi
     full_join(v_demolitionOut %>%
                 rename(dem = "value"),
               by = c(dims, "ttotOut")) %>%
-    mutate(value = ren + dem) %>%
+    mutate(value = .data$ren + .data$dem) %>%
     select(-"ren", -"dem")
 
   inflow <- v_renovationIn %>%
@@ -181,9 +175,8 @@ reportLCCShare <- function(path, gdxName = "output.gdx", filterFullRen = list(vi
            share = ifelse(.data[["value"]] != 0, .data[["con"]] / .data[["value"]], 0)) %>%
     select(-"con", -"ren")
 
-  # Construction and renovation shares
+  # Construction shares
   conShare <- select(inflow, -"value")
-  renShare <- mutate(conShare, share = 1 - .data[["share"]])
 
   inflow <- select(inflow, -"share")
 
@@ -217,13 +210,10 @@ reportLCCShare <- function(path, gdxName = "output.gdx", filterFullRen = list(vi
   # Remaining shares
   out[["stockInitLtAnteRemain"]] <- stockInitLtAnte %>%
     computeRemainingShare() %>%
-    rescaleRemainingShare(out[["stockWbRemain"]], t0, dims)
+    rescaleRemainingShare(out[["stockWbRemain"]], t0)
 
   out[["conLtAnteRemain"]] <- computeRemainingShare(conLtAnte)
   out[["renLtAnteRemain"]] <- computeRemainingShare(renLtAnte)
-
-  checkLtAnte <- .checkLifetimeResults(renLtAnte, dims)
-  checkLtAnteInitStock <- .checkLifetimeResults(stockInitLtAnte, dims)
 
 
   ## Ex-Post ====
@@ -238,14 +228,11 @@ reportLCCShare <- function(path, gdxName = "output.gdx", filterFullRen = list(vi
     dims
   )
 
-  checkLtPost <- .checkLifetimeResults(ltPost[["stockInitLtPost"]], dims)
-
   ltPostRemain <- stats::setNames(lapply(ltPost, computeRemainingShare), paste0(names(ltPost), "Remain"))
   ltPostRemain[["stockInitLtPostRemain"]] <- rescaleRemainingShare(
     ltPostRemain[["stockInitLtPostRemain"]],
     out[["stockWbRemain"]],
-    t0,
-    dims
+    t0
   )
 
   out <- c(out, ltPost, ltPostRemain)
@@ -262,16 +249,11 @@ reportLCCShare <- function(path, gdxName = "output.gdx", filterFullRen = list(vi
     dims
   )
 
-  checkRenLtMixed <- .checkLifetimeResults(ltMixed[["renLtMixed"]], dims)
-  checkStockLtMixed <- .checkLifetimeResults(ltMixed[["stockInitLtMixed"]], dims)
-  checkConLtMixed <- .checkLifetimeResults(ltMixed[["conLtMixed"]], dims)
-
   ltMixedRemain <- stats::setNames(lapply(ltMixed, computeRemainingShare), paste0(names(ltMixed), "Remain"))
   ltMixedRemain[["stockInitLtMixedRemain"]] <- rescaleRemainingShare(
     ltMixedRemain[["stockInitLtMixedRemain"]],
     out[["stockWbRemain"]],
-    t0,
-    dims
+    t0
   )
 
   out <- c(out, ltMixed, ltMixedRemain)
@@ -302,7 +284,7 @@ reportLCCShare <- function(path, gdxName = "output.gdx", filterFullRen = list(vi
 
   costRen <- p_specCostRen %>%
     inner_join(renAllowed, by = c("bs", "hs", "hsr")) %>%
-    pivot_wider(names_from = cost, values_from = value) %>%
+    pivot_wider(names_from = "cost", values_from = "value") %>%
     mutate(across(contains("hs"), as.character),
            # add status quo preference costs
            statusQuoPref = ifelse(.data$hs != .data$hsr, config[["statusQuoPreference"]], 0),
@@ -355,7 +337,10 @@ reportLCCShare <- function(path, gdxName = "output.gdx", filterFullRen = list(vi
   out[["renLccMixedScaledFull"]] <- normalizeLCC(renLccMixedFull, out[["renLtMixed"]], p_dt, "renovation") %>%
     .filterAsUnion(filterFullRen)
 
-  out[["renLcohMixedFull"]] <- computeLCOH(renLccMixedFull, out[["renLtMixed"]], p_ueDemand, p_dt, p_discountFac, dims) %>%
+  out[["renLcohMixedFull"]] <- computeLCOH(
+    renLccMixedFull, out[["renLtMixed"]],
+    p_ueDemand, p_dt, p_discountFac, dims
+  ) %>%
     .filterAsUnion(filterFullRen)
   out[["renLcohMixed"]] <- computeLCOH(out[["renLccMixed"]], out[["renLtMixed"]], p_ueDemand, p_dt, p_discountFac, dims)
 
@@ -367,14 +352,14 @@ reportLCCShare <- function(path, gdxName = "output.gdx", filterFullRen = list(vi
   out[["renLogitAnteFull"]] <- renLogitAnteFull %>%
     .filterAsUnion(filterFullRen)
   out[["renLogitEl1Ante"]] <- aggregateShare(renLogitAnteFull, weight = v_renovationIn,
-                                                  energyLadder = energyLadder, energyLadderNo = 1)
+                                             energyLadder = energyLadder, energyLadderNo = 1)
   out[["renLogitAllAnte"]] <- aggregateShare(renLogitAnteFull, weight = v_renovationIn)
 
   renLogitMixedFull <- computeLogitShare("renovation", renLccMixedFull, priceSensHs[["renovation"]])
   out[["renLogitMixedFull"]] <- renLogitMixedFull %>%
     .filterAsUnion(filterFullRen)
   out[["renLogitEl1Mixed"]] <- aggregateShare(renLogitMixedFull, weight = v_renovationIn,
-                                                   energyLadder = energyLadder, energyLadderNo = 1)
+                                              energyLadder = energyLadder, energyLadderNo = 1)
   out[["renLogitAllMixed"]] <- aggregateShare(renLogitMixedFull, weight = v_renovationIn)
 
 
@@ -417,8 +402,8 @@ reportLCCShare <- function(path, gdxName = "output.gdx", filterFullRen = list(vi
     pivot_wider(names_from = "hsr") %>%
     mutate(across(
       setdiff(hsNames, "gabo"),
-      ~ ifelse(.x == 0 | .data$gabo == 0, NA, log(.x / .data$gabo)))
-    ) %>%
+      ~ ifelse(.x == 0 | .data$gabo == 0, NA, log(.x / .data$gabo))
+    )) %>%
     pivot_longer(cols = setdiff(hsNames, "gabo"), names_to = "hsr") %>%
     select(-"gabo")
 
@@ -440,11 +425,23 @@ reportLCCShare <- function(path, gdxName = "output.gdx", filterFullRen = list(vi
 
   # NORMALIZE PRICE SENSITIVITY ------------------------------------------------
 
-  normLambdaCon <- normalizePriceSensitivity(out[["conLccMixed"]], conVin, priceSensHs[["construction"]], dims)
-  normLambdaRen <- normalizePriceSensitivity(out[["renLccMixed"]], v_renovationIn, priceSensHs[["renovation"]], dims)
+  normLambdaCon <- normalizePriceSensitivity( #nolint: object_usage_linter.
+    out[["conLccMixed"]], conVin, priceSensHs[["construction"]], dims
+  )
 
-  normLambdaConSubs <- normalizePriceSensitivity(out[["conLccMixed"]], conVin, priceSensHs[["construction"]], dims, groupCols = c("region", "loc", "typ", "inc"))
-  normLambdaRenSubs <- normalizePriceSensitivity(out[["renLccMixed"]], v_renovationIn, priceSensHs[["renovation"]], dims, groupCols = c("region", "loc", "typ", "inc"))
+  normLambdaRen <- normalizePriceSensitivity( #nolint: object_usage_linter.
+    out[["renLccMixed"]], v_renovationIn, priceSensHs[["renovation"]], dims
+  )
+
+  normLambdaConSubs <- normalizePriceSensitivity( #nolint: object_usage_linter.
+    out[["conLccMixed"]], conVin, priceSensHs[["construction"]], dims,
+    groupCols = c("region", "loc", "typ", "inc")
+  )
+
+  normLambdaRenSubs <- normalizePriceSensitivity( #nolint: object_usage_linter.
+    out[["renLccMixed"]], v_renovationIn, priceSensHs[["renovation"]], dims,
+    groupCols = c("region", "loc", "typ", "inc")
+  )
 
 
 
@@ -470,9 +467,11 @@ reportLCCShare <- function(path, gdxName = "output.gdx", filterFullRen = list(vi
 
 #' Read data from gdx and clean
 #'
-#' @param df data frame with data as read from a gdx
+#' @param gdx path to the gdx
+#' @param symbol character, symbol to read from gdx
 #' @param vinExists data frame with existing vintage and time period combinations
 #' @param renAllowed data frame with all possible renovation transitions
+#' @param asMagpie logical, whether to convert the data to a magpie opject
 #'
 #' @importFrom dplyr %>% across any_of .data filter mutate right_join
 #'

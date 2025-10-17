@@ -18,7 +18,7 @@ aggregateShare(
 
 \item{energyLadder}{data frame containing the map between heating system and energy ladder}
 
-\item{ernegyLadderNo}{numeric, energy ladder step to filter for}
+\item{energyLadderNo}{numeric, energy ladder step to filter for}
 }
 \description{
 Aggregate hsr shares by applying a weight (typically the total renovation flow

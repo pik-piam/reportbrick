@@ -31,6 +31,7 @@ computeLCC <- function(dfLt, dfCostsOpe, dfCostsRen, dfDt, dfDiscount) {
 #'
 #' @param dfLt data frame, lifetime estimate
 #' @param dfCosts data frame, costs
+#' @param dfDt data frame with time period lengths
 #' @param dfDiscount numeric or data frame, discount rate if numeric
 #'   or data frame containing the discount factor
 #'

@@ -13,9 +13,11 @@ verifyLtHs(inflow, v_stockInit, outflow, p_shareRenHSinit, p_shareRenHS, dims)
 
 \item{outflow}{data frame, all outflows}
 
-\item{dims}{character, dimensions of the data without time periods}
+\item{p_shareRenHSinit}{data frame with shares to be renovated for the initial stock}
 
-\item{gdx}{character, path to input gdx file}
+\item{p_shareRenHS}{data frame with shares to be renovated for the inflow}
+
+\item{dims}{character, dimensions of the data without time periods}
 }
 \description{
 Verify the lifetime constraint of heating systems
