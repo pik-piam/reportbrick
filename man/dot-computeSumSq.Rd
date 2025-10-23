@@ -4,10 +4,12 @@
 \alias{.computeSumSq}
 \title{Compute the square root of the sum of the squares in a data frame}
 \usage{
-.computeSumSq(df, rprt = "", addSign = TRUE)
+.computeSumSq(df, tCalib, rprt = "", addSign = TRUE)
 }
 \arguments{
 \item{df}{data frame, containing the data to be evaluated}
+
+\item{tCalib}{numeric, time periods the model was calibrated on}
 
 \item{rprt}{character, column names for which the sum of the squares should be reported separately}
 
