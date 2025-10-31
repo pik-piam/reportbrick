@@ -28,10 +28,7 @@ reportRenovation <- function(gdx, renovatedObj = c("bs", "hs"),
 
   # renovation variable
   v_renovation <- readGdxSymbol(gdx, renSymbol) %>%
-    complete_magpie(fill = 0)
-
-  # unit conversion: million m2 / yr-> billion m2 / yr
-  v_renovation <- (v_renovation / 1000) %>%
+    complete_magpie(fill = 0) %>%
     mselect(qty = "area") %>%
     collapseDim(dim = "qty")
 
@@ -91,70 +88,70 @@ reportRenovation <- function(gdx, renovatedObj = c("bs", "hs"),
 
     ## Total ====
     .reportAggRen(v_renovation,
-                  "Renovation|Buildings|{renName} (bn m2/yr)",
+                  "Renovation|Buildings|{renName} (mn m2/yr)",
                   agg = c(bs = "all", hs = "all", renr = "all", vin = "all",
                           loc = "all", typ = "resCom", inc = "all")),
     .reportAggRen(v_renovation,
-                  "Renovation|Residential|{renName} (bn m2/yr)",
+                  "Renovation|Residential|{renName} (mn m2/yr)",
                   agg = c(bs = "all", hs = "all", renr = "all", vin = "all",
                           loc = "all", typ = "res", inc = "all")),
     .reportAggRen(v_renovation,
-                  "Renovation|Commercial|{renName} (bn m2/yr)",
+                  "Renovation|Commercial|{renName} (mn m2/yr)",
                   agg = c(bs = "all", hs = "all", renr = "all", vin = "all", loc = "all", typ = "com", inc = "all")),
 
 
     ## by building type ====
     .reportAggRen(v_renovation,
-                  "Renovation|Residential|{renName}|{typ} (bn m2/yr)",
+                  "Renovation|Residential|{renName}|{typ} (mn m2/yr)",
                   agg = c(bs = "all", hs = "all", renr = "all", vin = "all", loc = "all", inc = "all"),
                   rprt = c(typ = "res")),
 
 
     ## by location ====
     .reportAggRen(v_renovation,
-                  "Renovation|Residential|{renName}|{loc} (bn m2/yr)",
+                  "Renovation|Residential|{renName}|{loc} (mn m2/yr)",
                   agg = c(bs = "all", hs = "all", renr = "all", vin = "all", typ = "res", inc = "all"),
                   rprt = c(loc = "all")),
 
 
     ## by initial state ====
     .reportAggRen(v_renovation,
-                  "Renovation|Residential|{renName}|Initial|{ren} (bn m2/yr)",
+                  "Renovation|Residential|{renName}|Initial|{ren} (mn m2/yr)",
                   agg = c(nonRen = "all", renr = "all", vin = "all", loc = "all", typ = "res", inc = "all"),
                   rprt = c(ren = "all")),
 
 
     ## by building type + initial state ====
     .reportAggRen(v_renovation,
-                  "Renovation|Residential|{renName}|{typ}|Initial|{ren} (bn m2/yr)",
+                  "Renovation|Residential|{renName}|{typ}|Initial|{ren} (mn m2/yr)",
                   agg = c(nonRen = "all", renr = "all", vin = "all", loc = "all", inc = "all"),
                   rprt = c(ren = "all", typ = "res")),
 
 
     ## by final state ====
     .reportAggRen(v_renovation,
-                  "Renovation|Residential|{renName}|Final|{renr} (bn m2/yr)",
+                  "Renovation|Residential|{renName}|Final|{renr} (mn m2/yr)",
                   agg = c(bs = "all", hs = "all", vin = "all", loc = "all", typ = "res", inc = "all"),
                   rprt = c(renr = "allr")),
 
 
     ## only identical replacement of the shell/heating system ====
     .reportAggRen(v_renovation,
-                  "Renovation|Residential|{renName}|Identical replacement (bn m2/yr)",
+                  "Renovation|Residential|{renName}|Identical replacement (mn m2/yr)",
                   agg = c(nonRen = "all", ren.renr = "identRepl", vin = "all", loc = "all",
                           typ = "res", inc = "all")),
 
 
     ## only identical heating replacement by shell/heating system ====
     .reportAggRen(v_renovation,
-                  "Renovation|Residential|{renName}|Identical replacement|{ren.renr} (bn m2/yr)",
+                  "Renovation|Residential|{renName}|Identical replacement|{ren.renr} (mn m2/yr)",
                   agg = c(nonRen = "all", vin = "all", loc = "all", typ = "res", inc = "all"),
                   rprt = c(ren.renr = "identRepl"))
 
   )
 
-  renTotal <- .constructVariableName("Renovation|Residential|{renName} (bn m2/yr)")
-  renIdentRepl <- .constructVariableName("Renovation|Residential|{renName}|Identical replacement (bn m2/yr)")
+  renTotal <- .constructVariableName("Renovation|Residential|{renName} (mn m2/yr)")
+  renIdentRepl <- .constructVariableName("Renovation|Residential|{renName}|Identical replacement (mn m2/yr)")
 
   if (all(c(renTotal, renIdentRepl) %in% getItems(out, dim = 3))) {
 
@@ -166,7 +163,7 @@ reportRenovation <- function(gdx, renovatedObj = c("bs", "hs"),
       ## only changes of heating systems ====
       setNames(
         out[, , renTotal, drop = TRUE] - out[, , renIdentRepl, drop = TRUE],
-        .constructVariableName("Renovation|Residential|{renName}|Effective change (bn m2/yr)")
+        .constructVariableName("Renovation|Residential|{renName}|Effective change (mn m2/yr)")
       )
     )
 
@@ -180,17 +177,17 @@ reportRenovation <- function(gdx, renovatedObj = c("bs", "hs"),
     ## only changes of heating systems by heating system ====
     do.call(mbind, lapply(brickSets[[finalCol]][["subsets"]][["all"]], function(elemName) {
       elem <- brickSets[[finalCol]][["elements"]][[elemName]]
-      renFinal <- paste0(.constructVariableName("Renovation|Residential|{renName}|Final|"), elem, " (bn m2/yr)")
+      renFinal <- paste0(.constructVariableName("Renovation|Residential|{renName}|Final|"), elem, " (mn m2/yr)")
       renIdentRepl <- paste0(
         .constructVariableName("Renovation|Residential|{renName}|Identical replacement|"),
         elem,
-        " (bn m2/yr)"
+        " (mn m2/yr)"
       )
 
       renChangeFinal <- paste0(
         .constructVariableName("Renovation|Residential|{renName}|Effective change|Final|"),
         elem,
-        " (bn m2/yr)"
+        " (mn m2/yr)"
       )
       if (all(c(renFinal, renIdentRepl) %in% getItems(out, dim = 3))) {
         setNames(out[, , renFinal, drop = TRUE] - out[, , renIdentRepl, drop = TRUE], renChangeFinal)
