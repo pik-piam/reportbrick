@@ -48,6 +48,21 @@ walk(heatingRes, showLinePlots, data = data)
 
 ### Commercial
 
+## Building stock difference
+
+### Residential
+
+```{r residential stock vars}
+tot <- "Stock Delta|Residential"
+heatingRes <- paste(tot, heating, sep = "|")
+```
+
+#### by Space heating
+```{r Stock-Residential-(heating)}
+showAreaAndBarPlots(data, vars = heatingRes, tot = tot, orderVars = "user", scales = "fixed")
+walk(heatingRes, showLinePlots, data = data)
+```
+
 ## Construction flow
 
 ```{r construction vars}
