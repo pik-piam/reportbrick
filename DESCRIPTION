@@ -1,8 +1,8 @@
 Type: Package
 Package: reportbrick
 Title: Reporting package for BRICK
-Version: 0.12.4
-Date: 2025-10-17
+Version: 0.13.0
+Date: 2025-11-06
 Authors@R: c(
     person("Robin", "Hasse", , "robin.hasse@pik-potsdam.de",
            role = c("aut", "cre"),
@@ -15,8 +15,10 @@ Description: This package contains BRICK-specific routines to report model resul
 License: LGPL-3
 URL: https://github.com/pik-piam/reportbrick
 Imports:
+  colorspace,
   dplyr,
   gamstransfer (>= 3.0.1),
+  ggforce,
   ggplot2,
   ggpubr,
   ggsankey,
@@ -37,4 +39,4 @@ Suggests:
   covr,
   testthat
 Encoding: UTF-8
-RoxygenNote: 7.3.2
+RoxygenNote: 7.3.3

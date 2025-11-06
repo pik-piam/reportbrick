@@ -1,0 +1,427 @@
+---
+title: "`r params$docTitle`"
+date: "`r format(Sys.Date())`"
+output:
+  pdf_document:
+    toc: true
+    toc_depth: 3
+    fig_caption: false
+params:
+    docTitle: "BRICK Analysis report"
+    file: "BRICK_analysis_report.csv"
+    path: "C:/Users/ricardar/Documents/PIAM/brick/output/noShellEUR-lowGran_2025-06-27_15.34.41/"
+    scenNames: NULL
+    savePlots: TRUE
+    name: ""
+---
+
+```{r setup, include=FALSE}
+library(dplyr) #nolint: undesirable_function_linter.
+library(ggplot2) #nolint: undesirable_function_linter.
+
+knitr::opts_chunk$set(
+  echo = FALSE,
+  error = TRUE,
+  message = FALSE,
+  warning = FALSE
+)
+```
+
+```{r set variables and functions, check existence of first file}
+
+# Assemble the file path
+filePath <- file.path(params$path, params$file)
+
+if (length(filePath) > 1) {
+  stop("plotsLcc.Rmd only runs on a single file.")
+}
+
+# Check if the file exists
+if (!file.exists(filePath)) {
+  message("No BRICK_analysis_report.csv file found. ",
+          "BRICK_calibration_calibration.csv is normally produced during calibration runs.")
+  knitr::knit_exit()
+}
+
+config <- yaml::read_yaml(file.path(params$path, "config", "config_COMPILED.yaml"))
+tmpl <- config[["reportingTemplate"]]
+
+outName <- params$name
+outPath <- dirname(filePath[1])
+
+```
+
+```{r Read in data}
+data <- utils::read.csv(filePath) %>%
+  filter(typ == "Res") # Temporary
+```
+
+# Lifetime distribution estimates
+
+## Lifetime distributions of standing stock
+
+### Ex-post estimate
+
+```{r Plot ex-post outflow of standing stock}
+
+showAnalysisPlot("bar", data, "stockInitLtPost", yname = "absVal", color = "hs", rprt = "vin",
+                 xlabName = "Time of removal", ylabName = "Quantity in million m2", tmpl = tmpl)
+
+showAnalysisPlot("line", data, c("stockInitLtPostRemain", "stockWbRemain"), yname = "relVal",
+                 color = "hs", linetype = "variable", rprt = "vin",
+                 xlabName = "Time of removal", ylabName = "Quantity in million m2", tmpl = tmpl)
+
+```
+
+### Ex-ante estimate
+
+```{r Plot ex-ante outflow of standing stock}
+
+showAnalysisPlot("bar", data, "stockInitLtAnte", yname = "absVal", color = "hs", rprt = "vin",
+                 xlabName = "Time of removal", ylabName = "Quantity in million m2", tmpl = tmpl)
+
+showAnalysisPlot("line", data, c("stockInitLtAnteRemain", "stockWbRemain"), yname = "relVal",
+                 color = "hs", linetype = "variable", rprt = "vin",
+                 xlabName = "Time of removal", ylabName = "Quantity in million m2", tmpl = tmpl)
+```
+
+### Mixed estimate
+
+```{r Plot mixture outflow of standing stock}
+
+showAnalysisPlot("bar", data, "stockInitLtMixed", yname = "absVal", color = "hs", rprt = "vin",
+                 xlabName = "Time of removal", ylabName = "Quantity in million m2", tmpl = tmpl)
+
+
+showAnalysisPlot("line", data, c("stockInitLtMixedRemain", "stockWbRemain"), yname = "relVal",
+                 color = "hs", linetype = "variable", rprt = "vin",
+                 xlabName = "Time of removal", ylabName = "Quantity in million m2", tmpl = tmpl)
+```
+
+### Mixed estimate compared to ex-ante estimate
+
+```{r Plot mixed initial stock leave time and ex-ante estimate}
+showAnalysisPlot("twoBar", data, c("stockInitLtMixed", "stockInitLtAnte"), yname = "absVal",
+                 color = "hs", remCols = c("value", "relVal"), rprt = "ttotIn",
+                 xlabName = "Time of removal", ylabName = "Quantity in million m2", tmpl = tmpl)
+```
+
+### Ex-post estimate, relative values
+
+```{r Plot ex-post outflow of standing stock, relative values}
+
+showAnalysisPlot("bar", data, "stockInitLtPost", yname = "relVal", color = "hs",
+                 rprt = "vin", avg = "ttotIn",
+                 xlabName = "Time of removal", ylabName = "Share of installations", tmpl = tmpl)
+
+```
+
+### Ex-ante estimate, relative values
+
+```{r Plot ex-ante outflow of standing stock, relative values}
+
+showAnalysisPlot("bar", data, "stockInitLtAnte", yname = "relVal", color = "hs",
+                 rprt = "vin", avg = "ttotIn",
+                 xlabName = "Time of removal", ylabName = "Share of installations", tmpl = tmpl)
+
+```
+
+## Lifetime estimates of new constructions
+
+### Ex-post estimate
+
+```{r Plot ex-post leave time of constructions}
+
+showAnalysisPlot("bar", data, "conLtPost", yname = "absVal", color = "hs", rprt = "ttotIn",
+                 xlabName = "Time of removal", ylabName = "Quantity in million m2", tmpl = tmpl)
+
+```
+
+### Ex-ante estimate
+
+```{r Plot ex-ante leave time of constructions}
+
+showAnalysisPlot("bar", data, "conLtAnte", yname = "absVal", color = "hs", rprt = "ttotIn",
+                 xlabName = "Time of removal", ylabName = "Quantity in million m2", tmpl = tmpl)
+
+```
+
+### Mixed estimate
+
+```{r Plot mixture leave time of constructions}
+
+showAnalysisPlot("bar", data, "conLtMixed", yname = "absVal", color = "hs", rprt = "ttotIn",
+                 xlabName = "Time of removal", ylabName = "Quantity in million m2", tmpl = tmpl)
+
+```
+
+### Mixed estimate compared to ex-ante estimate
+
+```{r Plot mixed construction leave time and ex-ante estimate}
+showAnalysisPlot("twoBar", data, c("conLtMixed", "conLtAnte"), yname = "absVal", color = "hs",
+                 remCols = c("value", "relVal"), rprt = "ttotIn",
+                 xlabName = "Time of removal", ylabName = "Quantity in million m2", tmpl = tmpl)
+```
+
+### Ex-post estimate, relative values
+
+```{r Plot ex-post leave time of constructions, relative values}
+
+showAnalysisPlot("bar", data, "conLtPost", yname = "relVal", color = "hs", rprt = "ttotIn",
+                 xlabName = "Time of removal", ylabName = "Share of installations", tmpl = tmpl)
+
+```
+
+### Ex-ante estimate, relative values
+
+```{r Plot ex-ante leave time of constructions, relative values}
+
+showAnalysisPlot("bar", data, "conLtAnte", yname = "relVal", color = "hs", rprt = "ttotIn",
+                 xlabName = "Time of removal", ylabName = "Share of installations", tmpl = tmpl)
+
+```
+
+## Lifetime distribution of renovations
+
+### Ex-post estimate
+
+```{r Plot ex-post leave time of renovations}
+
+showAnalysisPlot("bar", data, "renLtPost", yname = "absVal", color = "hs", rprt = "ttotIn",
+                 xlabName = "Time of removal", ylabName = "Quantity in million m2", tmpl = tmpl)
+
+showAnalysisPlot("line", data, c("renLtPostRemain", "wbRemain"), yname = "relVal",
+                 color = "hs", linetype = "variable", rprt = c("vin", "ttotIn"),
+                 xlabName = "Time of removal", ylabName = "Quantity in million m2", tmpl = tmpl)
+```
+
+### Ex-ante estimate
+
+```{r Plot ex-ante leave time of renovations}
+
+showAnalysisPlot("bar", data, "renLtAnte", yname = "absVal", color = "hs", rprt = "ttotIn",
+                 xlabName = "Time of removal", ylabName = "Quantity in million m2", tmpl = tmpl)
+
+showAnalysisPlot("line", data, c("renLtAnteRemain", "wbRemain"), yname = "relVal",
+                 color = "hs", linetype = "variable", rprt = c("vin", "ttotIn"),
+                 xlabName = "Time of removal", ylabName = "Quantity in million m2", tmpl = tmpl)
+```
+
+### Mixed estimate
+
+```{r Plot mixture leave time of renovations}
+
+showAnalysisPlot("bar", data, "renLtMixed", yname = "absVal", color = "hs", rprt = c("vin", "ttotIn"),
+                 xlabName = "Time of removal", ylabName = "Quantity in million m2", tmpl = tmpl)
+
+showAnalysisPlot("line", data, c("renLtMixedRemain", "wbRemain"), yname = "relVal",
+                 color = "hs", linetype = "variable", rprt = c("vin", "ttotIn"),
+                 xlabName = "Time of removal", ylabName = "Quantity in million m2", tmpl = tmpl)
+```
+
+### Mixed estimate compared to ex-ante estimate
+
+```{r Plot mixed renovation leave time and ex-ante estimate}
+
+showAnalysisPlot("twoBar", data, c("renLtMixed", "renLtAnte"), yname = "absVal", color = "hs",
+                 remCols = c("value", "relVal"), rprt = "ttotIn",
+                 xlabName = "Time of removal", ylabName = "Quantity in million m2", tmpl = tmpl)
+```
+
+### Ex-post estimate, relative values
+
+```{r Plot ex-post leave time of renovations, relative values}
+
+showAnalysisPlot("bar", data, "renLtPost", yname = "relVal", color = "hs",
+                 rprt = "ttotIn", avg = "vin",
+                 xlabName = "Time of removal", ylabName = "Share of installations", tmpl = tmpl)
+
+```
+
+### Ex-ante estimate, relative values
+
+```{r Plot ex-ante leave time of renovations, relative values}
+
+showAnalysisPlot("bar", data, "renLtAnte", yname = "relVal", color = "hs",
+                 rprt = "ttotIn", avg = "vin",
+                 xlabName = "Time of removal", ylabName = "Share of installations", tmpl = tmpl)
+
+```
+
+### Mixed estimate, relative values
+
+```{r Plot mixed leave time of renovations, relative values}
+
+showAnalysisPlot("bar", data, "renLtMixed", yname = "relVal", color = "hs",
+                 rprt = "ttotIn", avg = "vin",
+                 xlabName = "Time of removal", ylabName = "Share of installations", tmpl = tmpl)
+
+```
+
+
+## Total outflow
+
+```{r Plot total outflow}
+
+showAnalysisPlot("bar", data, "outflow", yname = "value", color = "hs", rprt = "vin",
+                 xlabName = "Time of removal", ylabName = "Quantity in million m2", tmpl = tmpl)
+
+```
+
+### Verification of lifetime inequality
+
+```{r Plot left-hand side and right-hand side of lifetime inequality}
+
+showAnalysisPlot("twoBar", data, c("lhsLtIneq", "rhsLtIneq"), yname = "value", color = "hs",
+                 rprt = "vin",
+                 xlabName = "Time of removal", ylabName = "Quantity in million m2", tmpl = tmpl)
+```
+
+
+# Lifecycle costs (LCC)
+
+## LCC of construction with ex-ante lifetimes
+
+```{r Plot ex-ante LCC of construction}
+showAnalysisPlot("bar", data, "conLccAnte",
+                 xname = "hs", yname = "value", color = "costType", rprt = c("ttotIn", "typ", "loc"),
+                 facets = NULL, xlabName = "Heating System", ylabName = "Costs in USD/m2", tmpl = tmpl)
+```
+
+## LCC of construction with mixed lifetimes
+
+```{r Plot LCC of construction with mixed lifetimes}
+showAnalysisPlot("bar", data, "conLccMixed",
+                 xname = "hs", yname = "value", color = "costType", rprt = c("ttotIn", "typ", "loc"),
+                 facets = NULL, xlabName = "Heating System", ylabName = "Costs in USD/m2", tmpl = tmpl)
+```
+
+## LCC of renovation with ex-ante lifetimes
+
+```{r Plot ex-ante LCC of renovation}
+showAnalysisPlot("bar", data, "renLccAnte",
+                 xname = "hs", yname = "value", color = "costType", rprt = c("ttotIn", "typ", "loc"), avg = "vin",
+                 facets = NULL, xlabName = "Heating System", ylabName = "Costs in USD/m2", tmpl = tmpl)
+```
+
+## LCC of renovation with mixed lifetimes
+
+```{r Plot LCC of renovation with mixed lifetimes}
+showAnalysisPlot("bar", data, "renLccMixed",
+                 xname = "hs", yname = "value", color = "costType", rprt = c("ttotIn", "typ", "loc"), avg = "vin",
+                 facets = NULL, xlabName = "Heating System", ylabName = "Costs in USD/m2", tmpl = tmpl)
+```
+
+# Levelized costs of heat (LCOH)
+
+## LCOH of construction with ex-ante lifetimes
+
+```{r Plot LCOH of construction with ex-ante lifetimes}
+showAnalysisPlot("bar", data, "conLcohAnte",
+                 xname = "hs", yname = "value", color = "costType", rprt = c("ttotIn", "typ", "loc"),
+                 facets = NULL, xlabName = "Heating System", ylabName = "Costs in US Cents/kWh", tmpl = tmpl)
+```
+
+## LCOH of construction with mixed lifetimes
+
+```{r Plot LCOH of construction with mixed lifetimes}
+showAnalysisPlot("bar", data, "conLcohMixed",
+                 xname = "hs", yname = "value", color = "costType", rprt = c("ttotIn", "typ", "loc"),
+                 facets = NULL, xlabName = "Heating System", ylabName = "Costs in US Cents/kWh", tmpl = tmpl)
+```
+
+## LCOH of renovation with ex-ante lifetimes
+
+```{r Plot LCOH of renovation with ex-ante lifetimes}
+showAnalysisPlot("bar", data, "renLcohAnte",
+                 xname = "hs", yname = "value", color = "costType", rprt = c("ttotIn", "typ", "loc"), avg = "vin",
+                 facets = NULL, xlabName = "Heating System", ylabName = "Costs in US Cents/kWh", tmpl = tmpl)
+```
+
+## LCOH of renovation with mixed lifetimes
+
+```{r Plot LCOH of renovation with mixed lifetimes}
+showAnalysisPlot("bar", data, "renLcohMixed",
+                 xname = "hs", yname = "value", color = "costType", rprt = c("ttotIn", "typ", "loc"), avg = "vin",
+                 facets = NULL, xlabName = "Heating System", ylabName = "Costs in US Cents/kWh", tmpl = tmpl)
+```
+
+# Logit Shares
+
+## Logit shares of renovation with ex-ante lifetimes
+
+```{r Plot logit shares of renovation with ex-ante lifetimes, all}
+showAnalysisPlot("bar", data, "renLogitAllAnte",
+                 xname = "ttotIn", yname = "value", color = "hs", rprt = "vin",
+                 xlabName = "Time of installation", ylabName = "Shares", tmpl = tmpl)
+```
+
+## Logit shares of renovation with mixed lifetimes
+
+```{r Plot logit shares of renovation with mixed lifetimes, energy ladder 1}
+showAnalysisPlot("bar", data, "renLogitAllMixed",
+                 xname = "ttotIn", yname = "value", color = "hs", rprt = "vin",
+                 xlabName = "Time of installation", ylabName = "Shares", tmpl = tmpl)
+```
+
+# Logit shares compared to Brick shares
+
+```{r Plot renovation-in shares}
+# This is the share computed based on the already aggregated inflow data
+# Needs to be taken with a grain of salt!
+showAnalysisPlot("bar", data, "renBrickIn",
+                 xname = "ttotIn", yname = "value", color = "hs", rprt = "vin",
+                 xlabName = "Time of installation", ylabName = "Shares", tmpl = tmpl)
+```
+
+## Shares of renovation with ex-ante lifetimes
+
+### Aggregated across all hs
+
+```{r Plot Logit and brick Share with ex-ante lifetimes, all}
+showAnalysisPlot("twoBar", data, c("renLogitAllAnte", "renBrickAll"),
+                 yname = "value", xname = "ttotIn", color = "hs", rprt = "vin",
+                 xlabName = "Time of installation", ylabName = "Shares", tmpl = tmpl)
+```
+
+### Energy ladder 1
+
+```{r Plot Logit and brick Share with ex-ante lifetimes, energy ladder 1}
+showAnalysisPlot("twoBar", data, c("renLogitEl1Ante", "renBrickEl1"),
+                 yname = "value", xname = "ttotIn", color = "hs", rprt = "vin",
+                 xlabName = "Time of installation", ylabName = "Shares", tmpl = tmpl)
+```
+
+### By initial heating system
+
+```{r Plot Logit and brick Share with ex-ante lifetimes, by hs}
+showAnalysisPlot("twoBar", data, c("renLogitAnteFull", "renBrickFull"),
+                 yname = "value", xname = "hs", color = "hsr", rprt = c("vin", "ttotIn"),
+                 xlabName = "Previous heating system", ylabName = "Shares", tmpl = tmpl)
+```
+
+## Shares of renovation with mixed lifetimes
+
+### Aggregated across all hs
+
+```{r Plot Logit and brick Share with mixed lifetimes, all}
+showAnalysisPlot("twoBar", data, c("renLogitAllMixed", "renBrickAll"),
+                 yname = "value", xname = "ttotIn", color = "hs", rprt = "vin",
+                 xlabName = "Time of installation", ylabName = "Shares", tmpl = tmpl)
+```
+
+### Energy ladder 1
+
+```{r Plot Logit and brick Share with mixed lifetimes, energy ladder 1}
+showAnalysisPlot("twoBar", data, c("renLogitEl1Mixed", "renBrickEl1"),
+                 yname = "value", xname = "ttotIn", color = "hs", rprt = "vin",
+                 xlabName = "Time of installation", ylabName = "Shares", tmpl = tmpl)
+```
+
+### By initial heating system
+
+```{r Plot Logit and brick Share with mixed lifetimes, by hs}
+showAnalysisPlot("twoBar", data, c("renLogitMixedFull", "renBrickFull"),
+                 yname = "value", xname = "hs", color = "hsr", rprt = c("vin", "ttotIn"),
+                 xlabName = "Previous heating system", ylabName = "Shares", tmpl = tmpl)
+```
