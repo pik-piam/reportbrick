@@ -21,7 +21,6 @@ showAnalysisPlot(
   ylabName = NULL,
   tmpl = NULL,
   filterRows = list(hs = "h2bo", hsr = "h2bo"),
-  valueCap = Inf,
   ...
 )
 }
@@ -61,8 +60,6 @@ from the plots shown}
 \item{tmpl}{character, name or path to reportbrick reporting template.}
 
 \item{filterRows}{named list, key-value pairs to filter the data by}
-
-\item{valueCap}{numeric, maximum value for value data to be included in the plot}
 
 \item{...}{additional parameters to be passed to the plotting functions}
 }
