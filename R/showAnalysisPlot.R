@@ -28,12 +28,11 @@
 #' @param ylabName character, y-axis label
 #' @param tmpl character, name or path to reportbrick reporting template.
 #' @param filterRows named list, key-value pairs to filter the data by
-#' @param valueCap numeric, maximum value for value data to be included in the plot
 #' @param ... additional parameters to be passed to the plotting functions
 #'
-#' @importFrom dplyr %>% .data across all_of any_of cur_column filter group_by lag mutate
+#' @importFrom dplyr %>% .data across all_of anti_join any_of cur_column filter group_by lag mutate
 #'   pull rename_with select slice_max slice_min summarise ungroup where
-#' @importFrom ggplot2 aes coord_fixed facet_grid element_text expansion facet_wrap
+#' @importFrom ggplot2 aes coord_cartesian coord_fixed facet_grid element_text expansion facet_wrap
 #'   geom_bar geom_col geom_line geom_point geom_text geom_tile ggplot ggtitle
 #'   scale_alpha_manual scale_color_identity scale_color_manual scale_fill_manual scale_shape_manual
 #'   sec_axis sym theme theme_minimal vars xlab ylab
@@ -44,7 +43,7 @@ showAnalysisPlot <- function(plotType, data, varName, yname, color = NULL, #noli
                              xname = "ttotOut", valueName = yname, suppressLateTtot = TRUE,
                              xlabName = NULL, ylabName = NULL, tmpl = NULL,
                              filterRows = list(hs = "h2bo", hsr = "h2bo"),
-                             valueCap = Inf, ...) {
+                             ...) {
 
 
 
@@ -57,9 +56,10 @@ showAnalysisPlot <- function(plotType, data, varName, yname, color = NULL, #noli
   }
 
   # Additional scatter plot
-  .addLtPoint <- function(pl, plDataMain, plDataAdd, xname, yname, y2labName) {
+  .addLtPoint <- function(pl, plDataMain, plDataAdd, xname, yname, y2labName, fixedYlim = NULL) {
 
-    scaleFactor <- max(plDataMain[[yname]]) / max(plDataAdd[[yname]])
+    maxMain <- if (!is.null(fixedYlim)) fixedYlim else max(plDataMain[[yname]])
+    scaleFactor <- maxMain / max(plDataAdd[[yname]])
 
     pl + geom_point(
       data = plDataAdd,
@@ -77,7 +77,9 @@ showAnalysisPlot <- function(plotType, data, varName, yname, color = NULL, #noli
   }
 
   # Bar plot
-  .createLtBar <- function(plData, xname, yname, color, addPoints = NULL) {
+  .createLtBar <- function(plData, xname, yname, color,
+                           addPoints = NULL,
+                           valueCap = Inf, capCol = NULL, fixedYlim = NULL) {
     if (!is.null(addPoints)) {
       plDataMain <- plData %>%
         filter(.data$variable != addPoints$variable)
@@ -88,31 +90,47 @@ showAnalysisPlot <- function(plotType, data, varName, yname, color = NULL, #noli
       plDataMain <- plData
     }
 
-    alphaMap <- c(`FALSE` = 1, `TRUE` = 0.3)
-
-    maxYlim <- plDataMain %>%
-      filter(!.data$exceedCap) %>%
-      group_by(across(-all_of(c(color, "exceedCap", yname)))) %>%
-      summarise(value = sum(.data[[yname]])) %>%
-      pull("value") %>%
-      max()
-
     plDataMain <- plDataMain %>%
-      group_by(across(-all_of(c(color, "exceedCap", yname)))) %>%
-      mutate(value = ifelse(
-        .data$exceedCap,
-        (maxYlim - sum(.data[[yname]][!.data$exceedCap])) / sum(.data$exceedCap),
-        .data[[yname]]
-      ))
+      group_by(across(-all_of(c(color, yname)))) %>%
+      mutate(exceedCap = pmax(sum(.data[[yname]]) - valueCap, 0)) %>%
+      ungroup()
+
+    if (valueCap != Inf) {
+      plDataExceed <- plDataMain %>%
+        filter(.data$exceedCap > 0) %>%
+        group_by(across(-all_of(c(color, yname)))) %>%
+        mutate(
+          modifyValue = if (!is.null(capCol)) .data[[color]] == capCol else max(.data[[yname]]) == .data[[yname]],
+          value = ifelse(
+            .data$modifyValue,
+            pmax(.data[[yname]] - .data$exceedCap, 0),
+            .data[[yname]]
+          )
+        ) %>%
+        rename_with(~ yname, .cols = "value")
+
+      plDataMain <- plDataMain %>%
+        anti_join(plDataExceed, by = setdiff(colnames(plDataMain), yname)) %>%
+        mutate(modifyValue = FALSE) %>%
+        rbind(plDataExceed)
+    } else {
+      plDataMain <- mutate(plDataMain, modifyValue = FALSE)
+    }
+
+    alphaMap <- c(`FALSE` = 1, `TRUE` = 0.3)
 
     pl <- plDataMain %>%
       .removeEmptyCols() %>%
-      ggplot(mapping = aes(x = !!sym(xname), y = .data$value, fill = !!sym(color), alpha = .data[["exceedCap"]])) +
+      ggplot(mapping = aes(x = !!sym(xname), y = .data[[yname]], fill = !!sym(color), alpha = .data$modifyValue)) +
       geom_col() +
       scale_alpha_manual(values = alphaMap, guide = "none")
 
     if (!is.null(addPoints) && nrow(plDataAdd) > 0) {
-      pl <- .addLtPoint(pl, plDataMain, plDataAdd, xname, yname, addPoints$y2labName)
+      pl <- .addLtPoint(pl, plDataMain, plDataAdd, xname, yname, addPoints$y2labName, fixedYlim)
+    }
+
+    if (!is.null(fixedYlim)) {
+      pl <- pl + coord_cartesian(ylim = c(0, fixedYlim))
     }
 
     pl
@@ -222,7 +240,7 @@ showAnalysisPlot <- function(plotType, data, varName, yname, color = NULL, #noli
       geom_text(mapping = aes(x = .data$x, y = .data$y),
                 data = labelPoint,
                 label = lab,
-                parse = TRUE, size = 3, hjust = 1.1, vjust = 1.1)
+                parse = TRUE, size = 3, hjust = 1.1, vjust = -1.1)
 
   }
 
@@ -268,7 +286,7 @@ showAnalysisPlot <- function(plotType, data, varName, yname, color = NULL, #noli
   }
 
   # Matrix pie chart
-  .createLtPieChart <- function(plData, varName, xname, yname, color, valueName = "value") {
+  .createLtPieChart <- function(plData, varName, xname, yname, color, valueName = "value", valueCap = Inf) {
 
     # Compute pie fractions
     plData <- plData %>%
@@ -277,7 +295,8 @@ showAnalysisPlot <- function(plotType, data, varName, yname, color = NULL, #noli
         x = as.factor(.data$x),
         y = as.factor(.data$y),
         xNum = as.numeric(.data$x),
-        yNum = as.numeric(.data$y)
+        yNum = as.numeric(.data$y),
+        exceedCap = .data[[valueName]] > valueCap
       ) %>%
       group_by(across(all_of(c("x", "y")))) %>%
       mutate(
@@ -386,15 +405,18 @@ showAnalysisPlot <- function(plotType, data, varName, yname, color = NULL, #noli
       )
   }
 
-  .createLtHeatMap <- function(plData, varName, xname, yname, valueName = "value") {
+  .createLtHeatMap <- function(plData, varName, xname, yname, valueName = "value", valueCap = Inf) {
 
     plData <- plData %>%
       filter(.data$costType == "intangible") %>%
-      mutate(fillValue = ifelse(
-        .data$exceedCap,
-        max(.data[[valueName]][!.data$exceedCap]),
-        .data[[valueName]]
-      ))
+      mutate(
+        exceedCap = .data[[valueName]] > valueCap,
+        fillValue = ifelse(
+          .data$exceedCap,
+          max(.data[[valueName]][!.data$exceedCap]),
+          .data[[valueName]]
+        )
+      )
 
     # Compute dynamic threshold (median of value column)
     valueThreshold <- stats::median(plData$fillValue, na.rm = TRUE)
@@ -559,14 +581,13 @@ showAnalysisPlot <- function(plotType, data, varName, yname, color = NULL, #noli
       plDataFiltered <- plDataFiltered %>%
         filter(.data[[col]] == filterVals[[col]][count[col]])
     }
-    plDataFiltered <- mutate(plDataFiltered, exceedCap = .data[[valueName]] > valueCap & .data$variable == varName)
 
 
     ## Handle the heading ====
 
     thisHeading <- paste(heading, paste(lapply(rprt, function(col) {
       paste(col, "=", filterVals[[col]][count[col]])
-    }), collapse = " | "), sep = " | ")
+    }), collapse = " | "), sep = "\n")
 
 
     ## Update the looping variable ====
@@ -595,9 +616,9 @@ showAnalysisPlot <- function(plotType, data, varName, yname, color = NULL, #noli
       line = .createLtLine(plDataMain, xname, yname, color, ...),
       scatter = .createScatter(plDataMain, xname, yname, color, ...),
       pieChart = .createLtPieChart(plDataMain, varName, xname, yname, color,
-                                   valueName = valueName),
+                                   valueName = valueName, ...),
       barMatrix = .createLtBarChart(plDataMain, varName, xname, yname, color, valueName = valueName),
-      heatMap = .createLtHeatMap(plDataMain, varName, xname, yname, valueName = valueName)
+      heatMap = .createLtHeatMap(plDataMain, varName, xname, yname, valueName = valueName, ...)
     ) +
       ggtitle(thisHeading)
 
