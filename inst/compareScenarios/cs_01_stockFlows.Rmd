@@ -209,7 +209,10 @@ showAreaAndBarPlots(data, vars = identReplRes, orderVars = "user", scales = "fix
 #### by identical replacement and by heating system
 ```{r Renovation-Residential-(heating-identicalReplacement)}
 showAreaAndBarPlots(data, vars = unlist(identReplHsRes), orderVars = "user", scales = "fixed")
-walk(identReplHsRes, showAreaAndBarPlots, data = data, orderVars = "user", scales = "fixed")
+finalHs <- lapply(heating, function(hsr) {
+  paste(tot, "Final", hsr, sep = "|")
+})
+walk2(identReplHsRes, finalHs, showAreaAndBarPlots, data = data, orderVars = "user", scales = "fixed")
 ```
 
 ### Commercial
