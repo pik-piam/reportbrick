@@ -16,6 +16,9 @@
 #'
 computeLtAnte <- function(data, shareRen, t0, isFlow = TRUE) {
 
+  joinCols <- c("hs", "region", "typ", "ttotIn")
+  if (isFALSE(isFlow)) joinCols <- c(joinCols, "vin")
+
   shareRen <- shareRen %>%
     group_by(across(-all_of(c("ttotOut", "value")))) %>%
     mutate(value = c(.data$value[1], diff(.data$value))) %>%
@@ -25,7 +28,7 @@ computeLtAnte <- function(data, shareRen, t0, isFlow = TRUE) {
   # Compute absolute floorspace being removed from the stock from relative share
   ltAnte <- data %>%
     left_join(shareRen,
-              by = c("hs", "region", "typ", "ttotIn")) %>%
+              by = joinCols) %>%
     filter(.data$ttotIn <= .data$ttotOut, xor(isTRUE(isFlow), .data$ttotIn %in% t0),
            !.data$ttotOut %in% t0) %>%
     mutate(absVal = .data[["value"]] * .data[["relVal"]]) %>%
