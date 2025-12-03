@@ -16,13 +16,16 @@ rescaleRemainingShare <- function(remainingShare, wbRescale, ttotRescale) {
     select(-"ttotIn", -"ttotOut") %>%
     rename(scale = "relVal")
 
+  allDims <- c("qty", "bs", "hs", "vin", "region", "loc", "typ", "inc", "ttotIn")
+  joinDims <- intersect(allDims, colnames(wbRescale))
+
   remainingShare %>%
     complete(
-      nesting(!!!syms(c("qty", "bs", "hs", "vin", "region", "loc", "typ", "inc", "ttotIn"))),
+      nesting(!!!syms(allDims)),
       ttotOut = c(ttotRescale, .data$ttotOut),
       fill = list(relVal = 1)
     ) %>%
-    left_join(wbRescale, by = c("hs", "region", "typ")) %>%
+    left_join(wbRescale, by = joinDims) %>%
     mutate(relVal = .data$relVal * .data$scale) %>%
     select(-"scale")
 }

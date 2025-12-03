@@ -20,7 +20,7 @@ verifyLtHs <- function(inflow, v_stockInit, outflow, p_shareRenHSinit, p_shareRe
     rename(stockVal = "value") %>%
     left_join(p_shareRenHSinit %>%
                 rename(shareVal = .data[["value"]]),
-              by = c("hs", "region", "typ", "ttotIn")) %>%
+              by = c("hs", "region", "typ", "vin", "ttotIn")) %>%
     mutate(initVal = .data[["stockVal"]] * .data[["shareVal"]]) %>%
     select(-"ttotIn", -"shareVal", -"stockVal")
 
