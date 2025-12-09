@@ -7,6 +7,7 @@
 showSankey(
   path,
   fill = c("bs", "hs"),
+  showOnlyRenovation = FALSE,
   filterData = NULL,
   maxPeriodsInRow = NULL,
   save = TRUE
@@ -17,6 +18,12 @@ showSankey(
 
 \item{fill}{character, dimension mapped to fill, either \code{"bs"} (building
 shell) or \code{"hs"} (heating system).}
+
+\item{showOnlyRenovation}{logical, if \code{FALSE}, the stock and all flows
+are shown including untouched buildings. If \code{TRUE}, only renovation
+activities are shown. This is helpful to better observe the renovation
+decision, especially with short time steps where renovation only affects a
+small share of the stock.}
 
 \item{filterData}{named list to filter the data before plotting}
 
