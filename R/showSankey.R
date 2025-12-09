@@ -6,6 +6,11 @@
 #' @param path character, path to the run
 #' @param fill character, dimension mapped to fill, either \code{"bs"} (building
 #'   shell) or \code{"hs"} (heating system).
+#' @param showOnlyRenovation logical, if \code{FALSE}, the stock and all flows
+#'   are shown including untouched buildings. If \code{TRUE}, only renovation
+#'   activities are shown. This is helpful to better observe the renovation
+#'   decision, especially with short time steps where renovation only affects a
+#'   small share of the stock.
 #' @param filterData named list to filter the data before plotting
 #' @param maxPeriodsInRow maximum number of time steps to plot in one row. If
 #'   there is more data, it is broken across multiple lines. If \code{NULL}, all
@@ -30,11 +35,12 @@
 #'   across all_of summarise arrange ungroup reframe everything rename case_when
 #' @importFrom ggplot2 ggplot aes geom_col position_stack geom_segment theme
 #'   theme_classic scale_x_continuous scale_y_continuous scale_fill_manual
-#'   scale_color_manual element_line element_blank ggsave
+#'   scale_color_manual element_line element_blank ggsave expansion
 #' @export
 
 showSankey <- function(path, # nolint: cyclocomp_linter.
                        fill = c("bs", "hs"),
+                       showOnlyRenovation = FALSE,
                        filterData = NULL,
                        maxPeriodsInRow = NULL,
                        save = TRUE) {
@@ -49,12 +55,19 @@ showSankey <- function(path, # nolint: cyclocomp_linter.
   # AESTHETICS -----------------------------------------------------------------
 
   # relative x-position between previous stock (0) and next stock (1)
-  xPos <- list(
-    con = 0.125,
-    ren_start = 0.3,
-    ren_end = 0.7,
-    dem = 0.875
-  )
+  xPos <- if (isTRUE(showOnlyRenovation)) {
+    list(
+      ren_start = 0.1,
+      ren_end = 0.9
+    )
+  } else {
+    list(
+      con = 0.125,
+      ren_start = 0.3,
+      ren_end = 0.7,
+      dem = 0.875
+    )
+  }
 
   # gap between construction from max. stock and demolition from zero w.r.t.
   # max stock in x direction
@@ -148,7 +161,7 @@ showSankey <- function(path, # nolint: cyclocomp_linter.
       .shiftXbyDt(x = shift_x, next_x = shift_next_x) %>%
       .setNode(node = node, next_node = next_node)
 
-    if (var != "Stock") {
+    if (var != "Stock" && !showOnlyRenovation) {
       dataFlow[["value"]] <- dataFlow[["value"]] * dataFlow[["dt"]]
     }
 
@@ -171,7 +184,10 @@ showSankey <- function(path, # nolint: cyclocomp_linter.
 
 
   # set target node of zero flows identical to origin
-  .attachZeroFlows <- function(df) {
+  .attachZeroFlows <- function(df, rmZeroFlows = FALSE) {
+    if (rmZeroFlows) {
+      return(df[df$next_node != "0", ])
+    }
     df %>%
       mutate(next_node = ifelse(.data$next_node == "0",
                                 .data$node,
@@ -208,7 +224,11 @@ showSankey <- function(path, # nolint: cyclocomp_linter.
 
 
   # add col for shift along x-axis for construction and demolition
-  .addShiftCol <- function(df) {
+  .addShiftCol <- function(df, zeroShift = FALSE) {
+    if (zeroShift) {
+      df$shift <- 0
+      return(df)
+    }
     totStock <- df %>%
       filter(.data$flow == "Stock_in") %>%
       group_by(.data$x) %>%
@@ -370,19 +390,25 @@ showSankey <- function(path, # nolint: cyclocomp_linter.
     stockBarWidth <- relBarWidth * min(dt[["dt"]])
     df %>%
       group_by(.data$x) %>%
-      mutate(width = stockBarWidth * case_when("Construction" %in% .data$node   ~ 0.5,
+      mutate(width = stockBarWidth * case_when(showOnlyRenovation               ~ 1.0,
+                                               "Construction" %in% .data$node   ~ 0.5,
                                                "Demolition_end" %in% .data$node ~ 0.5,
                                                .data$bar == "Renovation"        ~ 0.2,
                                                .default                         = 1.0),
-             outline = .data$bar %in% barsWithOutline & .data$node != "Shift")
+             outline = .data$bar %in% barsWithOutline & .data$node != "Shift" | showOnlyRenovation)
   }
 
 
 
-  # get maximum total stock across all time steps
-  .getMaxStock <- function(df) {
+  # get maximum y value across all time steps
+  .getYMax <- function(df) {
+    var <- if ("Stock" %in% df$bar) {
+      "Stock"
+    } else {
+      "Renovation"
+    }
     df %>%
-      filter(.data$bar == "Stock") %>%
+      filter(.data$bar == var) %>%
       group_by(.data$x) %>%
       summarise(value = sum(.data$value), .groups = "drop") %>%
       getElement("value") %>%
@@ -454,15 +480,15 @@ showSankey <- function(path, # nolint: cyclocomp_linter.
 
 
   # calculate pretty y breaks from max stock
-  .getYBreaks <- function(maxStock) {
-    y <- pretty(c(0, maxStock), 5)
+  .getYBreaks <- function(yMax) {
+    y <- pretty(c(0, yMax), 5)
 
     dy <- mean(diff(y))
 
     yMinor <- sort(c(y, y + dy / 2))
 
-    y <- y[y <= maxStock]
-    yMinor <- yMinor[yMinor <= maxStock]
+    y <- y[y <= yMax]
+    yMinor <- yMinor[yMinor <= yMax]
 
     list(major = y, minor = yMinor)
   }
@@ -498,11 +524,11 @@ showSankey <- function(path, # nolint: cyclocomp_linter.
 
 
   # print y axis until max stock
-  .extendYAxis <- function(bars, maxStock, minX = NA) {
-    if (is.na(minX)) {
-      minX <- min(bars[["x"]]) - max(bars[["width"]])
+  .extendYAxis <- function(bars, yMax, xMin = NA) {
+    if (is.na(xMin)) {
+      xMin <- min(bars[["x"]]) - max(bars[["width"]])
     }
-    geom_segment(aes(x = minX, xend = minX, y = 0, yend = maxStock),
+    geom_segment(aes(x = xMin, xend = xMin, y = 0, yend = yMax),
                  inherit.aes = FALSE)
   }
 
@@ -513,7 +539,7 @@ showSankey <- function(path, # nolint: cyclocomp_linter.
                     flows,
                     flowsMarked,
                     fillLabels,
-                    maxStock,
+                    yMax,
                     yName,
                     xLimits = c(lower = NA, upper = NA)) {
 
@@ -525,7 +551,7 @@ showSankey <- function(path, # nolint: cyclocomp_linter.
     fillLabels <- pull(fillLabels, "label", fill)
     legendTitle <- switch(fill, bs = "Building shell", hs = "Heating system")
 
-    yBreaks <- .getYBreaks(maxStock)
+    yBreaks <- .getYBreaks(yMax)
     nXBreaks <- if (is.null(maxPeriodsInRow)) 5 else maxPeriodsInRow
 
     ggplot(mapping = aes(x = .data$x, fill = .data$node)) +
@@ -534,15 +560,15 @@ showSankey <- function(path, # nolint: cyclocomp_linter.
       .geomBar(bars, c("Stock", "Renovation")) +
       .geomBar(bars, "Construction", just = 1) +
       .geomBar(bars, "Demolition_end", just = 0) +
-      .extendYAxis(bars, maxStock, xLimits[["lower"]]) +
+      .extendYAxis(bars, yMax, xLimits[["lower"]]) +
       scale_y_continuous(yName,
                          breaks = yBreaks$major,
                          minor_breaks = yBreaks$minor,
-                         expand = c(0.02, 0)) +
+                         expand = expansion(mult = c(0.02, 0))) +
       scale_x_continuous(NULL,
                          breaks = breaks_pretty(n = nXBreaks),
                          limits = xLimits,
-                         expand = c(0, 0.01)) +
+                         expand = expansion(mult = c(0, 0.01))) +
       scale_fill_manual(values = fillColors,
                         labels = fillLabels,
                         breaks = names(fillLabels),
@@ -613,7 +639,7 @@ showSankey <- function(path, # nolint: cyclocomp_linter.
     }
   )
 
-  data <- lapply(vars, function(v) {
+  data <- lapply(if (showOnlyRenovation) vars["Renovation"] else vars, function(v) {
     var <- readGdxSymbol(gdx, v, asMagpie = FALSE, stringAsFactor = FALSE) %>%
       filter(.data$qty == "area") %>%
       select(-"qty")
@@ -642,8 +668,7 @@ showSankey <- function(path, # nolint: cyclocomp_linter.
   data <- lapply(data, function(var) {
     var %>%
       group_by(across(-any_of(aggDim))) %>%
-      summarise(value = sum(.data$value), .groups = "drop") %>%
-      mutate(value = .data$value / 1000) # million m2 -> billion m2
+      summarise(value = sum(.data$value), .groups = "drop")
   })
 
 
@@ -653,35 +678,42 @@ showSankey <- function(path, # nolint: cyclocomp_linter.
   # PREPARE DATA ---------------------------------------------------------------
 
   # define flows with origin and target nodes
-  flows <- rbind(
-    .defineFlow("Stock_in", shift_x = xPos$ren_end - 1, drop = "start"),
-    .defineFlow("Stock_out", shift_next_x = xPos$ren_start, drop = "end"),
-    .defineFlow("Construction", shift_x = xPos$con - 1, shift_next_x = xPos$ren_start - 1, drop = "start"),
-    .defineFlow("Demolition", shift_x = xPos$ren_end - 1, shift_next_x = xPos$dem - 1, drop = "start"),
-    .defineFlow("Renovation", shift_x = xPos$ren_start - 1, shift_next_x = xPos$ren_end - 1,
-                next_node = switch(fill, bs = "bsr", hs = "hsr"), drop = "start")
-  )
+  flows <- .defineFlow("Renovation", shift_x = xPos$ren_start - 1, shift_next_x = xPos$ren_end - 1,
+                       next_node = switch(fill, bs = "bsr", hs = "hsr"), drop = "start")
+  if (!showOnlyRenovation) {
+    flows <- rbind(
+      flows,
+      .defineFlow("Stock_in", shift_x = xPos$ren_end - 1, drop = "start"),
+      .defineFlow("Stock_out", shift_next_x = xPos$ren_start, drop = "end"),
+      .defineFlow("Construction", shift_x = xPos$con - 1, shift_next_x = xPos$ren_start - 1, drop = "start"),
+      .defineFlow("Demolition", shift_x = xPos$ren_end - 1, shift_next_x = xPos$dem - 1, drop = "start")
+    )
+  }
 
   # prepare data for correct plotting
   flows <- flows %>%
     .addSuffixCol() %>%
-    .attachZeroFlows() %>%
+    .attachZeroFlows(rmZeroFlows = showOnlyRenovation) %>%
     .pasteSuffix(c("node", "next_node")) %>%
     .addVirtualOutFlows() %>% # all visible nodes need outflows
-    .addShiftCol() %>%
+    .addShiftCol(zeroShift = showOnlyRenovation) %>%
     .shiftXbyEps() %>% # avoid unwanted stacking
     .flowNodesAsFactor(fillLabels)
 
   # same data with ineffective flows marked as such
   flowsMarked <- .markIneffFlows(flows)
 
-  bars <- rbind(.defineRenBars(flows),
-                .defineFlowBars(flows),
-                .getStock(data)) %>%
+  bars <- .defineRenBars(flows)
+  if (!showOnlyRenovation) {
+    bars <- rbind(bars,
+                  .defineFlowBars(flows),
+                  .getStock(data))
+  }
+  bars <- bars %>%
     .barNodesAsFactor(fillLabels) %>%
     .setBarGeometry()
 
-  maxStock <- .getMaxStock(bars)
+  yMax <- .getYMax(bars)
 
 
 
@@ -689,13 +721,17 @@ showSankey <- function(path, # nolint: cyclocomp_linter.
 
   # PLOT -----------------------------------------------------------------------
 
-  yName <- "Floor space in billion m2"
+  yName <- if (showOnlyRenovation) {
+    "Floor space in million m2 / yr"
+  } else {
+    "Floor space in million m2"
+  }
 
   if (is.null(maxPeriodsInRow)) {
 
     ## primary plot ====
 
-    p <- .plot(bars, flows, flowsMarked, fillLabels, maxStock, yName)
+    p <- .plot(bars, flows, flowsMarked, fillLabels, yMax, yName)
 
   } else {
 
@@ -704,7 +740,7 @@ showSankey <- function(path, # nolint: cyclocomp_linter.
     limits <- .getLimits(bars, flows)
 
     plotlist <- apply(limits, 1, function(row) {
-      .plot(bars, flows, flowsMarked, fillLabels, maxStock,
+      .plot(bars, flows, flowsMarked, fillLabels, yMax,
             yName = NULL,
             xLimits = row[c("lower", "upper")])
     })
@@ -712,7 +748,8 @@ showSankey <- function(path, # nolint: cyclocomp_linter.
     p <- ggarrange(plotlist = plotlist,
                    ncol = 1,
                    common.legend = TRUE,
-                   legend = "right") %>%
+                   legend = "right",
+                   align = "hv") %>%
       annotate_figure(left = text_grob(yName, rot = 90, size = 11))
   }
 
