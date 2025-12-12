@@ -320,7 +320,8 @@ showAnalysisPlot("heatMap", data, "renLcohMixedFull",
 ```{r Plot Logit and brick Share with mixed lifetimes, all}
 showAnalysisPlot("twoBar", data, c("renLogitAllMixed", "renBrickAll"),
                  yname = "value", xname = "ttotIn", color = "hs", rprt = "vin",
-                 xlabName = "Time of installation", ylabName = "Shares", tmpl = tmpl)
+                 xlabName = "Time of installation", ylabName = "Shares", tmpl = tmpl,
+                 filterRows = NULL)
 ```
 
 ### Energy ladder 1
@@ -328,7 +329,8 @@ showAnalysisPlot("twoBar", data, c("renLogitAllMixed", "renBrickAll"),
 ```{r Plot Logit and brick Share with mixed lifetimes, energy ladder 1}
 showAnalysisPlot("twoBar", data, c("renLogitEl1Mixed", "renBrickEl1"),
                  yname = "value", xname = "ttotIn", color = "hs", rprt = "vin",
-                 xlabName = "Time of installation", ylabName = "Shares", tmpl = tmpl)
+                 xlabName = "Time of installation", ylabName = "Shares", tmpl = tmpl,
+                 filterRows = NULL)
 ```
 
 ### By initial heating system
@@ -336,7 +338,8 @@ showAnalysisPlot("twoBar", data, c("renLogitEl1Mixed", "renBrickEl1"),
 ```{r Plot Logit and brick Share with mixed lifetimes, by hs}
 showAnalysisPlot("twoBar", data, c("renLogitMixedFull", "renBrickFull"),
                  yname = "value", xname = "hs", color = "hsr", rprt = c("vin", "ttotIn"),
-                 xlabName = "Previous heating system", ylabName = "Shares", tmpl = tmpl)
+                 xlabName = "Previous heating system", ylabName = "Shares", tmpl = tmpl,
+                 filterRows = NULL)
 ```
 
 # Heating system ratio by LCC differences

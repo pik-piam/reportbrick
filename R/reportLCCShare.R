@@ -18,7 +18,8 @@
 #' @importFrom tidyr crossing pivot_wider replace_na
 #' @importFrom utils read.csv write.csv
 #'
-reportLCCShare <- function(path, gdxName = "output.gdx", filterFullRen = list(vin = "1980-1989", ttotIn = 2005)) {
+reportLCCShare <- function(path, gdxName = "output.gdx", filterFullRen = list(vin = "1980-1989", ttotIn = 2005),
+                           hsRef = "gabo") {
 
   gdx <- file.path(path, gdxName)
   gdxInput <- file.path(path, "input.gdx")
@@ -380,10 +381,11 @@ reportLCCShare <- function(path, gdxName = "output.gdx", filterFullRen = list(vi
   # LINEARIZED LOGISTIC MODEL --------------------------------------------------
 
   # Ratio of all renovation inflows w.r.t to the gabo inflow
+  # TODO: The naming still refers to gabo, which is the default but can be changed
   hsNames <- unique(v_renovationIn$hs)
   out[["renInRatioGabo"]] <- v_renovationIn %>%
     pivot_wider(names_from = "hs") %>%
-    mutate(across(setdiff(hsNames, "gabo"), ~ log(.x / .data$gabo))) %>%
+    mutate(across(setdiff(hsNames, hsRef), ~ log(.x / .data[[hsRef]]))) %>%
     pivot_longer(cols = setdiff(hsNames, "gabo"), names_to = "hs") %>%
     select(-"gabo")
 
@@ -392,29 +394,33 @@ reportLCCShare <- function(path, gdxName = "output.gdx", filterFullRen = list(vi
     group_by(across(-all_of(c("costType", "value")))) %>%
     summarise(value = sum(.data$value), .groups = "drop") %>%
     pivot_wider(names_from = "hs") %>%
-    mutate(across(setdiff(hsNames, "gabo"), ~ .x - .data$gabo)) %>%
-    pivot_longer(cols = setdiff(hsNames, "gabo"), names_to = "hs") %>%
-    select(-"gabo")
+    mutate(across(setdiff(hsNames, hsRef), ~ .x - .data[[hsRef]])) %>%
+    pivot_longer(cols = setdiff(hsNames, hsRef), names_to = "hs") %>%
+    select(-hsRef)
 
   out[["renInRatioGaboFull"]] <- v_renovation %>%
     rename(ttotIn = "ttot") %>%
     filter(.data$hsr != "0") %>%
     pivot_wider(names_from = "hsr") %>%
     mutate(across(
-      setdiff(hsNames, "gabo"),
-      ~ ifelse(.x == 0 | .data$gabo == 0, NA, log(.x / .data$gabo))
+      setdiff(hsNames, hsRef),
+      ~ ifelse(.x == 0 | .data[[hsRef]] == 0, NA, log(.x / .data[[hsRef]]))
     )) %>%
-    pivot_longer(cols = setdiff(hsNames, "gabo"), names_to = "hsr") %>%
-    select(-"gabo")
+    pivot_longer(cols = setdiff(hsNames, hsRef), names_to = "hsr") %>%
+    select(-hsRef)
 
   # Difference in LCC w.r.t to the gabo value
-  out[["renLccDiffGaboFull"]] <- renLccMixedFull %>%
+  renLccDiffHsRefFull <- renLccMixedFull %>%
     group_by(across(-all_of(c("costType", "value")))) %>%
     summarise(value = sum(.data$value), .groups = "drop") %>%
     pivot_wider(names_from = "hsr") %>%
-    mutate(across(setdiff(hsNames, "gabo"), ~ .x - .data$gabo)) %>%
-    pivot_longer(cols = setdiff(hsNames, "gabo"), names_to = "hsr") %>%
-    select(-"gabo")
+    mutate(across(setdiff(hsNames, hsRef), ~ .x - .data[[hsRef]])) %>%
+    pivot_longer(cols = setdiff(hsNames, hsRef), names_to = "hsr") %>%
+    select(-hsRef)
+
+  write.csv(renLccDiffHsRefFull, file.path(path, "renLccDiffHsRefFull.csv"), row.names = FALSE)
+
+  out[["renLccDiffGaboFull"]] <- renLccDiffHsRefFull
 
   # Price sensitivity
   out <- c(
@@ -425,23 +431,28 @@ reportLCCShare <- function(path, gdxName = "output.gdx", filterFullRen = list(vi
 
   # NORMALIZE PRICE SENSITIVITY ------------------------------------------------
 
-  normLambdaCon <- normalizePriceSensitivity( #nolint: object_usage_linter.
+  normLambdaCon <- normalizePriceSensitivity(
     out[["conLccMixed"]], conVin, priceSensHs[["construction"]], dims
   )
 
-  normLambdaRen <- normalizePriceSensitivity( #nolint: object_usage_linter.
+  normLambdaRen <- normalizePriceSensitivity(
     out[["renLccMixed"]], v_renovationIn, priceSensHs[["renovation"]], dims
   )
 
-  normLambdaConSubs <- normalizePriceSensitivity( #nolint: object_usage_linter.
+  normLambdaConSubs <- normalizePriceSensitivity(
     out[["conLccMixed"]], conVin, priceSensHs[["construction"]], dims,
     groupCols = c("region", "loc", "typ", "inc")
   )
 
-  normLambdaRenSubs <- normalizePriceSensitivity( #nolint: object_usage_linter.
+  normLambdaRenSubs <- normalizePriceSensitivity(
     out[["renLccMixed"]], v_renovationIn, priceSensHs[["renovation"]], dims,
     groupCols = c("region", "loc", "typ", "inc")
   )
+
+  out[["conPriceSensHSnorm"]] <- normLambdaCon
+  out[["renPriceSensHSnorm"]] <- normLambdaRen
+  out[["conPriceSensHSsubsNorm"]] <- normLambdaConSubs
+  out[["renPriceSensHSsubsNorm"]] <- normLambdaRenSubs
 
 
 
