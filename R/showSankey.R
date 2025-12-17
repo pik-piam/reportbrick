@@ -80,11 +80,8 @@ showSankey <- function(path, # nolint: cyclocomp_linter.
   barsWithOutline <- c("Stock", "Construction", "Demolition_end")
 
   # colors that are not related to the fill dimension
-  colors <- list(
-    construction = "#7CAEAF",
-    demolition   = "#D26868",
-    untouched    = "#f1daab"
-  )
+  colors <- setNames(as.list(plotstyle(c("Construction", "Demolition", "Renovation"))),
+                     c("construction", "demolition", "untouched"))
 
   # transparency of untouched and identical replacement flows
   alphaSemiTransparent <- 0.5

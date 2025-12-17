@@ -24,7 +24,7 @@ Imports:
   knitr,
   madrat,
   magclass,
-  mip (>= 0.148.19),
+  mip (>= 0.155.6),
   piamPlotComparison,
   piamutils (>= 0.0.9),
   purrr,
