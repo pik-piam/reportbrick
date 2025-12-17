@@ -67,6 +67,8 @@ readGdxSymbol <- function(gdx, symbol, field = "level", asMagpie = NULL,
       if (isTRUE(removeDescription)) {
         data <- data %>%
           select(-"element_text")
+      } else {
+        data$element_text[data$element_text == "NA"] <- NA
       }
       if (isTRUE(asMagpie)) {
         warning("Sets are not reported as Magpie object.")
