@@ -18,6 +18,25 @@
 
 showMatchingComparison <- function(path, showTitles = TRUE) {
 
+  .getColors <- function(refVars, refVarGroups) {
+
+    .descr2Color <- function(description, refVar) {
+      isColor <- !is.na(description) & grepl("^hex:", description)
+      x <- rep(NA, length(description))
+      x[isColor] <- sub("^hex:", "#", description[isColor])
+      x[!isColor] <- mip::plotstyle(ifelse(is.na(description[!isColor]) | description[!isColor] == "",
+                                           refVar[!isColor],
+                                           description[!isColor]))
+      x
+    }
+    refVars %>%
+      left_join(refVarGroups, by = c("reference", "refVar")) %>%
+      group_by(across(all_of(c("reference", "refVarGroup")))) %>%
+      mutate(color = .descr2Color(.data$element_text, .data$refVar)) %>%
+      ungroup() %>%
+      select(-"element_text", -"refVarGroup")
+  }
+
   .combineModelAndTargetData <- function(p_refVals, v_refVals, valTypes) {
     right_join(p_refVals, v_refVals,
                by = c("reference", "refVar", "region", ttot = "t"),
@@ -27,6 +46,7 @@ showMatchingComparison <- function(path, showTitles = TRUE) {
 
   .addConsiderationCol <- function(x, refVarConsidered) {
     refVarConsidered %>%
+      select("reference", "refVar") %>%
       mutate(considered = TRUE) %>%
       right_join(x, by = c("reference", "refVar")) %>%
       replace_na(list(considered = FALSE)) %>%
@@ -69,7 +89,7 @@ showMatchingComparison <- function(path, showTitles = TRUE) {
   }
 
 
-  .plot <- function(pData, yLabel = NULL) {
+  .plot <- function(pData, colors, yLabel = NULL) {
     ggplot(pData) +
       geom_hline(yintercept = 0) +
       suppressWarnings(geom_col(aes(x = .data$x,
@@ -82,7 +102,7 @@ showMatchingComparison <- function(path, showTitles = TRUE) {
       facet_grid(region ~ ., scales = "free_y") +
       scale_x_continuous(NULL, expand = c(0, 0)) +
       scale_y_continuous(yLabel, expand = c(0, 0)) +
-      scale_fill_brewer(palette = "Set1") +
+      scale_fill_manual(values = colors) +
       scale_linetype_manual(values = c(model = "solid", target = "dashed")) +
       scale_alpha_manual(values = c(`TRUE` = 1, `FALSE` = 0.4), guide = "none") +
       scale_color_manual(values = c(`TRUE` = "black", `FALSE` = "darkgrey"), guide = "none") +
@@ -109,6 +129,7 @@ showMatchingComparison <- function(path, showTitles = TRUE) {
   refsRel <- readGdxSymbol(gdx, "refRel", stringAsFactor = FALSE)[[1]]
   refVarBasic <- readGdxSymbol(gdx, "refVarBasic")
   refVarConsidered <- readGdxSymbol(gdx, "refVarConsidered")
+  refVarRef <- readGdxSymbol(gdx, "refVarRef", removeDescription = FALSE)
 
 
 
@@ -116,6 +137,7 @@ showMatchingComparison <- function(path, showTitles = TRUE) {
 
   description <- dplyr::pull(refs, var = "element_text", name = "reference")
   refs <- refs$reference
+  refVarColors <- .getColors(refVarRef, refVarBasic)
 
   refsWithWeight <- p_refWeight %>%
     filter(.data$value > 0) %>%
@@ -148,6 +170,10 @@ showMatchingComparison <- function(path, showTitles = TRUE) {
       return(NULL)
     }
 
+    colors <- refVarColors %>%
+      filter(.data$reference == ref) %>%
+      pull("color", "refVar")
+
     if (ref %in% refsRel) {
       refVarGroups <- unique(pData$refVarGroup)
 
@@ -162,7 +188,7 @@ showMatchingComparison <- function(path, showTitles = TRUE) {
       p <- lapply(setNames(nm = refVarGroups), function(rvg) {
         pRvg <- pData %>%
           filter(.data$refVarGroup == rvg) %>%
-          .plot(yLabel)
+          .plot(colors, yLabel)
         if (showTitles) {
           pRvg <- pRvg + ggtitle(ref, rvg)
         }
@@ -171,7 +197,7 @@ showMatchingComparison <- function(path, showTitles = TRUE) {
 
     } else {
 
-      p <- .plot(pData, yLabel)
+      p <- .plot(pData, colors, yLabel)
 
       if (showTitles) {
         p <- p + ggtitle(ref)
