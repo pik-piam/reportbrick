@@ -331,6 +331,16 @@ reportLCCShare <- function(path, gdxName = "output.gdx", filterFullRen = list(vi
     bs = "low"
   )
 
+  # Compute real LCC costs components, i.e. without intangible costs and status quo preference. Omit hs = "reel"
+  # and omit identical replacements to suppress the respective cost reduction
+  out[["renLccMixedReal"]] <- renLccMixedFull %>%
+    mutate(across(c("hs", "hsr"), as.character)) %>%
+    filter(.data$costType %in% c("tangible", "lccOpe"), .data$hs != "reel", .data$hs != .data$hsr) %>%
+    group_by(across(-all_of(c("costType", "value")))) %>%
+    summarise(value = sum(.data$value), .groups = "drop") %>%
+    group_by(across(-all_of(c("hs", "value")))) %>%
+    summarise(value = ifelse(all(.data$value == .data$value[[1]]), .data$value[[1]], NA))
+
   # If desired, filter the full resolution renovation data:
   out[["renLccMixedFull"]] <- .filterAsUnion(renLccMixedFull, filterFullRen)
 

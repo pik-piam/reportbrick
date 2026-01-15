@@ -511,7 +511,7 @@ showAnalysisPlot <- function(plotType, data, varName, yname, color = NULL, #noli
   if (!is.null(color)) {
     colorMap <- unlist(readBrickSets(tmpl)[[color]][["elements"]])
     if (!is.null(colorMap)) {
-      plData <- mutate(plData, across(any_of(color), ~ factor(colorMap[.x], levels = colorMap)))
+      plData <- mutate(plData, across(any_of(color), ~ factor(colorMap[as.character(.x)], levels = colorMap)))
     } else if (color == "costType") {
       plData <- mutate(plData, across(
         any_of(color),
@@ -563,7 +563,12 @@ showAnalysisPlot <- function(plotType, data, varName, yname, color = NULL, #noli
 
   # Loop through all desired plots ---------------------------------------------
 
-  while (isFALSE(complete)) {
+  # Set maximum number of iterations to avoid infinite looping
+  iter <- 1
+
+  while (isFALSE(complete) && iter <= 100) {
+
+    iter <- iter + 1
 
 
     ## Filter the data ====
@@ -576,7 +581,7 @@ showAnalysisPlot <- function(plotType, data, varName, yname, color = NULL, #noli
         mutate(across(col, ~ ifelse(
           is.na(.data[[col]]) & !is.na(.data[[yname]]),
           filterVals[[col]][count[col]],
-          .x
+          as.character(.x)
         )))
       plDataFiltered <- plDataFiltered %>%
         filter(.data[[col]] == filterVals[[col]][count[col]])
@@ -595,7 +600,7 @@ showAnalysisPlot <- function(plotType, data, varName, yname, color = NULL, #noli
     countAtMax <- count == unlist(lapply(filterVals, length))
     if (!all(countAtMax)) {
       count[!countAtMax][1] <- count[!countAtMax][1] + 1
-      if (any(which(countAtMax)) < which(!countAtMax)[1]) count[countAtMax[1:which(!countAtMax)[1]]] <- 1
+      if (any(which(countAtMax) < which(!countAtMax)[1])) count[1:(which(!countAtMax)[1] - 1)] <- 1
     } else {
       complete <- TRUE
     }
