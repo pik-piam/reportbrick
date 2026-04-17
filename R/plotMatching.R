@@ -1,7 +1,13 @@
-#' Compare matching references with model values
+#' Matching reporting
+#'
+#' Plot the following matching reporting
+#' \itemize{
+#'   \item comparison of the matching values and reference targets
+#'   \item share of initial heating systems thar have been removed over time
+#' }
 #'
 #' @param path character, path to the run
-#' @param outputFolder cahracter, directory where output file is stored. If
+#' @param outputFolder character, directory where output file is stored. If
 #'   NULL, the plots folder inside the given path is used.
 #' @returns file path to created output file
 #'
@@ -9,7 +15,7 @@
 #'
 #' @export
 
-plotMatchingComparison <- function(path, outputFolder = NULL) {
+plotMatching <- function(path, outputFolder = NULL) {
 
   # FUNCTIONS ------------------------------------------------------------------
 
@@ -22,7 +28,7 @@ plotMatchingComparison <- function(path, outputFolder = NULL) {
   }
 
   .fillTemplate <- function(file, ...) {
-    filePath <- piamutils::getSystemFile("plotsMatchingComparison", file,
+    filePath <- piamutils::getSystemFile("plotsMatching", file,
                                          package = "reportbrick",
                                          mustWork = TRUE)
     txt <- readLines(filePath)
@@ -37,7 +43,7 @@ plotMatchingComparison <- function(path, outputFolder = NULL) {
 
   # generate HTML --------------------------------------------------------------
 
-  fileName <- "matchingComparison"
+  fileName <- "matching"
 
   config <- yaml::read_yaml(file.path(path, "config", "config_COMPILED.yaml"))
   nRegions <- .countRegions(config)

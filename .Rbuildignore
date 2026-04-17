@@ -11,3 +11,5 @@
 ^.*\.pdf$
 ^.lintr$
 ^tests/.lintr$
+^\.claude$
+^_pkgdown\.yml$
