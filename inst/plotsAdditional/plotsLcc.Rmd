@@ -9,10 +9,10 @@ output:
 params:
     docTitle: "BRICK Analysis report"
     file: "BRICK_analysis_report.csv"
-    path: ""
+    path: "C:/Users/ricardar/Documents/Results/BRICK/adaptHpIntangCost/calibration-2015-CP_2026-03-26_17.09.44/"
     scenNames: NULL
     name: ""
-    region: ""
+    region: "DEU"
 ---
 
 ```{r setup, include=FALSE}
@@ -346,18 +346,23 @@ showAnalysisPlot("twoBar", data, c("renLogitMixedFull", "renBrickFull"),
 
 ```{r Plot hs ratio by lcc difference}
 slopeRenHS <- - data$value[data$variable == "renPriceSensHS"]
-showAnalysisPlot("scatter", data, c("renInRatioGabo", "renLccDiffGabo"),
-                 yname = "renInRatioGabo", xname = "renLccDiffGabo", valueName = "value",
+renInRatioVar <- unique(sub("Full$", "", grep("renInRatio", data$variable, value = TRUE)))
+renLccDiffVar <- unique(sub("Full$", "", grep("renLccDiff", data$variable, value = TRUE)))
+hsRef <- sub("renInRatio(.*)$", "\\1", renInRatioVar)
+showAnalysisPlot("scatter", data, c(renInRatioVar, renLccDiffVar),
+                 yname = renInRatioVar, xname = renLccDiffVar, valueName = "value",
                  color = "hs", rprt = c("vin"),
-                 xlabName = "Difference of LCC with gas heater",
-                 ylabName = "Log ratio of renovated floorspace w.r.t to gas heaters",
+                 xlabName = paste("Difference of LCC with", hsRef),
+                 ylabName = paste("Log ratio of renovated floorspace w.r.t to", hsRef),
                  tmpl = tmpl, shape = "ttotIn", slope = slopeRenHS, fitLinear = TRUE)
 ```
 
 ```{r Plot hs ratio by lcc difference, full resolution}
-showAnalysisPlot("scatter", data, c("renInRatioGaboFull", "renLccDiffGaboFull"),
-                 yname = "renInRatioGaboFull", xname = "renLccDiffGaboFull", valueName = "value",
-                 xlabName = "Difference of LCC with gas heater",
-                 ylabName = "Log ratio of renovated floorspace w.r.t to gas heaters",
+renInRatioVarFull <- paste0(renInRatioVar, "Full")
+renLccDiffVarFull <- paste0(renLccDiffVar, "Full")
+showAnalysisPlot("scatter", data, c(renInRatioVarFull, renLccDiffVarFull),
+                 yname = renInRatioVarFull, xname = renLccDiffVarFull, valueName = "value",
+                 xlabName = paste("Difference of LCC with", hsRef),
+                 ylabName = paste("Log ratio of renovated floorspace w.r.t to", hsRef),
                  color = "hsr", rprt = c("vin"), tmpl = tmpl, shape = "ttotIn", slope = slopeRenHS, fitLinear = TRUE)
 ```
