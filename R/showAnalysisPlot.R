@@ -39,7 +39,7 @@
 #' @importFrom tidyr crossing pivot_longer
 #'
 showAnalysisPlot <- function(plotType, data, varName, yname, color = NULL, #nolint: cyclocomp_linter.
-                             facets = c("loc", "typ"), rprt = NULL, avg = NULL, remCols = NULL,
+                             facets = c("loc", "typ"), rprt = NULL, avg = NULL, sumUp = NULL, remCols = NULL,
                              xname = "ttotOut", valueName = yname, suppressLateTtot = TRUE,
                              xlabName = NULL, ylabName = NULL, tmpl = NULL,
                              filterRows = list(hs = "h2bo", hsr = "h2bo"),
@@ -495,6 +495,14 @@ showAnalysisPlot <- function(plotType, data, varName, yname, color = NULL, #noli
     plData <- plData %>%
       group_by(across(-any_of(c(avg, yname, "absVal", "relVal")))) %>%
       summarise(value = mean(.data[[yname]], na.rm = TRUE), .groups = "drop")
+    yname <- "value"
+  }
+
+  # Sum data along given columns
+  if (!is.null(sumUp)) {
+    plData <- plData %>%
+      group_by(across(-any_of(c(sumUp, yname, "absVal", "relVal")))) %>%
+      summarise(value = sum(.data[[yname]], na.rm = TRUE), .groups = "drop")
     yname <- "value"
   }
 

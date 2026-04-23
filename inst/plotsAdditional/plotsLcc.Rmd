@@ -311,6 +311,23 @@ showAnalysisPlot("heatMap", data, "renLcohMixedFull",
                  valueCap = 100)
 ```
 
+## LCOH time evolution
+
+```{r Plot renovationLCOH, mixed lt by time and hs}
+showAnalysisPlot("line", data %>% filter(vin == "1980-1989"), "renLcohMixedFull",
+                 xname = "ttotIn", yname = "value", color = "hsr", rprt = c("hs", "typ", "loc"),
+                 sumUp = "costType",
+                 facets = NULL, xlabName = "Time of installation", ylabName = "Costs in US Cents/kWh",
+                 tmpl = tmpl, linetype = "hsr")
+```
+
+```{r Plot renovation LCOH, mixed lt by time, hs and cost type}
+showAnalysisPlot("bar", data %>% filter(vin == "1980-1989"), "renLcohMixedFull",
+                 xname = "ttotIn", yname = "value", color = "costType", rprt = c("hs", "typ", "loc"),
+                 facets = "hsr", xlabName = "Time of installation", ylabName = "Costs in US Cents/kWh",
+                 tmpl = tmpl, valueCap = 150)
+```
+
 # Logit shares compared to Brick shares
 
 ## Shares of renovation with mixed lifetimes
