@@ -105,25 +105,3 @@ reportEnergy <- function(gdx, brickSets = NULL, silent = TRUE) {
 
   return(out)
 }
-
-
-
-
-
-#' Add carrier dimesion based on heating system technology
-#'
-#' @param v_stock MagPIE object, BRICK variable
-#' @param hsCarrier data.frame, mapping between heating technology and energy
-#'  carrier
-#' @returns MagPIE object with additional carrier dimension
-
-.addCarrierDimension <- function(v_stock, hsCarrier) {
-  stock <- v_stock %>%
-    add_dimension(dim = 3.3, add = "carrier", "carrier")
-  for (i in seq_len(nrow(hsCarrier))) {
-    getNames(stock) <- sub(paste0(hsCarrier[i, "hs"], "\\.carrier"),
-                           paste(as.character(hsCarrier[i, ]), collapse = "."),
-                           getNames(stock))
-  }
-  return(stock)
-}

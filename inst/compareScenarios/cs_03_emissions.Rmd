@@ -1,0 +1,39 @@
+# CO2 emissions
+
+## All buildings
+
+## Residential
+
+### Space heating
+
+```{r (en)-Residential-Space heating-(carrier)}
+tot <- "Emi|CO2|Residential|Space heating"
+vars <- paste(tot, heating, sep = "|")
+showAreaAndBarPlots(data, vars = vars, tot = tot, orderVars = "user", scales = "fixed")
+walk(vars, showLinePlots, data = data)
+
+```
+
+#### by building type
+```{r (en)-Residential-(type)-Space heating-(carrier)}
+for (typ in type) {
+  tot <- paste0("Emi|CO2|Residential|", typ, "|Space heating")
+  vars <- paste(tot, carrier, sep = "|")
+  showAreaAndBarPlots(data, vars = vars, tot = tot, orderVars = "user", scales = "fixed")
+  walk(vars, showLinePlots, data = data)
+}
+```
+
+#### by location
+```{r (en)-Residential-(location)-Space heating-(carrier)}
+for (loc in location) {
+  tot <- paste0("Emi|CO2|Residential|", loc, "|Space heating")
+  vars <- paste(tot, carrier, sep = "|")
+  showAreaAndBarPlots(data, vars = vars, tot = tot, orderVars = "user", scales = "fixed")
+  walk(vars, showLinePlots, data = data)
+}
+```
+
+
+
+## Commercial
