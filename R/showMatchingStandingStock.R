@@ -145,6 +145,12 @@ showMatchingStandingStock <- function(path) {
 
   gdx <- file.path(path, "output.gdx")
 
+  # stop here if run is too old to have flexible lifetime
+  m <- Container$new(gdx)
+  if (!"v_shareRenHSinit" %in% m$listVariables()) {
+    return(NULL)
+  }
+
   v_stock <- readGdxSymbol(gdx, "v_stock", asMagpie = FALSE)
   p_shareRenHSinit <- readGdxSymbol(gdx, "p_shareRenHSinit", asMagpie = FALSE)
   v_shareRenHSinit <- readGdxSymbol(gdx, "v_shareRenHSinit", asMagpie = FALSE)
