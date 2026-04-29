@@ -31,7 +31,7 @@ showMatchingStandingStock <- function(path) {
 
   .combineData <- function(p_shareRenHSinit, v_shareRenHSinit, f_shareRenHSinit) {
     dataExtrapolated <- f_shareRenHSinit %>%
-      filter(.data$ttot >= max(p_shareRenHSinit$ttot),
+      filter(.data$ttotOut >= max(p_shareRenHSinit$ttotOut),
              .data$level == "matched") %>%
       mutate(level = "extrapolated")
     v_shareRenHSinit %>%
@@ -56,8 +56,8 @@ showMatchingStandingStock <- function(path) {
     # drop later extrapolated periods when all values are almost one
     # to see more of the S-curve
     relevantData %>%
-      group_by(.data$ttot) %>%
-      filter(min(.data$value) < 0.95 | .data$ttot <= max(stock$ttot)) %>%
+      group_by(.data$ttotOut) %>%
+      filter(min(.data$value) < 0.95 | .data$ttotOut <= max(stock$ttot)) %>%
       ungroup()
   }
 
@@ -78,9 +78,9 @@ showMatchingStandingStock <- function(path) {
 
   .completeInitial <- function(data, tinit) {
     data %>%
-      select(-"value", -"ttot") %>%
+      select(-"value", -"ttotOut") %>%
       unique() %>%
-      mutate(ttot = tinit,
+      mutate(ttotOut = tinit,
              value = 0) %>%
       rbind(data)
   }
@@ -104,7 +104,7 @@ showMatchingStandingStock <- function(path) {
     tunnel <- .getTunnelData(pData, tinit)
     line <- .getLineData(pData)
 
-    ggplot(mapping = aes(x = .data$ttot)) +
+    ggplot(mapping = aes(x = .data$ttotOut)) +
       geom_ribbon(aes(ymin = .data$lower,
                       ymax = .data$upper,
                       fill = .data$hs),
@@ -144,6 +144,12 @@ showMatchingStandingStock <- function(path) {
   # READ DATA ------------------------------------------------------------------
 
   gdx <- file.path(path, "output.gdx")
+
+  # stop here if run is too old to have flexible lifetime
+  m <- Container$new(gdx)
+  if (!"v_shareRenHSinit" %in% m$listVariables()) {
+    return(NULL)
+  }
 
   v_stock <- readGdxSymbol(gdx, "v_stock", asMagpie = FALSE)
   p_shareRenHSinit <- readGdxSymbol(gdx, "p_shareRenHSinit", asMagpie = FALSE)

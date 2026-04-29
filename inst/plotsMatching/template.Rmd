@@ -63,15 +63,19 @@ standingPlots <- reportbrick::showMatchingStandingStock("{path}")
 ```
 
 ```{r standing stock plot loop, results='asis',fig.width=15, fig.height=8, echo=F, message=F, warning=F}
-for (reg in names(standingPlots)) {
-  plotReg <- standingPlots[[reg]]
-  cat(paste("## ", reg, "{.tabset .tabset-pills}\n\n"))
-  for (tab in names(plotReg)) {
-    plotTab <- plotReg[[tab]]
-    cat(paste0("### ", tab, "\n\n"))
-    print(plotTab)
+if (is.null(standingPlots)) {
+  cat("This run has no flexible standing lifetime.")
+} else {
+  for (reg in names(standingPlots)) {
+    plotReg <- standingPlots[[reg]]
+    cat(paste("## ", reg, "{.tabset .tabset-pills}\n\n"))
+    for (tab in names(plotReg)) {
+      plotTab <- plotReg[[tab]]
+      cat(paste0("### ", tab, "\n\n"))
+      print(plotTab)
+      cat("\n\n")
+    }
     cat("\n\n")
   }
-  cat("\n\n")
 }
 ```
