@@ -76,35 +76,45 @@ reportEmissions <- function(gdx, brickSets = NULL, silent = TRUE) {
               silent = silent),
 
 
-    ## by carrier ====
+    ## by carrier (+ heating technology) ====
     reportAgg(emissions,
               "Emi|CO2|Residential|Space heating|{carrier} (Mt CO2/yr)", brickSets,
               agg = c(bs = "all", hs = "all", vin = "all", loc = "all", typ = "res", inc = "all"),
               rprt = c(carrier = "all"),
               silent = silent),
 
-
-    ## by heating technology ====
     reportAgg(emissions,
-              "Emi|CO2|Residential|Space heating|{hs} (Mt CO2/yr)", brickSets,
-              agg = c(bs = "all", carrier = "all", vin = "all", loc = "all", typ = "res", inc = "all"),
-              rprt = c(hs = "all"),
+              "Emi|CO2|Residential|Space heating|{carrier.hs} (Mt CO2/yr)", brickSets,
+              agg = c(bs = "all", vin = "all", loc = "all", typ = "res", inc = "all"),
+              rprt = c(carrier.hs = "multiHsCarriers"),
               silent = silent),
 
 
-    ## by building type + carrier ====
+    ## by building type + carrier (+ heating technology) ====
     reportAgg(emissions,
               "Emi|CO2|Residential|{typ}|Space heating|{carrier} (Mt CO2/yr)", brickSets,
               agg = c(bs = "all", hs = "all", vin = "all", loc = "all", inc = "all"),
               rprt = c(carrier = "all", typ = "res"),
               silent = silent),
 
+    reportAgg(emissions,
+              "Emi|CO2|Residential|{typ}|Space heating|{carrier.hs} (Mt CO2/yr)", brickSets,
+              agg = c(bs = "all", vin = "all", loc = "all", inc = "all"),
+              rprt = c(carrier.hs = "multiHsCarriers", typ = "res"),
+              silent = silent),
 
-    ## by location + carrier ====
+
+    ## by location + carrier (+ heating technology) ====
     reportAgg(emissions,
               "Emi|CO2|Residential|{loc}|Space heating|{carrier} (Mt CO2/yr)", brickSets,
               agg = c(bs = "all", hs = "all", vin = "all", typ = "res", inc = "all"),
               rprt = c(carrier = "all", loc = "all"),
+              silent = silent),
+
+    reportAgg(emissions,
+              "Emi|CO2|Residential|{loc}|Space heating|{carrier.hs} (Mt CO2/yr)", brickSets,
+              agg = c(bs = "all", vin = "all", typ = "res", inc = "all"),
+              rprt = c(carrier.hs = "multiHsCarriers", loc = "all"),
               silent = silent)
 
   )

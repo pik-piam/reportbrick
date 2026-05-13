@@ -67,35 +67,45 @@ reportEnergy <- function(gdx, brickSets = NULL, silent = TRUE) {
                 silent = silent),
 
 
-      ## by carrier ====
+      ## by carrier (+ heating technology) ====
       reportAgg(energyDemand,
                 paste0(energyLevel, "|Residential|Space heating|{carrier} (EJ/yr)"), brickSets,
                 agg = c(bs = "all", hs = "all", vin = "all", loc = "all", typ = "res", inc = "all"),
                 rprt = c(carrier = "all"),
                 silent = silent),
 
-
-      ## by heating technology ====
       reportAgg(energyDemand,
-                paste0(energyLevel, "|Residential|Space heating|{hs} (EJ/yr)"), brickSets,
-                agg = c(bs = "all", carrier = "all", vin = "all", loc = "all", typ = "res", inc = "all"),
-                rprt = c(hs = "all"),
+                paste0(energyLevel, "|Residential|Space heating|{carrier.hs} (EJ/yr)"), brickSets,
+                agg = c(bs = "all", vin = "all", loc = "all", typ = "res", inc = "all"),
+                rprt = c(carrier.hs = "multiHsCarriers"),
                 silent = silent),
 
 
-      ## by building type + carrier ====
+      ## by building type + carrier (+ heating technology) ====
       reportAgg(energyDemand,
                 paste0(energyLevel, "|Residential|{typ}|Space heating|{carrier} (EJ/yr)"), brickSets,
                 agg = c(bs = "all", hs = "all", vin = "all", loc = "all", inc = "all"),
                 rprt = c(carrier = "all", typ = "res"),
                 silent = silent),
 
+      reportAgg(energyDemand,
+                paste0(energyLevel, "|Residential|{typ}|Space heating|{carrier.hs} (EJ/yr)"), brickSets,
+                agg = c(bs = "all", vin = "all", loc = "all", inc = "all"),
+                rprt = c(carrier.hs = "multiHsCarriers", typ = "res"),
+                silent = silent),
 
-      ## by location + carrier ====
+
+      ## by location + carrier (+ heating technology) ====
       reportAgg(energyDemand,
                 paste0(energyLevel, "|Residential|{loc}|Space heating|{carrier} (EJ/yr)"), brickSets,
                 agg = c(bs = "all", hs = "all", vin = "all", typ = "res", inc = "all"),
                 rprt = c(carrier = "all", loc = "all"),
+                silent = silent),
+
+      reportAgg(energyDemand,
+                paste0(energyLevel, "|Residential|{loc}|Space heating|{carrier.hs} (EJ/yr)"), brickSets,
+                agg = c(bs = "all", vin = "all", typ = "res", inc = "all"),
+                rprt = c(carrier.hs = "multiHsCarriers", loc = "all"),
                 silent = silent)
 
     )
