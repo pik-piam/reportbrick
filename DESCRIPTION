@@ -1,8 +1,8 @@
 Type: Package
 Package: reportbrick
 Title: Reporting package for BRICK
-Version: 0.15.1
-Date: 2026-04-29
+Version: 0.16.0
+Date: 2026-05-15
 Authors@R: c(
     person("Robin", "Hasse", , "robin.hasse@pik-potsdam.de",
            role = c("aut", "cre"),
@@ -24,7 +24,7 @@ Imports:
   knitr,
   madrat,
   magclass,
-  mip (>= 0.155.6),
+  mip (>= 0.155.12),
   piamPlotComparison,
   piamutils (>= 0.0.9),
   purrr,

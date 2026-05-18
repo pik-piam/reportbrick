@@ -6,28 +6,21 @@
 
 ### Space heating
 
-```{r (en)-Residential-Space heating-(carrier)}
+```{r (en)-Residential-Space heating-(carrierHeating)}
 for (en in c("FE", "UE")) {
   tot <- paste0(en, "|Residential|Space heating")
-  vars <- paste(tot, carrier, sep = "|")
-  showAreaAndBarPlots(data, vars = vars, tot = tot, orderVars = "user", scales = "fixed")
-  walk(vars, showLinePlots, data = data)
-}
-
-for (en in c("FE", "UE")) {
-  tot <- paste0(en, "|Residential|Space heating")
-  vars <- paste(tot, heating, sep = "|")
+  vars <- paste(tot, carrierHeating, sep = "|")
   showAreaAndBarPlots(data, vars = vars, tot = tot, orderVars = "user", scales = "fixed")
   walk(vars, showLinePlots, data = data)
 }
 ```
 
 #### by building type
-```{r (en)-Residential-(type)-Space heating-(carrier)}
+```{r (en)-Residential-(type)-Space heating-(carrierHeating)}
 for (typ in type) {
   for (en in c("FE", "UE")) {
     tot <- paste0(en, "|Residential|", typ, "|Space heating")
-    vars <- paste(tot, carrier, sep = "|")
+    vars <- paste(tot, carrierHeating, sep = "|")
     showAreaAndBarPlots(data, vars = vars, tot = tot, orderVars = "user", scales = "fixed")
     walk(vars, showLinePlots, data = data)
   }
@@ -35,11 +28,11 @@ for (typ in type) {
 ```
 
 #### by location
-```{r (en)-Residential-(location)-Space heating-(carrier)}
+```{r (en)-Residential-(location)-Space heating-(carrierHeating)}
 for (loc in location) {
   for (en in c("FE", "UE")) {
     tot <- paste0(en, "|Residential|", loc, "|Space heating")
-    vars <- paste(tot, carrier, sep = "|")
+    vars <- paste(tot, carrierHeating, sep = "|")
     showAreaAndBarPlots(data, vars = vars, tot = tot, orderVars = "user", scales = "fixed")
     walk(vars, showLinePlots, data = data)
   }

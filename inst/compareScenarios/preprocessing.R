@@ -48,6 +48,16 @@ carrier <- c(
   "Liquids",
   "Coal"
 )
+carrierHeating <- c(
+  "Biomass",
+  "Heat",
+  "Electricity|Heat pump",
+  "Electricity|Resistive electric",
+  "Hydrogen",
+  "Gases",
+  "Liquids",
+  "Coal"
+)
 
 # automatic identification of vintages to allow for different model resolutions
 vintageRegex <- "(Before|After) \\d{4}|\\d{4} - \\d{4}"

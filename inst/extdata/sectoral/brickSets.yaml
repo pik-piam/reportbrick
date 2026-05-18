@@ -74,6 +74,9 @@ carrier:
     all: [biomod, heat, elec, h2, gases, liquids, coal]
     solids: [biomod, coal]
 
+carrier.hs:
+  subsets:
+    multiHsCarriers: [elec.reel, elec.ehp1]
 
 ## Vintage ====
 vin:

@@ -83,6 +83,23 @@ convGDX2MIF <- function(gdx,
   message("running reportEnergy ...")
   output <- mbind(output, extendPeriods(reportEnergy(gdx, brickSets, silent = silent), t))
 
+  ## Emissions ====
+  message("running reportEmissions ...")
+  output <- mbind(output, extendPeriods(reportEmissions(gdx, brickSets, silent = silent), t))
+
+
+
+  # AGGREGATED REGIONS ---------------------------------------------------------
+
+  eu27 <- c("DEU", "ECE", "ECS", "ENC", "ESC", "ESW", "EWN", "FRA", "IRL")
+  if (all(eu27 %in% getItems(output, 1))) {
+    output <- output[eu27, , ] %>%
+      dimSums(1) %>%
+      add_dimension(dim = 1, add = "region", nm = "EU27") %>%
+      mbind(output)
+  }
+
+
 
   # FINISH ---------------------------------------------------------------------
 
