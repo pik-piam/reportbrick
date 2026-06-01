@@ -9,11 +9,10 @@
 #' @param dfUe data frame, useful energy demand
 #' @param dfDt data frame, lengths of time periods
 #' @param dfDiscount data frame, discount rates
-#' @param dims character, dimensions of all data, excluding time dimension
 #'
 #' @importFrom dplyr %>% .data group_by left_join mutate rename select summarise
 #'
-computeLCOH <- function(dfLcc, dfLt, dfUe, dfDt, dfDiscount, dims) {
+computeLCOH <- function(dfLcc, dfLt, dfUe, dfDt, dfDiscount) {
 
   # Compute the sum of discounted UE demand
   dfUe <- computeDiscountSum(dfUe, dfDt, dfDiscount, unique(dfLt[["ttotIn"]]), unique(dfLt[["ttotOut"]])) %>%
@@ -23,11 +22,15 @@ computeLCOH <- function(dfLcc, dfLt, dfUe, dfDt, dfDiscount, dims) {
   expUe <- dfLt %>%
     rename(ltProb = "relVal") %>%
     select(-"absVal") %>%
-    left_join(dfUe, by = c(intersect(dims, colnames(dfUe)), "ttotIn", "ttotOut")) %>%
-    group_by(across(all_of(c(dims, "ttotIn")))) %>%
+    left_join(dfUe, by = c("vin", "region", "typ", "ttotIn", "ttotOut")) %>%
+    group_by(across(all_of(c("qty", "bs", "hs", "vin", "region", "loc", "typ", "inc", "ttotIn")))) %>%
     summarise(ue = sum(.data[["ltProb"]] * .data[["discountSum"]]), .groups = "drop")
 
-  joinDims <- if ("hsr" %in% colnames(dfLcc)) c(setdiff(dims, "hs"), hsr = "hs", "ttotIn") else c(dims, "ttotIn")
+  if ("hsr" %in% colnames(dfLcc)) {
+    joinDims <- c("qty", "bs", hsr = "hs", "vin", "region", "loc", "typ", "inc", "ttotIn")
+  } else {
+    joinDims <- c("qty", "bs", "hs", "vin", "region", "loc", "typ", "inc", "ttotIn")
+  }
 
   # Scale LCC by expected UE demand to obtain LCOH
   dfLcc %>%

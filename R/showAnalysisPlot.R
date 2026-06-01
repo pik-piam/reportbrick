@@ -31,7 +31,7 @@
 #' @param ... additional parameters to be passed to the plotting functions
 #'
 #' @importFrom dplyr %>% .data across all_of anti_join any_of cur_column filter group_by lag mutate
-#'   pull rename_with select slice_max slice_min summarise ungroup where
+#'   pull rename_with select slice slice_max slice_min summarise ungroup where
 #' @importFrom ggplot2 aes coord_cartesian coord_fixed facet_grid element_text expansion facet_wrap
 #'   geom_bar geom_col geom_line geom_point geom_text geom_tile ggplot ggtitle
 #'   scale_alpha_manual scale_color_identity scale_color_manual scale_fill_manual scale_shape_manual
@@ -425,7 +425,7 @@ showAnalysisPlot <- function(plotType, data, varName, yname, color = NULL, #noli
     plData <- plData %>%
       mutate(
         textColor = ifelse(.data$fillValue > valueThreshold, "white", "black"),
-        value = round(.data[[valueName]], 1)
+        value = round(.data[[valueName]])
       )
 
     # Build the plot
@@ -581,19 +581,19 @@ showAnalysisPlot <- function(plotType, data, varName, yname, color = NULL, #noli
 
     ## Filter the data ====
 
-    plDataFiltered <- plData
+    plDataFiltered <- plData %>%
+      mutate(across(rprt, ~ as.character(.x)))
 
     # Filter to obtain data for the desired single plot
+    plDataFilteredNoNa <- plDataFiltered
     for (col in rprt) {
       plDataFiltered <- plDataFiltered %>%
-        mutate(across(col, ~ ifelse(
-          is.na(.data[[col]]) & !is.na(.data[[yname]]),
-          filterVals[[col]][count[col]],
-          as.character(.x)
-        )))
-      plDataFiltered <- plDataFiltered %>%
+        filter(.data[[col]] == filterVals[[col]][count[col]] | is.na(.data[[col]]))
+
+      plDataFilteredNoNa <- plDataFilteredNoNa %>%
         filter(.data[[col]] == filterVals[[col]][count[col]])
     }
+    plDataFiltered <- if (nrow(plDataFilteredNoNa) == 0) plDataFilteredNoNa else plDataFiltered
 
 
     ## Handle the heading ====

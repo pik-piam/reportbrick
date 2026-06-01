@@ -7,13 +7,12 @@
 #' @param outflow data frame, all outflows
 #' @param p_shareRenHSinit data frame with shares to be renovated for the initial stock
 #' @param p_shareRenHS data frame with shares to be renovated for the inflow
-#' @param dims character, dimensions of the data without time periods
 #'
 #' @importFrom dplyr %>% across all_of .data filter group_by left_join mutate
 #'   rename select summarise
 #' @importFrom tidyr crossing pivot_longer replace_na
 #'
-verifyLtHs <- function(inflow, v_stockInit, outflow, p_shareRenHSinit, p_shareRenHS, dims) {
+verifyLtHs <- function(inflow, v_stockInit, outflow, p_shareRenHSinit, p_shareRenHS) {
 
   # Compute the initial stock that needs to be demolished
   stockInit <- v_stockInit %>%
@@ -31,18 +30,18 @@ verifyLtHs <- function(inflow, v_stockInit, outflow, p_shareRenHSinit, p_shareRe
     rename(outVal = "value", ttotSum = "ttotOut") %>%
     left_join(inflow %>%
                 rename(inVal = "value"),
-              by = c(dims, ttotSum = "ttotIn")) %>%
+              by = c("qty", "bs", "hs", "vin", "region", "loc", "typ", "inc", ttotSum = "ttotIn")) %>%
     crossing(ttotOut = unique(.data[["ttotSum"]])[-1]) %>%
     filter(.data[["ttotOut"]] >= .data[["ttotSum"]]) %>%
     left_join(p_shareRenHS %>%
                 rename(shareVal = "value"),
-              by = c(intersect(dims, colnames(p_shareRenHS)), ttotSum = "ttotIn", "ttotOut"))
+              by = c("hs", "region", "typ", ttotSum = "ttotIn", "ttotOut"))
   ltIneq <- ltIneq %>%
-    group_by(across(all_of(c(dims, "ttotOut")))) %>%
+    group_by(across(all_of(c("qty", "bs", "hs", "vin", "region", "loc", "typ", "inc", "ttotOut")))) %>%
     summarise(inSum = sum(.data[["inVal"]] * .data[["shareVal"]]),
               lhsLtIneq = sum(.data$outVal),
               .groups = "drop") %>%
-    left_join(stockInit, by = c(dims, "ttotOut")) %>%
+    left_join(stockInit, by = c("qty", "bs", "hs", "vin", "region", "loc", "typ", "inc", "ttotOut")) %>%
     replace_na(list(initVal = 0)) %>%
     mutate(rhsLtIneq = .data[["inSum"]] + .data[["initVal"]])
 
