@@ -48,12 +48,12 @@ walk(heatingRes, showLinePlots, data = data)
 
 ### Commercial
 
-## Building stock difference
+## Net yearly building stock change
 
 ### Residential
 
 ```{r residential stock vars}
-tot <- "Stock Delta|Residential"
+tot <- "Net stock change|Residential"
 heatingRes <- paste(tot, heating, sep = "|")
 ```
 

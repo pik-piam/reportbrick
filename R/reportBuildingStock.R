@@ -8,25 +8,35 @@
 #'
 #' @author Robin Hasse
 #'
-#' @importFrom magclass getYears getYears<- mbind setNames dimSums mselect collapseDim
+#' @importFrom magclass addDim getItems  getSets getYears getYears<- mbind setNames dimSums mselect collapseDim
 
 reportBuildingStock <- function(gdx, brickSets = NULL, silent = TRUE) {
 
   # Compute the stock difference between subsequent time periods
   # The data dimension of 'stock' needs to be identical for the whole magclass object
-  .computeStockDelta <- function(stock) {
+  .computeStockDelta <- function(stock, dt) {
 
     years <- getYears(stock)
 
-    stockBefore <- stock[, years[1:(length(years) - 1)], ]
-    getYears(stockBefore) <- lead(years)[1:(length(years) - 1)]
-    stockAfter <- stock[, years[2:length(years)], ]
+    stockBefore <- stock[, head(years, -1), ]
+    getYears(stockBefore) <- head(lead(years), -1)
+    stockAfter <- stock[, tail(years, -1), ]
 
     stockZero <- stock[, years[1], ]
     stockZero[, , ] <- NA
 
-    mbind(stockZero, stockAfter - stockBefore)
+    # Expand `dt` to dimensions of `stock`
+    dt <- dt %>%
+      mselect(ttot = tail(years, -1)) %>%
+      addDim(dim = 1, dimName = getSets(stock)["d1.1"], item = getItems(stock, dim = "region")) %>%
+      # Work around as `addDim` can't handle existing dim name
+      addDim(dim = 3, dimName = "tmpName", item = getItems(stock, dim = 3))
+    getSets(dt)["d3.1"] <- getSets(stock)["d3.1"]
+
+    mbind(stockZero, (stockAfter - stockBefore) / dt)
   }
+
+
 
   # READ -----------------------------------------------------------------------
 
@@ -34,6 +44,10 @@ reportBuildingStock <- function(gdx, brickSets = NULL, silent = TRUE) {
   v_stock <- readGdxSymbol(gdx, "v_stock") %>%
     mselect(qty = "area") %>%
     collapseDim(dim = "qty")
+
+  # Time step length
+  p_dt <- readGdxSymbol(gdx, "p_dt") %>%
+    collapseDim()
 
 
 
@@ -104,8 +118,8 @@ reportBuildingStock <- function(gdx, brickSets = NULL, silent = TRUE) {
 
     ## Net stock changes of total residential stock ====
     setNames(
-      .computeStockDelta(out[, , "Stock|Residential (mn m2)"]),
-      "Stock Delta|Residential (mn m2)"
+      .computeStockDelta(out[, , "Stock|Residential (mn m2)"], p_dt),
+      "Net stock change|Residential (mn m2/yr)"
     ),
 
     ## Net stock changes by hs ====
@@ -113,8 +127,8 @@ reportBuildingStock <- function(gdx, brickSets = NULL, silent = TRUE) {
       hsName <- brickSets[["hs"]][["elements"]][[hs]]
       varName <- paste0("Stock|Residential|", hsName, " (mn m2)")
       setNames(
-        .computeStockDelta(out[, , varName]),
-        paste0("Stock Delta|Residential|", hsName, " (mn m2)")
+        .computeStockDelta(out[, , varName], p_dt),
+        paste0("Net stock change|Residential|", hsName, " (mn m2/yr)")
       )
     }))
   )
