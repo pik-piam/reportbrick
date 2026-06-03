@@ -1,6 +1,6 @@
 # Reporting package for BRICK
 
-R package **reportbrick**, version **0.16.0**
+R package **reportbrick**, version **0.17.0**
 
    [![R build status](https://github.com/pik-piam/reportbrick/workflows/check/badge.svg)](https://github.com/pik-piam/reportbrick/actions) [![codecov](https://codecov.io/gh/pik-piam/reportbrick/branch/master/graph/badge.svg)](https://app.codecov.io/gh/pik-piam/reportbrick) [![r-universe](https://pik-piam.r-universe.dev/badges/reportbrick)](https://pik-piam.r-universe.dev/builds)
 
@@ -20,13 +20,13 @@ The additional repository can be made available permanently by adding the line a
 
 After that the most recent version of the package can be installed using `install.packages`:
 
-```r 
+```r
 install.packages("reportbrick")
 ```
 
 Package updates can be installed using `update.packages` (make sure that the additional repository has been added before running that command):
 
-```r 
+```r
 update.packages()
 ```
 
@@ -38,17 +38,15 @@ In case of questions / problems please contact Robin Hasse <robin.hasse@pik-pots
 
 To cite package **reportbrick** in publications use:
 
-Hasse R, Rosemann R (2026). "reportbrick: Reporting package for BRICK." Version: 0.16.0, <https://github.com/pik-piam/reportbrick>.
+Hasse R, Rosemann R (2026). "reportbrick: Reporting package for BRICK - Version 0.17.0."
 
 A BibTeX entry for LaTeX users is
 
  ```latex
 @Misc{,
-  title = {reportbrick: Reporting package for BRICK},
+  title = {reportbrick: Reporting package for BRICK - Version 0.17.0},
   author = {Robin Hasse and Ricarda Rosemann},
-  date = {2026-05-15},
+  date = {2026-06-03},
   year = {2026},
-  url = {https://github.com/pik-piam/reportbrick},
-  note = {Version: 0.16.0},
 }
 ```

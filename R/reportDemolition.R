@@ -15,10 +15,7 @@ reportDemolition <- function(gdx, brickSets = NULL, silent = TRUE) {
   # READ -----------------------------------------------------------------------
 
   # demolition variable
-  v_demolition <- readGdxSymbol(gdx, "v_demolition")
-
-  # unit conversion: million m2/yr -> billion m2/yr
-  v_demolition <- (v_demolition / 1000) %>%
+  v_demolition <- readGdxSymbol(gdx, "v_demolition") %>%
     mselect(qty = "area") %>%
     collapseDim(dim = "qty")
 
@@ -31,22 +28,22 @@ reportDemolition <- function(gdx, brickSets = NULL, silent = TRUE) {
 
     ## Total ====
     reportAgg(v_demolition,
-              "Demolition|Buildings (bn m2/yr)", brickSets,
+              "Demolition|Buildings (mn m2/yr)", brickSets,
               agg = c(bs = "all", hs = "all", vin = "all", loc = "all", typ = "resCom", inc = "all"),
               silent = silent),
     reportAgg(v_demolition,
-              "Demolition|Residential (bn m2/yr)", brickSets,
+              "Demolition|Residential (mn m2/yr)", brickSets,
               agg = c(bs = "all", hs = "all", vin = "all", loc = "all", typ = "res", inc = "all"),
               silent = silent),
     reportAgg(v_demolition,
-              "Demolition|Commercial (bn m2/yr)", brickSets,
+              "Demolition|Commercial (mn m2/yr)", brickSets,
               agg = c(bs = "all", hs = "all", vin = "all", loc = "all", typ = "com", inc = "all"),
               silent = silent),
 
 
     ## by building type ====
     reportAgg(v_demolition,
-              "Demolition|Residential|{typ} (bn m2/yr)", brickSets,
+              "Demolition|Residential|{typ} (mn m2/yr)", brickSets,
               agg = c(bs = "all", hs = "all", vin = "all", loc = "all", inc = "all"),
               rprt = c(typ = "res"),
               silent = silent),
@@ -54,7 +51,7 @@ reportDemolition <- function(gdx, brickSets = NULL, silent = TRUE) {
 
     ## by location ====
     reportAgg(v_demolition,
-              "Demolition|Residential|{loc} (bn m2/yr)", brickSets,
+              "Demolition|Residential|{loc} (mn m2/yr)", brickSets,
               agg = c(bs = "all", hs = "all", vin = "all", typ = "res", inc = "all"),
               rprt = c(loc = "all"),
               silent = silent),
@@ -62,7 +59,7 @@ reportDemolition <- function(gdx, brickSets = NULL, silent = TRUE) {
 
     ## by vintage ====
     reportAgg(v_demolition,
-              "Demolition|Residential|{vin} (bn m2/yr)", brickSets,
+              "Demolition|Residential|{vin} (mn m2/yr)", brickSets,
               agg = c(bs = "all", hs = "all", loc = "all", typ = "res", inc = "all"),
               rprt = c(vin = "all"),
               silent = silent),
@@ -70,7 +67,7 @@ reportDemolition <- function(gdx, brickSets = NULL, silent = TRUE) {
 
     ## by heating system ====
     reportAgg(v_demolition,
-              "Demolition|Residential|{hs} (bn m2/yr)", brickSets,
+              "Demolition|Residential|{hs} (mn m2/yr)", brickSets,
               agg = c(bs = "all", vin = "all", loc = "all", typ = "res", inc = "all"),
               rprt = c(hs = "all"),
               silent = silent),
@@ -78,7 +75,7 @@ reportDemolition <- function(gdx, brickSets = NULL, silent = TRUE) {
 
     ## by building type + heating system ====
     reportAgg(v_demolition,
-              "Demolition|Residential|{typ}|{hs} (bn m2/yr)", brickSets,
+              "Demolition|Residential|{typ}|{hs} (mn m2/yr)", brickSets,
               agg = c(bs = "all", vin = "all", loc = "all", inc = "all"),
               rprt = c(hs = "all", typ = "res"),
               silent = silent)
