@@ -183,12 +183,6 @@ showAnalysisPlot("bar", data, "conLccMixed",
                  facets = NULL, xlabName = "Heating System", ylabName = "Costs in USD/m2", tmpl = tmpl)
 ```
 
-```{r Plot LCC of construction with mixed lifetimes, scaled}
-showAnalysisPlot("bar", data, "conLccMixedScaled",
-                 xname = "hs", yname = "value", color = "costType", rprt = c("ttotIn", "typ", "loc"),
-                 facets = NULL, xlabName = "Heating System", ylabName = "Costs in USD/m2", tmpl = tmpl)
-```
-
 ## LCC of renovation with mixed lifetimes
 
 ### Averaged across vintages

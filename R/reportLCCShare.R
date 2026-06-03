@@ -218,37 +218,6 @@ reportLCCShare <- function(path, gdxName = "output.gdx", filterFullRen = list(vi
   out[["wbRemain"]] <- computeRemainingShare(p_shareRenHSfull, asDensity = FALSE, valueName = "value") %>%
     filter(.data$ttotIn != t0)
 
-  # Remaining shares from lifetimes
-  out[["stockInitLtAnteRemain"]] <- stockInitLtAnte %>%
-    computeRemainingShare() %>%
-    rescaleRemainingShare(out[["stockWbRemain"]], t0)
-
-  out[["conLtAnteRemain"]] <- computeRemainingShare(conLtAnte)
-  out[["renLtAnteRemain"]] <- computeRemainingShare(renLtAnte)
-
-
-  ## Ex-Post ====
-
-  # Lifetimes assuming that the oldest heating systems leave the stock first
-  ltPost <- computeLtPost(
-    inflow,
-    outflow,
-    list(stock = v_stockInit, construction = conVin, renovation = v_renovationIn),
-    conShare,
-    p_ttotVin,
-    ttotNum,
-    dims = c("qty", "bs", "hs", "vin", subs)
-  )
-
-  # Remaining shares
-  ltPostRemain <- stats::setNames(lapply(ltPost, computeRemainingShare), paste0(names(ltPost), "Remain"))
-  ltPostRemain[["stockInitLtPostRemain"]] <- rescaleRemainingShare(
-    ltPostRemain[["stockInitLtPostRemain"]],
-    out[["stockWbRemain"]],
-    t0
-  )
-
-  out <- c(out, ltPost, ltPostRemain)
 
 
   ## Mixed: Matching ex-ante lifetimes to brick outflow ====
@@ -279,11 +248,6 @@ reportLCCShare <- function(path, gdxName = "output.gdx", filterFullRen = list(vi
   out[["renLtMixedVin"]] <- renLtMixedVin
 
 
-  ## Save outflows ====
-
-  out[["outflow"]] <- outflow
-
-
   ## Verification of the lifetime inequality ====
 
   ltIneq <- verifyLtHs(inflow, v_stockInit, outflow, p_shareRenHSinit, p_shareRenHS)
@@ -312,41 +276,6 @@ reportLCCShare <- function(path, gdxName = "output.gdx", filterFullRen = list(vi
     replace_na(list(intangible = 0))
 
 
-  ## Ex-ante LCC and LCOH ====
-
-  # Lifecycle costs and levelized costs of heat based on ex-ante lifetimes
-
-  ### construction ####
-
-  out[["conLccAnte"]] <- computeLCC(out[["conLtAnte"]], p_specCostOpe, costCon, p_dt, p_discountFac)
-  out[["conLcohAnte"]] <- computeLCOH(out[["conLccAnte"]], out[["conLtAnte"]], p_ueDemand, p_dt, p_discountFac)
-
-  # As a test: Scale LCC by lifetime to align with average lifetime
-  # TODO: Can be removed #nolint: todo_comment_linter.
-  out[["conLccAnteScaled"]] <- normalizeLCC(out[["conLccAnte"]], out[["conLtAnte"]], p_dt, "construction")
-
-  ### renovation ####
-
-  renLccAnteFull <- computeLCC(out[["renLtAnte"]], p_specCostOpe, costRen, p_dt, p_discountFac)
-
-  out[["renLccAnte"]] <- mutate(
-    .avgAlongDim(renLccAnteFull, v_renovation, "vin", c("qty", "bs", "hs", "hsr", "vin", subs, ttotIn = "ttot")),
-    bs = "low"
-  )
-
-  # If desired, filter the full resolution renovation data
-  out[["renLccAnteFull"]] <- .filterAsUnion(renLccAnteFull, filterFullRen)
-
-  out[["renLcohAnteFull"]] <- computeLCOH(renLccAnteFull, out[["renLtAnte"]], p_ueDemand, p_dt, p_discountFac) %>%
-    .filterAsUnion(filterFullRen)
-  out[["renLcohAnte"]] <- .avgAlongDim(out[["renLcohAnteFull"]], v_renovation, "vin", c("qty", "bs", "hs", "hsr", "vin", subs, ttotIn = "ttot"))
-
-  # As a test: Scale LCC by lifetime to align with average lifetime
-  # TODO: Can be removed #nolint: todo_comment_linter.
-  out[["renLccAnteScaledFull"]] <- normalizeLCC(renLccAnteFull, out[["renLtAnte"]], p_dt, "renovation") %>%
-    .filterAsUnion(filterFullRen)
-
-
   ## Mixed LCC and LCOH ====
 
   # Lifecycle costs and levelized costs of heat based on mixed lifetimes
@@ -355,10 +284,6 @@ reportLCCShare <- function(path, gdxName = "output.gdx", filterFullRen = list(vi
 
   out[["conLccMixed"]] <- computeLCC(out[["conLtMixed"]], p_specCostOpe, costCon, p_dt, p_discountFac)
   out[["conLcohMixed"]] <- computeLCOH(out[["conLccMixed"]], out[["conLtMixed"]], p_ueDemand, p_dt, p_discountFac)
-
-  # As a test: Scale LCC by lifetime to align with average lifetime
-  # TODO: Can be removed #nolint: todo_comment_linter.
-  out[["conLccMixedScaled"]] <- normalizeLCC(out[["conLccMixed"]], out[["conLtMixed"]], p_dt, "construction")
 
   ### renovation ####
 
@@ -393,37 +318,9 @@ reportLCCShare <- function(path, gdxName = "output.gdx", filterFullRen = list(vi
     c("qty", "bs", "hs", "hsr", "vin", subs, ttotIn = "ttot")
   )
 
-  # Compute real LCC costs components, i.e. without intangible costs and status quo preference. Omit hs = "reel"
-  # and omit identical replacements to suppress the respective cost reduction
-  out[["renLccMixedReal"]] <- renLccMixedFull %>%
-    mutate(across(c("hs", "hsr"), as.character)) %>%
-    filter(.data$costType %in% c("tangible", "lccOpe"), .data$hs != "reel", .data$hs != .data$hsr) %>%
-    group_by(across(-all_of(c("costType", "value")))) %>%
-    summarise(value = sum(.data$value), .groups = "drop") %>%
-    group_by(across(-all_of(c("hs", "value")))) %>%
-    summarise(value = ifelse(all(.data$value == .data$value[[1]]), .data$value[[1]], NA))
-
-  # As a test: Scale LCC by lifetime to align with average lifetime
-  # TODO: Can be removed #nolint: todo_comment_linter.
-  out[["renLccMixedScaledFull"]] <- normalizeLCC(renLccMixedFull, out[["renLtMixed"]], p_dt, "renovation") %>%
-    .filterAsUnion(filterFullRen)
-
 
 
   # COMPUTE LOGIT HEATING SYSTEM SHARES ----------------------------------------
-
-
-  ## Ex-ante lifetimes ====
-
-  renLogitAnteFull <- computeLogitShare("renovation", renLccAnteFull, priceSensHs[["renovation"]])
-  out[["renLogitAnteFull"]] <- renLogitAnteFull %>%
-    .filterAsUnion(filterFullRen)
-
-  # Aggregate over initial hs
-  out[["renLogitAllAnte"]] <- aggregateShare(renLogitAnteFull, dimAgg = "hs", weight = v_renovationOut)
-  # Aggregate and filter for energy ladder level 1
-  out[["renLogitEl1Ante"]] <- aggregateShare(renLogitAnteFull, dimAgg = "hs", weight = v_renovationOut,
-                                             energyLadder = energyLadder, energyLadderNo = 1)
 
 
   ## Mixed lifetimes ====
@@ -443,9 +340,6 @@ reportLCCShare <- function(path, gdxName = "output.gdx", filterFullRen = list(vi
 
 
   # COMPUTE BRICK HEATING SYSTEM SHARES ----------------------------------------
-
-  # Shares of initial systems when renovating
-  out[["renBrickIn"]] <- computeBrickShare("renovationIn", v_renovationIn)
 
   renBrickFull <- computeBrickShare("renovation", rename(v_renovation, ttotIn = "ttot"))
   out[["renBrickFull"]] <- renBrickFull %>%
@@ -486,9 +380,6 @@ reportLCCShare <- function(path, gdxName = "output.gdx", filterFullRen = list(vi
     pivot_longer(cols = setdiff(hsNames, hsRef), names_to = "hsr") %>%
     select(-hsRef)
 
-  # TODO: Can most likely be rme
-  write.csv(renLccDiffHsRefFull, file.path(path, "renLccDiffHsRefFull.csv"), row.names = FALSE)
-
   out[[paste0("renLccDiff", hsRef, "Full")]] <- renLccDiffHsRefFull
 
   # Price sensitivity
@@ -502,28 +393,23 @@ reportLCCShare <- function(path, gdxName = "output.gdx", filterFullRen = list(vi
 
   # NORMALIZE PRICE SENSITIVITY ------------------------------------------------
 
-  normLambdaCon <- normalizePriceSensitivity(
+  out[["conPriceSensHSnorm"]] <- normalizePriceSensitivity(
     out[["conLccMixed"]], conVin, priceSensHs[["construction"]],
   )
 
-  normLambdaRen <- normalizePriceSensitivity(
+  out[["renPriceSensHSnorm"]] <- normalizePriceSensitivity(
     out[["renLccMixedFull"]], v_renovation, priceSensHs[["renovation"]], timeDimWeight = "ttot",
   )
 
-  normLambdaConSubs <- normalizePriceSensitivity(
+  out[["conPriceSensHSsubsNorm"]] <- normalizePriceSensitivity(
     out[["conLccMixed"]], conVin, priceSensHs[["construction"]],
     groupCols = c("region", "loc", "typ", "inc")
   )
 
-  normLambdaRenSubs <- normalizePriceSensitivity(
+  out[["renPriceSensHSsubsNorm"]] <- normalizePriceSensitivity(
     out[["renLccMixedFull"]], v_renovation, priceSensHs[["renovation"]], timeDimWeight = "ttot",
     groupCols = c("region", "loc", "typ", "inc")
   )
-
-  out[["conPriceSensHSnorm"]] <- normLambdaCon
-  out[["renPriceSensHSnorm"]] <- normLambdaRen
-  out[["conPriceSensHSsubsNorm"]] <- normLambdaConSubs
-  out[["renPriceSensHSsubsNorm"]] <- normLambdaRenSubs
 
 
 
