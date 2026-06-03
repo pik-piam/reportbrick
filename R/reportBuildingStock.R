@@ -22,8 +22,8 @@ reportBuildingStock <- function(gdx, brickSets = NULL, silent = TRUE) {
     getYears(stockBefore) <- head(lead(years), -1)
     stockAfter <- stock[, tail(years, -1), ]
 
-    stockZero <- stock[, years[1], ]
-    stockZero[, , ] <- NA
+    deltaStockZero <- stock[, years[1], ]
+    deltaStockZero[, , ] <- NA
 
     # Expand `dt` to dimensions of `stock`
     dt <- dt %>%
@@ -33,7 +33,7 @@ reportBuildingStock <- function(gdx, brickSets = NULL, silent = TRUE) {
       addDim(dim = 3, dimName = "tmpName", item = getItems(stock, dim = 3))
     getSets(dt)["d3.1"] <- getSets(stock)["d3.1"]
 
-    mbind(stockZero, (stockAfter - stockBefore) / dt)
+    mbind(deltaStockZero, (stockAfter - stockBefore) / dt)
   }
 
 
