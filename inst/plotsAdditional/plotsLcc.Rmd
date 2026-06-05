@@ -190,16 +190,16 @@ showAnalysisPlot("bar", data, "conLccMixed",
 ```{r Plot LCC of renovation with mixed lifetimes}
 showAnalysisPlot("bar", data, c("renLccMixed", "renBrickVin"),
                  xname = "hsr", yname = "value", color = "costType", rprt = c("ttotIn", "typ", "loc"),
-                 facets = "hs", xlabName = "Heating System", ylabName = "Costs in USD/m2", tmpl = tmpl,
-                 valueCap = 1500, capCol = "intangible",
+                 facets = "hs", xlabName = "Final Heating System", ylabName = "Costs in USD/m2", tmpl = tmpl,
+                 valueCap = 1500, capCol = "Investment (intangible)",
                  addPoints = list(variable = "renBrickVin", yname = "value", y2labName = "Brick Share"))
 ```
 
 ```{r Plot LCC of renovation with mixed lifetimes, no facets}
 showAnalysisPlot("bar", data %>% filter(hs == "gabo"), c("renLccMixed", "renBrickVin"),
                  xname = "hsr", yname = "value", color = "costType", rprt = c("ttotIn", "typ", "loc"),
-                 facets = NULL, xlabName = "Heating System", ylabName = "Costs in USD/m2", tmpl = tmpl,
-                 valueCap = 1500, capCol = "intangible",
+                 facets = NULL, xlabName = "Final Heating System", ylabName = "Costs in USD/m2", tmpl = tmpl,
+                 valueCap = 1500, capCol = "Investment (intangible)",
                  addPoints = list(variable = "renBrickVin", yname = "value", y2labName = "Brick Share"))
 ```
 
@@ -208,16 +208,16 @@ showAnalysisPlot("bar", data %>% filter(hs == "gabo"), c("renLccMixed", "renBric
 ```{r Plot LCC of renovation with mixed lifetimes, full}
 showAnalysisPlot("bar", data, c("renLccMixedFull", "renBrickFull"),
                  xname = "hsr", yname = "value", color = "costType", rprt = c("vin", "ttotIn", "typ", "loc"),
-                 facets = "hs", xlabName = "Heating System", ylabName = "Costs in USD/m2", tmpl = tmpl,
-                 valueCap = 1500, capCol = "intangible",
+                 facets = "hs", xlabName = "Final Heating System", ylabName = "Costs in USD/m2", tmpl = tmpl,
+                 valueCap = 1500, capCol = "Investment (intangible)",
                  addPoints = list(variable = "renBrickFull", yname = "value", y2labName = "Brick Share"))
 ```
 
 ```{r Plot LCC of renovation with mixed lifetimes, full, only hs gabo}
 showAnalysisPlot("bar", data %>% filter(.data$hs == "gabo"), c("renLccMixedFull", "renBrickFull"),
                  xname = "hsr", yname = "value", color = "costType", rprt = c("vin", "ttotIn", "typ", "loc"),
-                 facets = NULL, xlabName = "Heating System", ylabName = "Costs in USD/m2", tmpl = tmpl,
-                 valueCap = 1500, capCol = "intangible",
+                 facets = NULL, xlabName = "Final Heating System", ylabName = "Costs in USD/m2", tmpl = tmpl,
+                 valueCap = 1500, capCol = "Investment (intangible)",
                  addPoints = list(variable = "renBrickFull", yname = "value", y2labName = "Brick Share"))
 ```
 
@@ -231,7 +231,7 @@ showAnalysisPlot("bar", data %>% filter(.data$hs == "gabo"), c("renLccMixedFull"
 showAnalysisPlot("pieChart", data, "renLccMixed",
                  xname = "hs", yname = "hsr", valueName = "value", color = "costType",
                  rprt = c("ttotIn", "typ", "loc"),
-                 facets = NULL, xlabName = "Original Heating System", ylabName = "Final heating system", tmpl = tmpl,
+                 facets = NULL, xlabName = "Original Heating System", ylabName = "Final Heating System", tmpl = tmpl,
                  valueCap = 1500)
 ```
 
@@ -241,7 +241,7 @@ showAnalysisPlot("pieChart", data, "renLccMixed",
 showAnalysisPlot("pieChart", data, "renLccMixedFull",
                  xname = "hs", yname = "hsr", valueName = "value", color = "costType",
                  rprt = c("vin", "ttotIn", "typ", "loc"),
-                 facets = NULL, xlabName = "Original Heating System", ylabName = "Final heating system", tmpl = tmpl,
+                 facets = NULL, xlabName = "Original Heating System", ylabName = "Final Heating System", tmpl = tmpl,
                  valueCap = 1500)
 ```
 
@@ -252,7 +252,7 @@ showAnalysisPlot("pieChart", data, "renLccMixedFull",
 ```{r Plot renovation LCC, mixed lt as heat map matrix}
 showAnalysisPlot("heatMap", data, "renLccMixed",
                  xname = "hs", yname = "hsr", valueName = "value", rprt = c("ttotIn", "typ", "loc"),
-                 facets = NULL, xlabName = "Original Heating System", ylabName = "Final heating system", tmpl = tmpl,
+                 facets = NULL, xlabName = "Original Heating System", ylabName = "Final Heating System", tmpl = tmpl,
                  valueCap = 1500)
 ```
 
@@ -261,7 +261,7 @@ showAnalysisPlot("heatMap", data, "renLccMixed",
 ```{r Plot renovation LCC, mixed lt as heat map matrix, full res}
 showAnalysisPlot("heatMap", data, "renLccMixedFull",
                  xname = "hs", yname = "hsr", valueName = "value", rprt = c("vin", "ttotIn", "typ", "loc"),
-                 facets = NULL, xlabName = "Original Heating System", ylabName = "Final heating system", tmpl = tmpl,
+                 facets = NULL, xlabName = "Original Heating System", ylabName = "Final Heating System", tmpl = tmpl,
                  valueCap = 1500)
 ```
 
@@ -272,7 +272,7 @@ showAnalysisPlot("heatMap", data, "renLccMixedFull",
 ```{r Plot LCOH of construction with mixed lifetimes}
 showAnalysisPlot("bar", data, "conLcohMixed",
                  xname = "hs", yname = "value", color = "costType", rprt = c("ttotIn", "typ", "loc"),
-                 facets = NULL, xlabName = "Heating System", ylabName = "Costs in US Cents/kWh", tmpl = tmpl)
+                 facets = NULL, xlabName = "Final Heating System", ylabName = "Costs in US Cents/kWh", tmpl = tmpl)
 ```
 
 ## LCOH of renovation with mixed lifetimes
@@ -282,16 +282,16 @@ showAnalysisPlot("bar", data, "conLcohMixed",
 ```{r Plot LCOH of renovation with mixed lifetimes}
 showAnalysisPlot("bar", data, c("renLcohMixed", "renBrickVin"),
                  xname = "hsr", yname = "value", color = "costType", rprt = c("ttotIn", "typ", "loc"),
-                 facets = "hs", xlabName = "Heating System", ylabName = "Costs in US Cents/kWh", tmpl = tmpl,
-                 valueCap = 100, capCol = "intangible",
+                 facets = "hs", xlabName = "Final Heating System", ylabName = "Costs in US Cents/kWh", tmpl = tmpl,
+                 valueCap = 100, capCol = "Investment (intangible)",
                  addPoints = list(variable = "renBrickVin", yname = "value", y2labName = "Brick Share"))
 ```
 
 ```{r Plot LCOH of renovation with mixed lifetimes, no facets}
 showAnalysisPlot("bar", data %>% filter(.data$hs == "gabo"), c("renLcohMixed", "renBrickVin"),
                  xname = "hsr", yname = "value", color = "costType", rprt = c("ttotIn", "typ", "loc"),
-                 facets = NULL, xlabName = "Heating System", ylabName = "Costs in US Cents/kWh", tmpl = tmpl,
-                 valueCap = 100, capCol = "intangible",
+                 facets = NULL, xlabName = "Final Heating System", ylabName = "Costs in US Cents/kWh", tmpl = tmpl,
+                 valueCap = 100, capCol = "Investment (intangible)",
                  addPoints = list(variable = "renBrickVin", yname = "value", y2labName = "Brick Share"))
 ```
 
@@ -301,16 +301,16 @@ showAnalysisPlot("bar", data %>% filter(.data$hs == "gabo"), c("renLcohMixed", "
 # Can decrease valueCap to valueCap = 50 and set fixedYlim = valueCap for comparable plots
 showAnalysisPlot("bar", data, c("renLcohMixedFull", "renBrickFull"),
                  xname = "hsr", yname = "value", color = "costType", rprt = c("vin", "ttotIn", "typ", "loc"),
-                 facets = "hs", xlabName = "Heating System", ylabName = "Costs in US Cents/kWh", tmpl = tmpl,
-                 valueCap = 100, capCol = "intangible",
+                 facets = "hs", xlabName = "Final Heating System", ylabName = "Costs in US Cents/kWh", tmpl = tmpl,
+                 valueCap = 100, capCol = "Investment (intangible)",
                  addPoints = list(variable = "renBrickFull", yname = "value", y2labName = "Brick Share"))
 ```
 
 ```{r Plot LCOH of renovation with mixed lifetimes full res, filter gabo}
 showAnalysisPlot("bar", data %>% filter(.data$hs == "gabo"), c("renLcohMixedFull", "renBrickFull"),
                  xname = "hsr", yname = "value", color = "costType", rprt = c("vin", "ttotIn", "typ", "loc"),
-                 facets = NULL, xlabName = "Heating System", ylabName = "Costs in US Cents/kWh", tmpl = tmpl,
-                 valueCap = 100, capCol = "intangible",
+                 facets = NULL, xlabName = "Final Heating System", ylabName = "Costs in US Cents/kWh", tmpl = tmpl,
+                 valueCap = 100, capCol = "Investment (intangible)",
                  addPoints = list(variable = "renBrickFull", yname = "value", y2labName = "Brick Share"))
 ```
 
@@ -324,7 +324,7 @@ showAnalysisPlot("bar", data %>% filter(.data$hs == "gabo"), c("renLcohMixedFull
 showAnalysisPlot("pieChart", data, "renLcohMixed",
                  xname = "hs", yname = "hsr", color = "costType", valueName = "value",
                  rprt = c("ttotIn", "typ", "loc"),
-                 facets = NULL, xlabName = "Original Heating System", ylabName = "Final heating system", tmpl = tmpl,
+                 facets = NULL, xlabName = "Original Heating System", ylabName = "Final Heating System", tmpl = tmpl,
                  valueCap = 100)
 ```
 
@@ -334,7 +334,7 @@ showAnalysisPlot("pieChart", data, "renLcohMixed",
 showAnalysisPlot("pieChart", data, "renLcohMixedFull",
                  xname = "hs", yname = "hsr", color = "costType", valueName = "value",
                  rprt = c("vin", "ttotIn", "typ", "loc"),
-                 facets = NULL, xlabName = "Original Heating System", ylabName = "Final heating system", tmpl = tmpl,
+                 facets = NULL, xlabName = "Original Heating System", ylabName = "Final Heating System", tmpl = tmpl,
                  valueCap = 100)
 ```
 
@@ -346,7 +346,7 @@ showAnalysisPlot("pieChart", data, "renLcohMixedFull",
 showAnalysisPlot("heatMap", data, "renLcohMixed",
                  xname = "hs", yname = "hsr", valueName = "value",
                  rprt = c("ttotIn", "typ", "loc"),
-                 facets = NULL, xlabName = "Original Heating System", ylabName = "Final heating system", tmpl = tmpl,
+                 facets = NULL, xlabName = "Original Heating System", ylabName = "Final Heating System", tmpl = tmpl,
                  valueCap = 100)
 ```
 
@@ -356,7 +356,7 @@ showAnalysisPlot("heatMap", data, "renLcohMixed",
 showAnalysisPlot("heatMap", data, "renLcohMixedFull",
                  xname = "hs", yname = "hsr", valueName = "value",
                  rprt = c("vin", "ttotIn", "typ", "loc"),
-                 facets = NULL, xlabName = "Original Heating System", ylabName = "Final heating system", tmpl = tmpl,
+                 facets = NULL, xlabName = "Original Heating System", ylabName = "Final Heating System", tmpl = tmpl,
                  valueCap = 100)
 ```
 

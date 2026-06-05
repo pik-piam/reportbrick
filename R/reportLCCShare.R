@@ -33,6 +33,8 @@ reportLCCShare <- function(path, gdxName = "output.gdx", filterFullRen = list(vi
     stop("This analysis currently only supports runs with ignoreShell set to TRUE.")
   }
 
+  fixedBuildings <- config[["switches"]][["FIXEDBUILDINGS"]]
+
   pathHs <- getSystemFile("extdata", "sectoral", "dim_hs.csv",
                           package = "brick", mustWork = TRUE)
 
@@ -70,7 +72,6 @@ reportLCCShare <- function(path, gdxName = "output.gdx", filterFullRen = list(vi
   v_renovation <- .cleanReadGdx(gdx, "v_renovationHS", vinExists, renAllowed)
   v_demolition <- .cleanReadGdx(gdx, "v_demolition", vinExists)
 
-  dims <- setdiff(colnames(v_stock), c("ttot", "value"))
   subs <- c("region", "loc", "typ", "inc")
 
 
@@ -207,7 +208,7 @@ reportLCCShare <- function(path, gdxName = "output.gdx", filterFullRen = list(vi
   renLtAnte <- computeLtAnte(v_renovationIn, p_shareRenHS, t0)
 
   out[["stockInitLtAnte"]] <- stockInitLtAnte
-  out[["conLtAnte"]] <- conLtAnte
+  if (isFALSE(fixedBuildings)) out[["conLtAnte"]] <- conLtAnte
 
   out[["renLtAnteVin"]] <- aggregateShare(renLtAnte, "vin", "ttotOut", weight = v_renovationIn, ttotWeight = "ttotIn")
 
@@ -242,6 +243,11 @@ reportLCCShare <- function(path, gdxName = "output.gdx", filterFullRen = list(vi
   )
 
   out <- c(out, ltMixed, ltMixedRemain)
+
+  if (isTRUE(fixedBuildings)) {
+    out[["conLtMixed"]] <- NULL
+    out[["conLtMixedRemain"]] <- NULL
+  }
 
   out$renLtMixed <- .filterAsUnion(ltMixed$renLtMixed, filterFullRen)
   out[["renLtMixedRemain"]] <- .filterAsUnion(ltMixedRemain[["renLtMixedRemain"]], filterFullRen)
@@ -282,12 +288,16 @@ reportLCCShare <- function(path, gdxName = "output.gdx", filterFullRen = list(vi
 
   ### construction ####
 
-  out[["conLccMixed"]] <- computeLCC(out[["conLtMixed"]], p_specCostOpe, costCon, p_dt, p_discountFac)
-  out[["conLcohMixed"]] <- computeLCOH(out[["conLccMixed"]], out[["conLtMixed"]], p_ueDemand, p_dt, p_discountFac)
+  if (isFALSE(fixedBuildings)) {
+    out[["conLccMixed"]] <- computeLCC(out[["conLtMixed"]], p_specCostOpe, costCon, p_dt, p_discountFac) %>%
+      .renameCostType()
+    out[["conLcohMixed"]] <- computeLCOH(out[["conLccMixed"]], out[["conLtMixed"]], p_ueDemand, p_dt, p_discountFac)
+  }
 
   ### renovation ####
 
-  renLccMixedFull <- computeLCC(ltMixed[["renLtMixed"]], p_specCostOpe, costRen, p_dt, p_discountFac)
+  renLccMixedFull <- computeLCC(ltMixed[["renLtMixed"]], p_specCostOpe, costRen, p_dt, p_discountFac) %>%
+    .renameCostType()
 
   out[["renLccMixed"]] <- mutate(
     .avgAlongDim(renLccMixedFull, v_renovation, "vin", c("qty", "bs", "hs", "hsr", "vin", subs, ttotIn = "ttot")),
@@ -393,17 +403,18 @@ reportLCCShare <- function(path, gdxName = "output.gdx", filterFullRen = list(vi
 
   # NORMALIZE PRICE SENSITIVITY ------------------------------------------------
 
-  out[["conPriceSensHSnorm"]] <- normalizePriceSensitivity(
-    out[["conLccMixed"]], conVin, priceSensHs[["construction"]],
-  )
+  if (isFALSE(fixedBuildings)) {
+    out[["conPriceSensHSnorm"]] <- normalizePriceSensitivity(
+      out[["conLccMixed"]], conVin, priceSensHs[["construction"]],
+    )
+    out[["conPriceSensHSsubsNorm"]] <- normalizePriceSensitivity(
+      out[["conLccMixed"]], conVin, priceSensHs[["construction"]],
+      groupCols = c("region", "loc", "typ", "inc")
+    )
+  }
 
   out[["renPriceSensHSnorm"]] <- normalizePriceSensitivity(
     out[["renLccMixedFull"]], v_renovation, priceSensHs[["renovation"]], timeDimWeight = "ttot",
-  )
-
-  out[["conPriceSensHSsubsNorm"]] <- normalizePriceSensitivity(
-    out[["conLccMixed"]], conVin, priceSensHs[["construction"]],
-    groupCols = c("region", "loc", "typ", "inc")
   )
 
   out[["renPriceSensHSsubsNorm"]] <- normalizePriceSensitivity(
@@ -510,20 +521,23 @@ reportLCCShare <- function(path, gdxName = "output.gdx", filterFullRen = list(vi
   df
 }
 
-#' Check plausibility of lifetime results
+#' Rename the entries of the cost type column to more legible names
 #'
-#' @param dfLt data frame with lifetime data
-#' @param dims character, dimensions to group by
+#' @param df data frame with cost type column to be modified
 #'
-#' @importFrom dplyr %>% .data across all_of group_by mutate summarise
-#'
-.checkLifetimeResults <- function(dfLt, dims) {
+.renameCostType <- function(df) {
+  if ("costType" %in% colnames(df)) {
+    costNameMap <- c(
+      tangible = "Investment (tangible)",
+      intangible = "Investment (intangible)",
+      lccOpe = "Operational",
+      statusQuoPref = "Status quo preference"
+    )
 
-  dfLt %>%
-    group_by(across(all_of(c(dims, "ttotIn")))) %>%
-    summarise(value = sum(.data[["relVal"]]), .groups = "drop") %>%
-    mutate(error = .data[["value"]] <= 0.95)
+    df <- mutate(df, costType = costNameMap[.data$costType])
+  }
 
+  df
 }
 
 #' Compute data average along given dimensions

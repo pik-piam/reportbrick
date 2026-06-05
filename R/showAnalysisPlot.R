@@ -408,7 +408,7 @@ showAnalysisPlot <- function(plotType, data, varName, yname, color = NULL, #noli
   .createLtHeatMap <- function(plData, varName, xname, yname, valueName = "value", valueCap = Inf) {
 
     plData <- plData %>%
-      filter(.data$costType == "intangible") %>%
+      filter(.data$costType == "Investment (intangible)") %>%
       mutate(
         exceedCap = .data[[valueName]] > valueCap,
         fillValue = ifelse(
@@ -523,7 +523,10 @@ showAnalysisPlot <- function(plotType, data, varName, yname, color = NULL, #noli
     } else if (color == "costType") {
       plData <- mutate(plData, across(
         any_of(color),
-        ~ factor(.x, levels = c("statusQuoPref", "intangible", "tangible", "lccOpe"))
+        ~ factor(.x, levels = c("Investment (tangible)",
+                                "Investment (intangible)",
+                                "Operational",
+                                "Status quo preference"))
       ))
     }
   } else {
