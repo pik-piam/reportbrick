@@ -1,7 +1,7 @@
-#' Compute heating system lifetimes ex-ante
+#' Compute maximum heating system lifetimes
 #'
-#' Determine the lifetime of the heating system according to the respective Weibull distribution.
-#' No early retirement is reflected
+#' Determine the maximum lifetime of the heating system according to the respective Weibull distribution.
+#' No early retirement is reflected.
 #'
 #' @author Ricarda Rosemann
 #'
@@ -14,7 +14,7 @@
 #' @importFrom dplyr %>% across all_of .data filter group_by left_join mutate
 #'   rename select ungroup
 #'
-computeLtAnte <- function(data, shareRen, t0, isFlow = TRUE) {
+computeLtMax <- function(data, shareRen, t0, isFlow = TRUE) {
 
   joinCols <- c("hs", "region", "typ", "ttotIn")
   if (isFALSE(isFlow)) joinCols <- c(joinCols, "vin")
@@ -26,7 +26,7 @@ computeLtAnte <- function(data, shareRen, t0, isFlow = TRUE) {
     rename(relVal = "value")
 
   # Compute absolute floorspace being removed from the stock from relative share
-  ltAnte <- data %>%
+  ltMax <- data %>%
     left_join(shareRen,
               by = joinCols) %>%
     filter(.data$ttotIn <= .data$ttotOut, xor(isTRUE(isFlow), .data$ttotIn %in% t0),
@@ -34,5 +34,5 @@ computeLtAnte <- function(data, shareRen, t0, isFlow = TRUE) {
     mutate(absVal = .data[["value"]] * .data[["relVal"]]) %>%
     select(-"value")
 
-  return(ltAnte)
+  return(ltMax)
 }

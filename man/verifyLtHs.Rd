@@ -4,7 +4,7 @@
 \alias{verifyLtHs}
 \title{Verify the lifetime constraint of heating systems}
 \usage{
-verifyLtHs(inflow, v_stockInit, outflow, p_shareRenHSinit, p_shareRenHS, dims)
+verifyLtHs(inflow, v_stockInit, outflow, p_shareRenHSinit, p_shareRenHS)
 }
 \arguments{
 \item{inflow}{data frame, all inflows}
@@ -16,8 +16,6 @@ verifyLtHs(inflow, v_stockInit, outflow, p_shareRenHSinit, p_shareRenHS, dims)
 \item{p_shareRenHSinit}{data frame with shares to be renovated for the initial stock}
 
 \item{p_shareRenHS}{data frame with shares to be renovated for the inflow}
-
-\item{dims}{character, dimensions of the data without time periods}
 }
 \description{
 Verify the lifetime constraint of heating systems

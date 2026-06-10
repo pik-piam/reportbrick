@@ -4,7 +4,7 @@
 \alias{computeLCOH}
 \title{Compute LCOH from LCC}
 \usage{
-computeLCOH(dfLcc, dfLt, dfUe, dfDt, dfDiscount, dims)
+computeLCOH(dfLcc, dfLt, dfUe, dfDt, dfDiscount)
 }
 \arguments{
 \item{dfLcc}{data frame, lifecycle costs}
@@ -16,8 +16,6 @@ computeLCOH(dfLcc, dfLt, dfUe, dfDt, dfDiscount, dims)
 \item{dfDt}{data frame, lengths of time periods}
 
 \item{dfDiscount}{data frame, discount rates}
-
-\item{dims}{character, dimensions of all data, excluding time dimension}
 }
 \description{
 Compute the levelized costs of heat (LCOH) by scaling the LCC with discounted UE demand

@@ -19,6 +19,7 @@
 #' @param rprt character, columns for which a separate plot should be created for
 #'   each entry
 #' @param avg character, columns over which the average should be computed
+#' @param sumUp character, columns over which the sum should be computed
 #' @param remCols character, columns to be removed before creating the plot
 #' @param xname character, column to be used as x-aesthetic
 #' @param valueName character, column to be used as the value column
@@ -568,7 +569,7 @@ showAnalysisPlot <- function(plotType, data, varName, yname, color = NULL, #noli
   count <- stats::setNames(rep(1, length.out = length(rprt)), rprt)
   complete <- FALSE
 
-  heading <- paste(paste(varName, collapse = " and "), "by", color)
+  heading <- paste(paste(varName, collapse = " and\n"), "by", color)
 
 
 

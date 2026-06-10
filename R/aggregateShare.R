@@ -18,7 +18,9 @@
 #'   select summarise ungroup
 #' @importFrom tidyr replace_na
 #'
-aggregateShare <- function(share, dimAgg, dimShare = "hsr", weight = NULL, ttotWeight = "ttotOut", energyLadder = NULL, energyLadderNo = NULL) {
+aggregateShare <- function(share, dimAgg, dimShare = "hsr",
+                           weight = NULL, ttotWeight = "ttotOut",
+                           energyLadder = NULL, energyLadderNo = NULL) {
 
   # Check if the data also contains absolute values
   absInData <- all(c("absVal", "relVal") %in% colnames(share))

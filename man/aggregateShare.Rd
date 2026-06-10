@@ -6,7 +6,10 @@
 \usage{
 aggregateShare(
   share,
+  dimAgg,
+  dimShare = "hsr",
   weight = NULL,
+  ttotWeight = "ttotOut",
   energyLadder = NULL,
   energyLadderNo = NULL
 )
@@ -14,14 +17,20 @@ aggregateShare(
 \arguments{
 \item{share}{data frame with heating system shares}
 
+\item{dimAgg}{character, dimension to aggregate over}
+
+\item{dimShare}{character, dimension to compute the share over}
+
 \item{weight}{data frame with weights to scale}
+
+\item{ttotWeight}{character, name of the ttot column in the weight}
 
 \item{energyLadder}{data frame containing the map between heating system and energy ladder}
 
 \item{energyLadderNo}{numeric, energy ladder step to filter for}
 }
 \description{
-Aggregate hsr shares by applying a weight (typically the total renovation flow
+Aggregate hsr shares by applying a weight (typically the total renovation outflow
 to reconstruct the renovation flow by hsr), summing over hs and then recalculating
 the share.
 }

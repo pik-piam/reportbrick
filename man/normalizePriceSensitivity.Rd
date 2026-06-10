@@ -4,7 +4,13 @@
 \alias{normalizePriceSensitivity}
 \title{Compute a normalized price sensitivity from life-cycle costs}
 \usage{
-normalizePriceSensitivity(dfLcc, brickRes, lambda, dims, groupCols = NULL)
+normalizePriceSensitivity(
+  dfLcc,
+  brickRes,
+  lambda,
+  timeDimWeight = "ttotIn",
+  groupCols = NULL
+)
 }
 \arguments{
 \item{dfLcc}{data frame containing LCC data}
@@ -13,7 +19,7 @@ normalizePriceSensitivity(dfLcc, brickRes, lambda, dims, groupCols = NULL)
 
 \item{lambda}{numeric, price sensitivity used for the brick run from which the data comes}
 
-\item{dims}{character, dimensions of LCC data and brick results}
+\item{timeDimWeight}{character, time dimension of the weight \code{brickRes}}
 
 \item{groupCols}{character, columns to group by when normalizing}
 }

@@ -3,6 +3,7 @@
 #' @param dfLcc data frame containing LCC data
 #' @param brickRes data frame with brick results corresponding to the LCC data
 #' @param lambda numeric, price sensitivity used for the brick run from which the data comes
+#' @param timeDimWeight character, time dimension of the weight \code{brickRes}
 #' @param groupCols character, columns to group by when normalizing
 #'
 #' @author Ricarda Rosemann

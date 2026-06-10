@@ -13,6 +13,7 @@ showAnalysisPlot(
   facets = c("loc", "typ"),
   rprt = NULL,
   avg = NULL,
+  sumUp = NULL,
   remCols = NULL,
   xname = "ttotOut",
   valueName = yname,
@@ -43,6 +44,8 @@ Can either be one or two columns.}
 each entry}
 
 \item{avg}{character, columns over which the average should be computed}
+
+\item{sumUp}{character, columns over which the sum should be computed}
 
 \item{remCols}{character, columns to be removed before creating the plot}
 
