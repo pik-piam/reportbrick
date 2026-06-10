@@ -9,10 +9,11 @@ output:
 geometry: "a4paper,left=1cm,right=1cm,top=1cm,bottom=1cm,footnotesep=0.0cm,footskip=0.1cm"
 params:
     docTitle: "BRICK calibration report"
-    cal: "BRICK_calibration_report.csv"
-    path: "C:/Users/ricardar/Documents/Results/BRICK/ECEMP-runs/WithConstruction/calibration_2025-10-14_17.22.25/"
+    file: "BRICK_calibration_report.csv"
+    path: ""
     scenNames: NULL
     name: ""
+    region: "all"
     figWidth: 15 
     figHeight: 10
 ---
@@ -39,7 +40,7 @@ knitr::opts_chunk$set(
 ```{r set variables and check existence of first file}
 
 # Assemble all file paths
-filePath <- file.path(params$path, params$cal)
+filePath <- file.path(params$path, params$file)
 
 # Check if at least one file in the given paths exists
 if (!any(file.exists(filePath))) {
@@ -85,6 +86,8 @@ if (length(filePath) == 1) {
   color <- "scenario"
   facets <- "scenario"
 }
+
+if (!identical(params$region, "all")) data <- filter(data, .data$region %in% params$region)
 
 # Determine whether this is sequential or hierarchical calibration
 varAll <- NULL
@@ -182,7 +185,7 @@ namingMap <- c(
 ## Variable Reference Table
 
 ```{r}
-varReference <- read.csv(getSystemFile(file.path("plotsCalibrationReporting", "variableNames.csv"),
+varReference <- read.csv(getSystemFile(file.path("plotsAdditional", "variableNames.csv"),
                                        package = "reportbrick")) %>%
   filter(.data$variable %in% data$variable)
 
