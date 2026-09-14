@@ -1,0 +1,26 @@
+---
+## Building shell ====
+# Only low for state and `0` for renovation
+bsr:
+  elements:
+    low: Low efficiency
+    "0": No change
+  subsets:
+    all: low
+    allr: "0"
+  child:
+    bs:
+      elements: low
+      subsets: all
+
+
+## Renovation ====
+bs.bsr:
+  subsets:
+    identRepl: []
+
+# Only `0` for renovation
+bsr.hsr:
+  subsets:
+    all: [0.biom, 0.dihe, 0.ehp1, 0.reel, 0.h2bo, 0.gabo, 0.libo, 0.sobo]
+...
