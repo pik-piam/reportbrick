@@ -1,0 +1,9 @@
+---
+## Energy enduse ====
+enduse:
+  elements:
+  space_heating: Space heating
+water_heating: Water heating
+subsets:
+  all: [space_heating, water_heating]
+...
