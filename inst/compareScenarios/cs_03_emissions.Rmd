@@ -1,39 +1,29 @@
 # CO2 emissions
-
-## All buildings
-
-## Residential
-
-### Space heating
-
-```{r Emi-CO2-Residential-Space heating-(carrierHeating)}
-tot <- "Emi|CO2|Residential|Space heating"
-vars <- paste(tot, carrierHeating, sep = "|")
-showAreaAndBarPlots(data, vars = vars, tot = tot, orderVars = "user", scales = "fixed")
-walk(vars, showLinePlots, data = data)
-
+```{r emission vars}
+total <- c(all = "Emi|CO2|Buildings",
+           res = "Emi|CO2|Residential",
+           com = "Emi|CO2|Commercial")
 ```
 
-#### by building type
-```{r Emi-CO2-Residential-(type)-Space heating-(carrierHeating)}
-for (typ in type) {
-  tot <- paste0("Emi|CO2|Residential|", typ, "|Space heating")
-  vars <- paste(tot, carrierHeating, sep = "|")
-  showAreaAndBarPlots(data, vars = vars, tot = tot, orderVars = "user", scales = "fixed")
-  walk(vars, showLinePlots, data = data)
+```{r energy loop, results='asis'}
+for (eu in enduse) {
+  
+  heading(eu, 2)
+
+  for (sec in names(total)) {
+    tot <- paste(total[[sec]], eu, sep = "|")
+    
+    if (!tot %in% data$variable) next
+    
+    heading(sec, 3)
+    
+    showAreaBarLinePlots(data = data, tot = tot, items = carrierHeating)
+    
+    showAreaBarLinePlots(data = data, tot = paste(tot, type, sep = "|"), items = carrierHeating,
+                         heading = "by Building type", nHeading = 4)
+    
+    showAreaBarLinePlots(data = data, tot = paste(tot, location, sep = "|"), items = carrierHeating,
+                         heading = "by Location", nHeading = 4)
+  }
 }
 ```
-
-#### by location
-```{r Emi-CO2-Residential-(location)-Space heating-(carrierHeating)}
-for (loc in location) {
-  tot <- paste0("Emi|CO2|Residential|", loc, "|Space heating")
-  vars <- paste(tot, carrierHeating, sep = "|")
-  showAreaAndBarPlots(data, vars = vars, tot = tot, orderVars = "user", scales = "fixed")
-  walk(vars, showLinePlots, data = data)
-}
-```
-
-
-
-## Commercial

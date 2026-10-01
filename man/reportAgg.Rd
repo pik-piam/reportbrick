@@ -16,8 +16,9 @@ reportAgg(
 \arguments{
 \item{x}{MagPIE object, BRICK object}
 
-\item{name}{character, name of reporting variable. reported dimensions passed
-with \code{rprt} have to be escaped with curly brackets.}
+\item{name}{character, name of reporting variable. Vectors are collapsed
+separating with \code{|}. Reported dimensions passed with \code{rprt} have
+to be escaped with curly brackets.}
 
 \item{brickSets}{named list, BRICK reporting template}
 

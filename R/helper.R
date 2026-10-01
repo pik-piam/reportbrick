@@ -77,3 +77,37 @@
   }
   return(stock)
 }
+
+
+
+
+
+#' Add dimension of not yet existing
+#'
+#' wrapper around \code{magclass::addDim} that does nothing if a dimension of
+#' the given name already exists
+#'
+#' @param x	MAgPIE object which should be extended.
+#' @param dimName	The name of the new dimension
+#' @param dim	The dimension number of the new dimension (e.g. 3.1)
+#' @param item One or more names of items in the new dimension.
+#' @returns The extended MAgPIE object
+#'
+#' @author Robin Hasse
+
+.addDim <- function(x, dimName, item, dim = 3.1) {
+  if (dimName %in% getSets(x)) return(x)
+  addDim(x, dim = dim, dimName = dimName, item = item)
+}
+
+
+
+
+.addEnduseDimension <- function(x, ref = NULL, dim = 3.1) {
+  enduses <- if (is.null(ref) || !"enduse" %in% getSets(ref)) {
+    "space_heating"
+  } else {
+    getItems(ref, "enduse")
+  }
+.addDim(x, dimName = "enduse", item = enduses, dim = dim)
+}

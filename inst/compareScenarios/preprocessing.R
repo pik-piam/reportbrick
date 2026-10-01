@@ -4,17 +4,15 @@
 library(dplyr, include.only = "%>%")
 library(mip, include.only = c("showAreaAndBarPlots", "showLinePlots"))
 library(purrr, include.only = c("walk"))
+library(reportbrick, include.only = c("heading", "showAreaBarLinePlots"))
 # nolint end
+
 
 
 # BRICK sets -------------------------------------------------------------------
 
 # Sets are used in Rmd files to select variables
 
-subsec <- c(
-  "Residential",
-  "Commercial"
-)
 type <- c(
   "SFH",
   "MFH"
@@ -39,6 +37,10 @@ heating <- c(
   "Coal heater"
 )
 heating0 <- c(heating, "No change")
+enduse <- c(
+  "Space heating",
+  "Water heating"
+)
 carrier <- c(
   "Biomass",
   "Heat",
@@ -57,6 +59,14 @@ carrierHeating <- c(
   "Gases",
   "Liquids",
   "Coal"
+)
+identRepl <- c(
+  "Identical replacement",
+  "Effective change"
+)
+enDemand <- c(
+  FE = "Final energy demand",
+  UE = "Useful energy demand"
 )
 
 # automatic identification of vintages to allow for different model resolutions

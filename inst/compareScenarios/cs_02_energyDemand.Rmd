@@ -1,44 +1,31 @@
-# Final energy demand
-
-## All buildings
-
-## Residential
-
-### Space heating
-
-```{r (en)-Residential-Space heating-(carrierHeating)}
-for (en in c("FE", "UE")) {
-  tot <- paste0(en, "|Residential|Space heating")
-  vars <- paste(tot, carrierHeating, sep = "|")
-  showAreaAndBarPlots(data, vars = vars, tot = tot, orderVars = "user", scales = "fixed")
-  walk(vars, showLinePlots, data = data)
-}
-```
-
-#### by building type
-```{r (en)-Residential-(type)-Space heating-(carrierHeating)}
-for (typ in type) {
-  for (en in c("FE", "UE")) {
-    tot <- paste0(en, "|Residential|", typ, "|Space heating")
-    vars <- paste(tot, carrierHeating, sep = "|")
-    showAreaAndBarPlots(data, vars = vars, tot = tot, orderVars = "user", scales = "fixed")
-    walk(vars, showLinePlots, data = data)
+```{r energy loop, results='asis'}
+for (en in names(enDemand)) {
+  
+  heading(enDemand[[en]], 1)
+  
+  for (eu in enduse) {
+    heading(eu, 2)
+    
+    # demand vars
+    total <- c(all = paste0(en, "|Buildings|", eu),
+               res = paste0(en, "|Residential|", eu),
+               com = paste0(en, "|Commercial|", eu))
+    
+    for (sec in names(total)) {
+        tot <- total[[sec]]
+        
+        if (!tot %in% data$variable) next
+        
+        heading(sec, 3)
+        
+        showAreaBarLinePlots(data = data, tot = tot, items = carrierHeating)
+        
+        showAreaBarLinePlots(data = data, tot = paste(tot, type, sep = "|"), items = carrierHeating,
+                             heading = "by Building type", nHeading = 4)
+        
+        showAreaBarLinePlots(data = data, tot = paste(tot, location, sep = "|"), items = carrierHeating,
+                             heading = "by Location", nHeading = 4)
+    }
   }
 }
 ```
-
-#### by location
-```{r (en)-Residential-(location)-Space heating-(carrierHeating)}
-for (loc in location) {
-  for (en in c("FE", "UE")) {
-    tot <- paste0(en, "|Residential|", loc, "|Space heating")
-    vars <- paste(tot, carrierHeating, sep = "|")
-    showAreaAndBarPlots(data, vars = vars, tot = tot, orderVars = "user", scales = "fixed")
-    walk(vars, showLinePlots, data = data)
-  }
-}
-```
-
-
-
-## Commercial
