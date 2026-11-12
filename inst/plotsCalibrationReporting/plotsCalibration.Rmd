@@ -13,7 +13,7 @@ params:
     path: "C:/Users/ricardar/Documents/Results/BRICK/ECEMP-runs/WithConstruction/calibration_2025-10-14_17.22.25/"
     scenNames: NULL
     name: ""
-    figWidth: 15 
+    figWidth: 15
     figHeight: 10
 ---
 
@@ -195,7 +195,6 @@ varReference %>%
     bootstrap_options = c("striped", "condensed"),
     latex_options = c("HOLD_position")
   ) %>%
-  # kableExtra::column_spec(1:2, background = bkgndColors) %>%
   kableExtra::column_spec(1, width = "3.5cm") %>%
   kableExtra::column_spec(2, width = "15cm")
 ```
