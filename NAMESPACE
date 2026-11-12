@@ -82,6 +82,7 @@ importFrom(ggpubr,
 )
 importFrom(madrat,toolGetMapping)
 importFrom(magclass,
+  "getItems<-",
   "getNames<-",
   "getSets<-",
   "getYears<-",

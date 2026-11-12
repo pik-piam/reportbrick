@@ -8,14 +8,25 @@
 #'
 #' @author Robin Hasse
 #'
-#' @importFrom magclass addDim getItems  getSets getYears getYears<- mbind setNames dimSums mselect collapseDim
+#' @importFrom magclass addDim getItems  getSets getYears getYears<- mbind
+#'   setNames dimSums mselect collapseDim getItems<-
+#' @importFrom dplyr %>%
 
 reportBuildingStock <- function(gdx, brickSets = NULL, silent = TRUE) {
 
-  # Compute the stock difference between subsequent time periods
+  # Compute the stock difference between subsequent time periods and bind to data
   # The data dimension of 'stock' needs to be identical for the whole magclass object
-  .computeStockDelta <- function(stock, dt) {
+  .bindStockDelta <- function(data, var, dt) {
 
+    if (!var %in% getItems(data, 3)) return(data)
+
+    # new variable name
+    pattern <- "^([^\\|]+)(.*) \\((.*)\\)$"
+    newVar <- paste0("Net ", tolower(sub(pattern, "\\1", var)), " change",
+                     sub(pattern, "\\2", var),
+                     " (", sub(pattern, "\\3", var), "/yr)")
+
+    stock <- data[, , var]
     years <- getYears(stock)
 
     stockBefore <- stock[, head(years, -1), ]
@@ -33,7 +44,10 @@ reportBuildingStock <- function(gdx, brickSets = NULL, silent = TRUE) {
       addDim(dim = 3, dimName = "tmpName", item = getItems(stock, dim = 3))
     getSets(dt)["d3.1"] <- getSets(stock)["d3.1"]
 
-    mbind(deltaStockZero, (stockAfter - stockBefore) / dt)
+    deltaStock <- mbind(deltaStockZero, (stockAfter - stockBefore) / dt)
+    getItems(deltaStock, 3) <- newVar
+
+    mbind(data, deltaStock)
   }
 
 
@@ -49,89 +63,108 @@ reportBuildingStock <- function(gdx, brickSets = NULL, silent = TRUE) {
   p_dt <- readGdxSymbol(gdx, "p_dt") %>%
     collapseDim()
 
+  # add demand dimension to stock
+  hsCarrier <- readGdxSymbol(gdx, "hsCarrier", stringAsFactor = FALSE)
+  stock <- .addCarrierDimension(v_stock, hsCarrier)
+  stock <- complete_magpie(stock, fill = 0)
 
 
 
   # REPORT ---------------------------------------------------------------------
 
-  out <- mbind(
+  sectors <- c(res = "Residential", com = "Commercial", resCom = "Buildings")
+  out <- NULL
 
-    ## Total ====
-    reportAgg(v_stock,
-              "Stock|Buildings (mn m2)", brickSets,
-              agg = c(bs = "all", hs = "all", vin = "all", loc = "all", typ = "resCom", inc = "all"),
-              silent = silent),
-    reportAgg(v_stock,
-              "Stock|Residential (mn m2)", brickSets,
-              agg = c(bs = "all", hs = "all", vin = "all", loc = "all", typ = "res", inc = "all"),
-              silent = silent),
-    reportAgg(v_stock,
-              "Stock|Commercial (mn m2)", brickSets,
-              agg = c(bs = "all", hs = "all", vin = "all", loc = "all", typ = "com", inc = "all"),
-              silent = silent),
+  for (sec in names(sectors)) {
+    sector <- sectors[[sec]]
+
+    out <- mbind(out,
+
+      ## Total ====
+      reportAgg(v_stock,
+                c("Stock", sector, "(mn m2)"), brickSets,
+                agg = c(bs = "all", hs = "all", vin = "all", loc = "all", typ = sec, inc = "all"),
+                silent = silent),
 
 
-    ## by building type ====
-    reportAgg(v_stock,
-              "Stock|Residential|{typ} (mn m2)", brickSets,
-              agg = c(bs = "all", hs = "all", vin = "all", loc = "all", inc = "all"),
-              rprt = c(typ = "res"),
-              silent = silent),
+      ## by location ====
+      reportAgg(v_stock,
+                c("Stock", sector, "{loc} (mn m2)"), brickSets,
+                agg = c(bs = "all", hs = "all", vin = "all", typ = sec, inc = "all"),
+                rprt = c(loc = "all"),
+                silent = silent),
 
 
-    ## by location ====
-    reportAgg(v_stock,
-              "Stock|Residential|{loc} (mn m2)", brickSets,
-              agg = c(bs = "all", hs = "all", vin = "all", typ = "res", inc = "all"),
-              rprt = c(loc = "all"),
-              silent = silent),
+      ## by vintage ====
+      reportAgg(v_stock,
+                c("Stock", sector, "{vin} (mn m2)"), brickSets,
+                agg = c(bs = "all", hs = "all", loc = "all", typ = sec, inc = "all"),
+                rprt = c(vin = "all"),
+                silent = silent),
 
 
-    ## by vintage ====
-    reportAgg(v_stock,
-              "Stock|Residential|{vin} (mn m2)", brickSets,
-              agg = c(bs = "all", hs = "all", loc = "all", typ = "res", inc = "all"),
-              rprt = c(vin = "all"),
-              silent = silent),
+      ## by heating system ====
+      reportAgg(v_stock,
+                c("Stock", sector, "{hs} (mn m2)"), brickSets,
+                agg = c(bs = "all", vin = "all", loc = "all", typ = sec, inc = "all"),
+                rprt = c(hs = "all"),
+                silent = silent),
 
 
-    ## by heating system ====
-    reportAgg(v_stock,
-              "Stock|Residential|{hs} (mn m2)", brickSets,
-              agg = c(bs = "all", vin = "all", loc = "all", typ = "res", inc = "all"),
-              rprt = c(hs = "all"),
-              silent = silent),
+
+      ## by carrier (+ heating technology) ====
+      reportAgg(stock,
+                c("Stock", sector, "{carrier} (mn m2)"), brickSets,
+                agg = c(bs = "all", hs = "all", vin = "all", loc = "all", typ = sec, inc = "all"),
+                rprt = c(carrier = "all"),
+                silent = silent),
+
+      reportAgg(stock,
+                c("Stock", sector, "{carrier.hs} (mn m2)"), brickSets,
+                agg = c(bs = "all", vin = "all", loc = "all", typ = sec, inc = "all"),
+                rprt = c(carrier.hs = "multiHsCarriers"),
+                silent = silent)
+    )
 
 
-    ## by building type + heating system ====
-    reportAgg(v_stock,
-              "Stock|Residential|{typ}|{hs} (mn m2)", brickSets,
-              agg = c(bs = "all", vin = "all", loc = "all", inc = "all"),
-              rprt = c(hs = "all", typ = "res"),
-              silent = silent)
+    if (sec == "res") {
+      out <- mbind(out,
 
-  )
+        ## by building type ====
+        reportAgg(v_stock,
+                  c("Stock", sector, "{typ} (mn m2)"), brickSets,
+                  agg = c(bs = "all", hs = "all", vin = "all", loc = "all", inc = "all"),
+                  rprt = c(typ = sec),
+                  silent = silent),
 
-  out <- mbind(
 
-    out,
+        ## by building type + carrier (+ heating technology) ====
+        reportAgg(stock,
+                  c("Stock", sector, "{typ}|{carrier} (mn m2)"), brickSets,
+                  agg = c(bs = "all", hs = "all", vin = "all", loc = "all", inc = "all"),
+                  rprt = c(carrier = "all", typ = sec),
+                  silent = silent),
+
+        reportAgg(stock,
+                  c("Stock", sector, "{typ}|{carrier.hs} (mn m2)"), brickSets,
+                  agg = c(bs = "all", vin = "all", loc = "all", inc = "all"),
+                  rprt = c(carrier.hs = "multiHsCarrier", typ = sec),
+                  silent = silent)
+      )
+    }
+
 
     ## Net stock changes of total residential stock ====
-    setNames(
-      .computeStockDelta(out[, , "Stock|Residential (mn m2)"], p_dt),
-      "Net stock change|Residential (mn m2/yr)"
-    ),
+    out <- .bindStockDelta(out, .collapseName(c("Stock", sector, "(mn m2)")), p_dt)
+
 
     ## Net stock changes by hs ====
-    do.call(mbind, lapply(brickSets[["hs"]][["subsets"]][["all"]], function(hs) {
+    for (hs in brickSets[["hs"]][["subsets"]][["all"]]) {
       hsName <- brickSets[["hs"]][["elements"]][[hs]]
-      varName <- paste0("Stock|Residential|", hsName, " (mn m2)")
-      setNames(
-        .computeStockDelta(out[, , varName], p_dt),
-        paste0("Net stock change|Residential|", hsName, " (mn m2/yr)")
-      )
-    }))
-  )
+      varName <- .collapseName(c("Stock", sector, hsName, "(mn m2)"))
+      out <- .bindStockDelta(out, varName, p_dt)
+    }
+  }
 
   return(out)
 }
