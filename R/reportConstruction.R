@@ -24,55 +24,59 @@ reportConstruction <- function(gdx, brickSets = NULL, silent = TRUE) {
 
   # REPORT ---------------------------------------------------------------------
 
-  out <- mbind(
+  sectors <- c(res = "Residential", com = "Commercial", resCom = "Buildings")
+  out <- NULL
 
-    ## Total ====
-    reportAgg(v_construction,
-              "Construction|Buildings (mn m2/yr)", brickSets,
-              agg = c(bs = "all", hs = "all", loc = "all", typ = "resCom", inc = "all"),
-              silent = silent),
-    reportAgg(v_construction,
-              "Construction|Residential (mn m2/yr)", brickSets,
-              agg = c(bs = "all", hs = "all", loc = "all", typ = "res", inc = "all"),
-              silent = silent),
-    reportAgg(v_construction,
-              "Construction|Commercial (mn m2/yr)", brickSets,
-              agg = c(bs = "all", hs = "all", loc = "all", typ = "com", inc = "all"),
-              silent = silent),
+  for (sec in names(sectors)) {
+    sector <- sectors[[sec]]
+
+    out <- mbind(out,
+
+      ## Total ====
+      reportAgg(v_construction,
+                c("Construction", sector, "(mn m2/yr)"), brickSets,
+                agg = c(bs = "all", hs = "all", loc = "all", typ = sec, inc = "all"),
+                silent = silent),
 
 
-    ## by building type ====
-    reportAgg(v_construction,
-              "Construction|Residential|{typ} (mn m2/yr)", brickSets,
-              agg = c(bs = "all", hs = "all", loc = "all", inc = "all"),
-              rprt = c(typ = "res"),
-              silent = silent),
+      ## by location ====
+      reportAgg(v_construction,
+                c("Construction", sector, "{loc}", "(mn m2/yr)"), brickSets,
+                agg = c(bs = "all", hs = "all", typ = sec, inc = "all"),
+                rprt = c(loc = "all"),
+                silent = silent),
 
 
-    ## by location ====
-    reportAgg(v_construction,
-              "Construction|Residential|{loc} (mn m2/yr)", brickSets,
-              agg = c(bs = "all", hs = "all", typ = "res", inc = "all"),
-              rprt = c(loc = "all"),
-              silent = silent),
+      ## by heating system ====
+      reportAgg(v_construction,
+                c("Construction", sector, "{hs}", "(mn m2/yr)"), brickSets,
+                agg = c(bs = "all", loc = "all", typ = sec, inc = "all"),
+                rprt = c(hs = "all"),
+                silent = silent)
+    )
 
 
-    ## by heating system ====
-    reportAgg(v_construction,
-              "Construction|Residential|{hs} (mn m2/yr)", brickSets,
-              agg = c(bs = "all", loc = "all", typ = "res", inc = "all"),
-              rprt = c(hs = "all"),
-              silent = silent),
+    if (sec == "res") {
+
+      out <- mbind(out,
+
+        ## by building type ====
+        reportAgg(v_construction,
+                  c("Construction", sector, "{typ}", "(mn m2/yr)"), brickSets,
+                  agg = c(bs = "all", hs = "all", loc = "all", inc = "all"),
+                  rprt = c(typ = sec),
+                  silent = silent),
 
 
-    ## by building type + heating system ====
-    reportAgg(v_construction,
-              "Construction|Residential|{typ}|{hs} (mn m2/yr)", brickSets,
-              agg = c(bs = "all", loc = "all", inc = "all"),
-              rprt = c(hs = "all", typ = "res"),
-              silent = silent)
-
-  )
+        ## by building type + heating system ====
+        reportAgg(v_construction,
+                  c("Construction", sector, "{typ}|{hs}", "(mn m2/yr)"), brickSets,
+                  agg = c(bs = "all", loc = "all", inc = "all"),
+                  rprt = c(hs = "all", typ = sec),
+                  silent = silent)
+      )
+    }
+  }
 
   return(out)
 }

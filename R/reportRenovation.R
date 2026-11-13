@@ -16,12 +16,19 @@ reportRenovation <- function(gdx, renovatedObj = c("bs", "hs"),
                              brickSets = NULL, silent = TRUE) {
 
   renovatedObj <- match.arg(renovatedObj)
-
   initialCol <- renovatedObj
-  finalCol <- paste0(initialCol, "r")
-  renSymbol <- paste0("v_renovation", toupper(renovatedObj))
 
-  renName <- if (identical(renovatedObj, "bs")) "Shell" else "Heating"
+  if (renovatedObj == "bs") {
+    finalCol <- "bsr"
+    renSymbol <- "v_renovationBS"
+    renName <- "Shell"
+  } else if (renovatedObj == "hs") {
+    finalCol <- "hsr"
+    renSymbol <- "v_renovationHS"
+    renName <- "Heating"
+  } else {
+    stop('`renovatedObj` has to be either "bs" or "hs".')
+  }
 
 
   # READ -----------------------------------------------------------------------
@@ -66,7 +73,7 @@ reportRenovation <- function(gdx, renovatedObj = c("bs", "hs"),
 
   # Insert "Heating" or "Shell" in variable name and replace placeholders for "bs(r)/hs(r)"
   .constructVariableName <- function(baseName) {
-    sub("{renName}", renName, .replaceRenr(baseName, .replaceInVariableName), fixed = TRUE)
+    .replaceRenr(baseName, .replaceInVariableName)
   }
 
   # Adjust agg and rprt and the variable name and call reportAgg
@@ -82,120 +89,112 @@ reportRenovation <- function(gdx, renovatedObj = c("bs", "hs"),
   }
 
 
+
   # REPORT ---------------------------------------------------------------------
 
-  out <- mbind(
+  sectors <- c(res = "Residential", com = "Commercial", resCom = "Buildings")
 
-    ## Total ====
-    .reportAggRen(v_renovation,
-                  "Renovation|Buildings|{renName} (mn m2/yr)",
-                  agg = c(bs = "all", hs = "all", renr = "all", vin = "all",
-                          loc = "all", typ = "resCom", inc = "all")),
-    .reportAggRen(v_renovation,
-                  "Renovation|Residential|{renName} (mn m2/yr)",
-                  agg = c(bs = "all", hs = "all", renr = "all", vin = "all",
-                          loc = "all", typ = "res", inc = "all")),
-    .reportAggRen(v_renovation,
-                  "Renovation|Commercial|{renName} (mn m2/yr)",
-                  agg = c(bs = "all", hs = "all", renr = "all", vin = "all", loc = "all", typ = "com", inc = "all")),
+  out <- NULL
 
+  for (sec in names(sectors)) {
+    sector <- sectors[[sec]]
 
-    ## by building type ====
-    .reportAggRen(v_renovation,
-                  "Renovation|Residential|{renName}|{typ} (mn m2/yr)",
-                  agg = c(bs = "all", hs = "all", renr = "all", vin = "all", loc = "all", inc = "all"),
-                  rprt = c(typ = "res")),
+    out <- mbind(out,
+
+      ## Total ====
+      .reportAggRen(v_renovation,
+                    c("Renovation", sector, renName, "(mn m2/yr)"),
+                    agg = c(bs = "all", hs = "all", renr = "all", vin = "all",
+                            loc = "all", typ = sec, inc = "all")),
 
 
-    ## by location ====
-    .reportAggRen(v_renovation,
-                  "Renovation|Residential|{renName}|{loc} (mn m2/yr)",
-                  agg = c(bs = "all", hs = "all", renr = "all", vin = "all", typ = "res", inc = "all"),
-                  rprt = c(loc = "all")),
+      ## by location ====
+      .reportAggRen(v_renovation,
+                    c("Renovation", sector, renName, "{loc}", "(mn m2/yr)"),
+                    agg = c(bs = "all", hs = "all", renr = "all", vin = "all", typ = sec, inc = "all"),
+                    rprt = c(loc = "all")),
 
 
-    ## by initial state ====
-    .reportAggRen(v_renovation,
-                  "Renovation|Residential|{renName}|Initial|{ren} (mn m2/yr)",
-                  agg = c(nonRen = "all", renr = "all", vin = "all", loc = "all", typ = "res", inc = "all"),
-                  rprt = c(ren = "all")),
+      ## by initial state ====
+      .reportAggRen(v_renovation,
+                    c("Renovation", sector, renName, "Initial|{ren}", "(mn m2/yr)"),
+                    agg = c(nonRen = "all", renr = "all", vin = "all", loc = "all", typ = sec, inc = "all"),
+                    rprt = c(ren = "all")),
 
 
-    ## by building type + initial state ====
-    .reportAggRen(v_renovation,
-                  "Renovation|Residential|{renName}|{typ}|Initial|{ren} (mn m2/yr)",
-                  agg = c(nonRen = "all", renr = "all", vin = "all", loc = "all", inc = "all"),
-                  rprt = c(ren = "all", typ = "res")),
+      ## by final state ====
+      .reportAggRen(v_renovation,
+                    c("Renovation", sector, renName, "Final|{renr}", "(mn m2/yr)"),
+                    agg = c(bs = "all", hs = "all", vin = "all", loc = "all", typ = sec, inc = "all"),
+                    rprt = c(renr = "allr")),
 
 
-    ## by final state ====
-    .reportAggRen(v_renovation,
-                  "Renovation|Residential|{renName}|Final|{renr} (mn m2/yr)",
-                  agg = c(bs = "all", hs = "all", vin = "all", loc = "all", typ = "res", inc = "all"),
-                  rprt = c(renr = "allr")),
+      ## only identical replacement of the shell/heating system ====
+      .reportAggRen(v_renovation,
+                    c("Renovation", sector, renName, "Identical replacement", "(mn m2/yr)"),
+                    agg = c(nonRen = "all", ren.renr = "identRepl", vin = "all", loc = "all",
+                            typ = sec, inc = "all")),
 
 
-    ## only identical replacement of the shell/heating system ====
-    .reportAggRen(v_renovation,
-                  "Renovation|Residential|{renName}|Identical replacement (mn m2/yr)",
-                  agg = c(nonRen = "all", ren.renr = "identRepl", vin = "all", loc = "all",
-                          typ = "res", inc = "all")),
-
-
-    ## only identical heating replacement by shell/heating system ====
-    .reportAggRen(v_renovation,
-                  "Renovation|Residential|{renName}|Identical replacement|{ren.renr} (mn m2/yr)",
-                  agg = c(nonRen = "all", vin = "all", loc = "all", typ = "res", inc = "all"),
-                  rprt = c(ren.renr = "identRepl"))
-
-  )
-
-  renTotal <- .constructVariableName("Renovation|Residential|{renName} (mn m2/yr)")
-  renIdentRepl <- .constructVariableName("Renovation|Residential|{renName}|Identical replacement (mn m2/yr)")
-
-  if (all(c(renTotal, renIdentRepl) %in% getItems(out, dim = 3))) {
-
-    out <- mbind(
-
-      out,
-
-
-      ## only changes of heating systems ====
-      setNames(
-        out[, , renTotal, drop = TRUE] - out[, , renIdentRepl, drop = TRUE],
-        .constructVariableName("Renovation|Residential|{renName}|Effective change (mn m2/yr)")
-      )
+      ## only identical heating replacement by shell/heating system ====
+      .reportAggRen(v_renovation,
+                    c("Renovation", sector, renName, "Identical replacement|{ren.renr}", "(mn m2/yr)"),
+                    agg = c(nonRen = "all", vin = "all", loc = "all", typ = sec, inc = "all"),
+                    rprt = c(ren.renr = "identRepl"))
     )
 
-  }
 
-  out <- mbind(
+    if (sec == "res") {
+      out <- mbind(out,
 
-    out,
+        ## by building type ====
+        .reportAggRen(v_renovation,
+                      c("Renovation", sector, renName, "{typ}", "(mn m2/yr)"),
+                      agg = c(bs = "all", hs = "all", renr = "all", vin = "all", loc = "all", inc = "all"),
+                      rprt = c(typ = sec)),
+
+
+        ## by building type + initial state ====
+        .reportAggRen(v_renovation,
+                      c("Renovation", sector, renName, "{typ}|Initial|{ren}", "(mn m2/yr)"),
+                      agg = c(nonRen = "all", renr = "all", vin = "all", loc = "all", inc = "all"),
+                      rprt = c(ren = "all", typ = sec))
+      )
+    }
+
+
+    ## only changes of heating systems ====
+
+    renTotal     <- .collapseName(c("Renovation", sector, renName,                          "(mn m2/yr)"))
+    renIdentRepl <- .collapseName(c("Renovation", sector, renName, "Identical replacement", "(mn m2/yr)"))
+    renEffChange <- .collapseName(c("Renovation", sector, renName, "Effective change",      "(mn m2/yr)"))
+
+    if (all(c(renTotal, renIdentRepl) %in% getItems(out, dim = 3))) {
+
+      out <- mbind(out,
+        setNames(out[, , renTotal, drop = TRUE] - out[, , renIdentRepl, drop = TRUE],
+                 renEffChange)
+      )
+    }
 
 
     ## only changes of heating systems by heating system ====
-    do.call(mbind, lapply(brickSets[[finalCol]][["subsets"]][["all"]], function(elemName) {
-      elem <- brickSets[[finalCol]][["elements"]][[elemName]]
-      renFinal <- paste0(.constructVariableName("Renovation|Residential|{renName}|Final|"), elem, " (mn m2/yr)")
-      renIdentRepl <- paste0(
-        .constructVariableName("Renovation|Residential|{renName}|Identical replacement|"),
-        elem,
-        " (mn m2/yr)"
-      )
 
-      renChangeFinal <- paste0(
-        .constructVariableName("Renovation|Residential|{renName}|Effective change|Final|"),
-        elem,
-        " (mn m2/yr)"
-      )
+    for (elemName in brickSets[[finalCol]][["subsets"]][["all"]]) {
+      elem <- brickSets[[finalCol]][["elements"]][[elemName]]
+      renFinal       <- .collapseName(c("Renovation", sector, renName, "Final",                  elem, "(mn m2/yr)"))
+      renIdentRepl   <- .collapseName(c("Renovation", sector, renName, "Identical replacement",  elem, "(mn m2/yr)"))
+      renChangeFinal <- .collapseName(c("Renovation", sector, renName, "Effective change|Final", elem, "(mn m2/yr)"))
+
       if (all(c(renFinal, renIdentRepl) %in% getItems(out, dim = 3))) {
-        setNames(out[, , renFinal, drop = TRUE] - out[, , renIdentRepl, drop = TRUE], renChangeFinal)
-      } else {
-        NULL
+        out <- mbind(out,
+          setNames(out[, , renFinal, drop = TRUE] - out[, , renIdentRepl, drop = TRUE],
+                   renChangeFinal)
+        )
       }
-    }))
-  )
+    }
+  }
+
 
   return(out)
 }

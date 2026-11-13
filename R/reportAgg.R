@@ -1,8 +1,9 @@
 #' Report aggregated quantities
 #'
 #' @param x MagPIE object, BRICK object
-#' @param name character, name of reporting variable. reported dimensions passed
-#'   with \code{rprt} have to be escaped with curly brackets.
+#' @param name character, name of reporting variable. Vectors are collapsed
+#'   separating with \code{|}. Reported dimensions passed with \code{rprt} have
+#'   to be escaped with curly brackets.
 #' @param brickSets named list, BRICK reporting template
 #' @param agg named vector of dimensions to aggregate. Names are dimension names
 #'   of \code{x} and values are either set elements or subsets of set elements
@@ -29,6 +30,10 @@ reportAgg <- function(x,
                       agg = NULL,
                       rprt = NULL,
                       silent = TRUE) {
+
+  name <- .collapseName(name)
+
+
 
   # CHECK INPUT ----------------------------------------------------------------
 
@@ -143,6 +148,26 @@ reportAgg <- function(x,
 }
 
 
+
+#' collapse a character vector to variable name
+#'
+#' Elements of the vector are collapsed with \code{|}. If the last element is
+#' unit embraced in brackets, it is separated with a space.
+#'
+#' @param name character vector
+#' @returns collapsed name
+#'
+#' @importFrom utils head tail
+
+.collapseName <- function(name) {
+  if (length(name) == 1) {
+    return(name)
+  }
+  if (grepl("^\\(.*\\)$", tail(name, 1))) {
+    return(paste(paste(head(name, -1), collapse = "|"), tail(name, 1)))
+  }
+  paste(name, collapse = "|")
+}
 
 
 

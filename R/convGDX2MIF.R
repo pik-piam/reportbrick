@@ -36,7 +36,10 @@ convGDX2MIF <- function(gdx,
 
   brickSets <- readBrickSets(tmpl)
   inconsistencies <- .findInconsistenSetElements(brickSets, gdx)
-  if (!is.null(inconsistencies)) {
+  if (identical(inconsistencies,
+                data.frame(set = "enduse", element = NA, inconsistency = "no set"))) {
+    warning("There is no enduse set in the gdx")
+  } else if (!is.null(inconsistencies)) {
     stop("The reporting template is not consistent with the gdx:\n  ",
          paste(capture.output(inconsistencies), collapse = "\n  "))
   }
@@ -91,13 +94,22 @@ convGDX2MIF <- function(gdx,
 
   # AGGREGATED REGIONS ---------------------------------------------------------
 
-  eu27 <- c("DEU", "ECE", "ECS", "ENC", "ESC", "ESW", "EWN", "FRA", "IRL")
-  if (all(eu27 %in% getItems(output, 1))) {
-    output <- output[eu27, , ] %>%
-      dimSums(1) %>%
-      add_dimension(dim = 1, add = "region", nm = "EU27") %>%
-      mbind(output)
+  eu27 <- list(
+    EU27as9 = c("DEU", "ECE", "ECS", "ENC", "ESC", "ESW", "EWN", "FRA", "IRL"),
+    national = c("AUT", "BEL", "BGR", "CYP", "CZE", "DEU", "DNK", "ESP", "EST",
+                 "FIN", "FRA", "GRC", "HRV", "HUN", "IRL", "ITA", "LTU", "LUX",
+                 "LVA", "MLT", "NLD", "POL", "PRT", "ROU", "SVK", "SVN", "SWE")
+  )
+  for (eu27Regs in eu27) {
+    if (all(eu27Regs %in% getItems(output, 1))) {
+      output <- output[eu27Regs, , ] %>%
+        dimSums(1) %>%
+        add_dimension(dim = 1, add = "region", nm = "EU27") %>%
+        mbind(output)
+      break
+    }
   }
+
 
 
 
@@ -132,9 +144,15 @@ convGDX2MIF <- function(gdx,
 
 .findInconsistenSetElements <- function(brickSets, gdx) {
   m <- Container$new(gdx)
-  sets <- unique(.split(names(brickSets)))
-  setsGdx <- setNames(m$getSymbols(sets), sets)
+  nmSets <- unique(.split(names(brickSets)))
+  nmSetsGdx <- m$listSets()
+  nmSetsMissing <- setdiff(nmSets, nmSetsGdx)
+  nmSetsExisiting <- intersect(nmSets, nmSetsGdx)
+  setsGdx <- setNames(m$getSymbols(nmSetsExisiting), nmSetsExisiting)
   do.call(rbind, lapply(names(brickSets), function(s) {
+    if (s %in% nmSetsMissing) {
+      return(data.frame(set = s, element = NA, inconsistency = "no set"))
+    }
     elementsGdx <- .combinations(lapply(.split(s), function(ps) {
       as.character(setsGdx[[ps]]$records[[1]])
     }))

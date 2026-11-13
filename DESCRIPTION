@@ -1,8 +1,8 @@
 Type: Package
 Package: reportbrick
 Title: Reporting package for BRICK
-Version: 0.17.1
-Date: 2026-08-19
+Version: 0.18.0
+Date: 2026-11-12
 Authors@R: c(
     person("Robin", "Hasse", , "robin.hasse@pik-potsdam.de",
            role = c("aut", "cre"),
@@ -23,7 +23,7 @@ Imports:
   kableExtra,
   knitr,
   madrat,
-  magclass,
+  magclass (>= 0.7.3),
   mip (>= 0.155.12),
   piamPlotComparison,
   piamutils (>= 0.0.9),
@@ -37,4 +37,4 @@ Suggests:
   covr,
   testthat
 Encoding: UTF-8
-Config/roxygen2/version: 8.0.0
+Config/roxygen2/version: 8.1.0

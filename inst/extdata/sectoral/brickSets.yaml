@@ -60,6 +60,14 @@ hs.hsr:
                 gabo.gabo, libo.libo, sobo.sobo]
 
 
+## Energy enduse ====
+enduse:
+  elements:
+    space_heating: Space heating
+  subsets:
+    all: [space_heating]
+
+
 ## Energy carrier ====
 carrier:
   elements:
