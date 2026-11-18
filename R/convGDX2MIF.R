@@ -87,6 +87,9 @@ convGDX2MIF <- function(gdx,
   message("running reportEmissions ...")
   output <- mbind(output, extendPeriods(reportEmissions(gdx, brickSets, silent = silent), t))
 
+  ## Rates ====
+  message("running reportRates ...")
+  output <- mbind(output, extendPeriods(reportRates(gdx, brickSets, silent = silent), t))
 
 
   # AGGREGATED REGIONS ---------------------------------------------------------

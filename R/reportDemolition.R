@@ -16,9 +16,7 @@ reportDemolition <- function(gdx, brickSets = NULL, silent = TRUE) {
 
   # demolition variable
   v_demolition <- readGdxSymbol(gdx, "v_demolition") %>%
-    mselect(qty = "area") %>%
-    collapseDim(dim = "qty")
-
+    .prepVar()
 
 
 
@@ -62,6 +60,14 @@ reportDemolition <- function(gdx, brickSets = NULL, silent = TRUE) {
               "Demolition|Residential|{vin} (mn m2/yr)", brickSets,
               agg = c(bs = "all", hs = "all", loc = "all", typ = "res", inc = "all"),
               rprt = c(vin = "all"),
+              silent = silent),
+
+
+    ## by building shell ====
+    reportAgg(v_demolition,
+              "Demolition|Residential|{bs} (bn m2/yr)", brickSets,
+              agg = c(hs = "all", vin = "all", loc = "all", typ = "res", inc = "all"),
+              rprt = c(bs = "all"),
               silent = silent),
 
 

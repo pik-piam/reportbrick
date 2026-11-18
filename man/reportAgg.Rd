@@ -6,7 +6,7 @@
 \usage{
 reportAgg(
   x,
-  name,
+  name = NULL,
   brickSets = readBrickSets(NULL),
   agg = NULL,
   rprt = NULL,

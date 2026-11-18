@@ -42,7 +42,6 @@
 
 
 
-
 #' Escape tag in curly brackets
 #'
 #' @param tag character tag
@@ -76,4 +75,81 @@
                            getNames(stock))
   }
   return(stock)
+
+
+
+
+
+#' Prepare variable
+#'
+#' Convert values by multiplying with given factor and select the area quantity.
+#'
+#' @param x MAgPIE object of brick variable
+#' @param factor numeric, scalar factor that \code{x} is multiplied with
+#' @param onlyArea logical, if TRUE, select 'area' quantity and collapse
+#'   quantity dimension
+#' @returns scales and filtered MAgPIE object
+#'
+#' @author Robin Hasse
+#'
+#' @importFrom magclass getSets mselect collapseDim
+#' @importFrom dplyr %>%
+
+.prepVar <- function(x, factor = 1, onlyArea = TRUE) {
+  stopifnot("factor needs to be a scalar" =
+              is.numeric(factor) && length(factor) == 1)
+  x <- x * factor
+  if (isTRUE(onlyArea) && "qty" %in% getSets(x)) {
+    x <- x %>%
+      mselect(qty = "area") %>%
+      collapseDim(dim = "qty")
+  }
+  return(x)
+}
+
+
+
+
+
+#' Shift data in time
+#'
+#' The nominal periods are maintained.
+#'
+#' @param x MAgPIE object of brick variable
+#' @param by fraction of time step length to shift by
+#' @param unknownEnd character, how to handle the unknown end value
+#'   \itemeize {
+#'    \item \code{"drop"} the returned object has one period less
+#'    \item \code{"na} the returned object has the same periods but NA values at
+#'                     the unknown end
+#'   }
+#' @returns MagPIE object
+#'
+#' @author Robin Hasse
+#'
+#' @importFrom utils head tail
+#' @importFrom magclass getYears getYears<- add_columns
+
+.shiftTime <- function(x, by = 0, unknownEnd = c("drop", "na")) {
+
+  unknownEnd <- match.arg(unknownEnd)
+
+  if (by == 0) return(x)
+  if (abs(by) > 1) stop("Can't shift by more than one time step.")
+
+  t <- sort(getYears(x))
+  tNext <- if (by > 0) tail(t, -1) else head(t, -1)
+  tKnown <- if (by > 0) head(t, -1) else tail(t, -1)
+  tUnknown <- setdiff(t, tKnown)
+
+  xNext <- x[, tNext, ]
+  getYears(xNext) <- tKnown
+
+  xShift <- xNext[, tKnown, ] * abs(by) + x[, tKnown, ] * (1 - abs(by))
+
+  if (unknownEnd == "na") {
+    xShift <- add_columns(xShift, tUnknown, 2)
+  }
+
+  return(xShift)
 }
