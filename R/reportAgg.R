@@ -24,7 +24,7 @@
 #' @importFrom stringr str_escape
 
 reportAgg <- function(x,
-                      name,
+                      name = NULL,
                       brickSets = readBrickSets(NULL),
                       agg = NULL,
                       rprt = NULL,
@@ -246,8 +246,9 @@ reportAgg <- function(x,
     }
     if (grepl("\\.", dim)) {
       existingElements <- unique(sub(
-        pattern = paste(rep("(.*)", magclass::ndim(x, 3)), collapse = "\\."),
-        replacement = paste(paste0("\\", match(.split(dim), tail(getSets(x), -2))), collapse = "\\."),
+        pattern = paste(rep("(.*)", ndim(x, 3)), collapse = "\\."),
+        replacement = paste(paste0("\\", match(.split(dim), tail(getSets(x), -2))),
+                            collapse = "\\."),
         x = getItems(x, dim = 3)
       ))
       return(setdiff(dimLst[[dim]], existingElements))
@@ -286,6 +287,9 @@ reportAgg <- function(x,
 #' @returns vector of tags in name, NULL if there are none
 
 .findTags <- function(name) {
+  if (is.null(name)) {
+    return(NULL)
+  }
   tags <- gregexpr("\\{[a-z\\.]+\\}", name)[[1]]
   tags <- if (all(tags == -1)) {
     NULL

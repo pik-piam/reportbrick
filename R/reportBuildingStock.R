@@ -42,8 +42,7 @@ reportBuildingStock <- function(gdx, brickSets = NULL, silent = TRUE) {
 
   # stock variable
   v_stock <- readGdxSymbol(gdx, "v_stock") %>%
-    mselect(qty = "area") %>%
-    collapseDim(dim = "qty")
+    .prepVar()
 
   # Time step length
   p_dt <- readGdxSymbol(gdx, "p_dt") %>%
@@ -92,6 +91,14 @@ reportBuildingStock <- function(gdx, brickSets = NULL, silent = TRUE) {
               "Stock|Residential|{vin} (mn m2)", brickSets,
               agg = c(bs = "all", hs = "all", loc = "all", typ = "res", inc = "all"),
               rprt = c(vin = "all"),
+              silent = silent),
+
+
+    ## by building shell ====
+    reportAgg(v_stock,
+              "Stock|Residential|{bs} (bn m2)", brickSets,
+              agg = c(hs = "all", vin = "all", loc = "all", typ = "res", inc = "all"),
+              rprt = c(bs = "all"),
               silent = silent),
 
 
